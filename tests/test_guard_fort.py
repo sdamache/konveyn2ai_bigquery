@@ -10,11 +10,12 @@ import sys
 import uuid
 from unittest.mock import patch
 
+# Add src directory to path for imports
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
+
 import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
-
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from guard_fort import GuardFort, init_guard_fort
 

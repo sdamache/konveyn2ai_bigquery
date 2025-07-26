@@ -132,18 +132,18 @@ def test_credentials():
         # Initialize AI Platform
         aiplatform.init(project='konveyn2ai', location='us-central1')
         print("✅ Google Cloud credentials working")
-        
+
         # Test vector index access
         indexes = list(aiplatform.MatchingEngineIndex.list())
         print(f"✅ Found {len(indexes)} vector indexes")
-        
+
         # Check credentials type
         credentials, project = google.auth.default()
         print(f"✅ Auth type: {type(credentials).__name__}")
         print(f"✅ Project: {project}")
-        
+
         return True
-        
+
     except Exception as e:
         print(f"❌ Credential test failed: {e}")
         return False

@@ -35,7 +35,7 @@ This document outlines the regional resource configuration for the KonveyN2AI pr
 - **URL Pattern**: `https://amatya-role-prompter-72021522495.us-central1.run.app`
 
 #### Janapada Memory
-- **Service Name**: `janapada-memory` 
+- **Service Name**: `janapada-memory`
 - **Region**: `us-central1`
 - **Image**: `us-central1-docker.pkg.dev/konveyn2ai/konveyn2ai-repo/janapada-memory:latest`
 - **Service Account**: `konveyn2ai-vertex-ai@konveyn2ai.iam.gserviceaccount.com`

@@ -11,7 +11,7 @@ This document outlines the service accounts created for the KonveyN2AI project a
 - **IAM Roles**:
   - `roles/aiplatform.user` - Vertex AI User role for accessing AI Platform services
 
-### 2. KonveyN2AI Cloud Run Service Account  
+### 2. KonveyN2AI Cloud Run Service Account
 - **Email**: `konveyn2ai-cloud-run@konveyn2ai.iam.gserviceaccount.com`
 - **Display Name**: KonveyN2AI Cloud Run Service Account
 - **Purpose**: Manages Cloud Run deployments and container registry operations
@@ -23,7 +23,7 @@ This document outlines the service accounts created for the KonveyN2AI project a
 - **Email**: `72021522495-compute@developer.gserviceaccount.com`
 - **Display Name**: Default compute service account
 - **Purpose**: Default GCP compute service account
-- **IAM Roles**: 
+- **IAM Roles**:
   - `roles/editor` - Editor role (standard for default compute service account)
 
 ## Security Best Practices
@@ -47,7 +47,7 @@ To verify service account permissions are correctly configured:
 # Test Vertex AI permissions
 gcloud ai operations list --project=konveyn2ai
 
-# Test Cloud Run permissions  
+# Test Cloud Run permissions
 gcloud run services list --project=konveyn2ai --region=us-central1
 
 # Test Artifact Registry permissions
@@ -57,7 +57,7 @@ gcloud artifacts repositories list --project=konveyn2ai --location=us-central1
 ## Next Steps
 
 1. Generate and download service account keys for local development (Task 2.4)
-2. Configure Workload Identity for production environments (Task 2.3) 
+2. Configure Workload Identity for production environments (Task 2.3)
 3. Integrate service accounts into the three-component architecture
 
 ## Project Configuration

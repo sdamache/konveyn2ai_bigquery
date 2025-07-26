@@ -31,10 +31,11 @@ Then test with curl:
 import os
 import sys
 
+# Add src directory to path for imports
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
+
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
-
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from guard_fort import init_guard_fort
 
