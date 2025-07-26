@@ -1,10 +1,12 @@
-import httpx
 import uuid
 from contextlib import asynccontextmanager
 from typing import Any, Dict, Optional, Union
+
+import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from .models import JsonRpcRequest, JsonRpcResponse, JsonRpcError
+from .models import JsonRpcError, JsonRpcRequest, JsonRpcResponse
+
 
 class JsonRpcClient:
     def __init__(self, url: str, timeout: int = 30, max_retries: int = 3):

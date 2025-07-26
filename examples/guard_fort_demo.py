@@ -15,12 +15,14 @@ Then visit:
     - http://localhost:8000/docs (FastAPI auto-generated docs)
 """
 
-import sys
 import os
+import sys
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 import uvicorn
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request
+
 from guard_fort import init_guard_fort
 
 # Create FastAPI application
@@ -111,7 +113,7 @@ def main():
     print("   curl -H 'Authorization: Bearer demo-token' http://localhost:8000/protected")
     print("   curl -X POST -H 'Content-Type: application/json' -d '{\"key\":\"value\"}' http://localhost:8000/data")
     print()
-    
+
     uvicorn.run(
         app,
         host="0.0.0.0",

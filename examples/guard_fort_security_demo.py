@@ -28,12 +28,14 @@ Then test with curl:
     curl -I -H 'Authorization: Bearer demo-token' http://localhost:8001/test
 """
 
-import sys
 import os
+import sys
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 import uvicorn
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+
 from guard_fort import init_guard_fort
 
 # Create FastAPI application
@@ -68,7 +70,7 @@ async def health_check():
         "message": "Enhanced security features enabled!",
         "features": [
             "Bearer token authentication",
-            "API key authentication", 
+            "API key authentication",
             "CORS protection",
             "Security headers (CSP, XSS, etc.)",
             "Request tracing",
@@ -138,7 +140,7 @@ async def headers_demo_endpoint(request: Request):
         "request_id": request.state.request_id,
         "security_headers": [
             "Content-Security-Policy",
-            "X-XSS-Protection", 
+            "X-XSS-Protection",
             "X-Content-Type-Options",
             "X-Frame-Options",
             "Referrer-Policy",
@@ -147,7 +149,7 @@ async def headers_demo_endpoint(request: Request):
         ],
         "guard_fort_headers": [
             "X-Request-ID",
-            "X-Service", 
+            "X-Service",
             "X-GuardFort-Version"
         ]
     }
@@ -171,7 +173,7 @@ def main():
     print()
     print("📋 Available Endpoints:")
     print("   - GET  /           Health check (no auth)")
-    print("   - GET  /public     Public endpoint (no auth)")  
+    print("   - GET  /public     Public endpoint (no auth)")
     print("   - GET  /test       Basic protected endpoint")
     print("   - GET  /bearer-only   Bearer token demo")
     print("   - GET  /apikey-demo   API key demo")
@@ -190,7 +192,7 @@ def main():
     print("   # API Key")
     print("   curl -H 'Authorization: ApiKey demo-api-key' http://localhost:8001/test")
     print()
-    print("   # View Security Headers")  
+    print("   # View Security Headers")
     print("   curl -I -H 'Authorization: Bearer demo-token' http://localhost:8001/headers-demo")
     print()
     print("   # Test Authentication Failure")
@@ -199,7 +201,7 @@ def main():
     print("   # Test CORS Preflight")
     print("   curl -X OPTIONS -H 'Origin: https://konveyn2ai.com' http://localhost:8001/test")
     print()
-    
+
     uvicorn.run(
         app,
         host="0.0.0.0",
