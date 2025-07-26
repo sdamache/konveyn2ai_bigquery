@@ -1,5 +1,11 @@
 google-cloud-aiplatform
 google-generativeai
+google-cloud-run
+google-cloud-artifact-registry
+fastapi
+uvicorn[standard]
+pytest
+httpx
 streamlit
 numpy
 pandas
