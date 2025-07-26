@@ -32,3 +32,4 @@ repos:
         types: [python]
         args: [--recursive, --format, txt]
         files: ^src/.*\.py$
+        exclude: ^src/.*/test_.*\.py$
