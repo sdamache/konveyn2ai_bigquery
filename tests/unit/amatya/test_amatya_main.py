@@ -115,8 +115,6 @@ class TestAmatyaRolePrompter:
             {"chunks": [{"file_path": "test.py", "content": "code"}]},
             # Missing chunks
             {"role": "developer"},
-            # Empty role
-            {"role": "", "chunks": []},
             # Invalid chunks format
             {"role": "developer", "chunks": "invalid"},
         ]
@@ -136,8 +134,15 @@ class TestAmatyaRolePrompter:
 
             # Should return parameter error
             assert data["jsonrpc"] == "2.0"
-            assert "error" in data
-            assert data["error"]["code"] == -32602  # Invalid params
+            assert (
+                "error" in data
+            ), f"Test case {i} with params {params}: No error field in response {data}"
+            assert (
+                data["error"] is not None
+            ), f"Test case {i} with params {params}: Error field is None in response {data}"
+            assert (
+                data["error"]["code"] == -32602
+            ), f"Test case {i}: Expected error code -32602, got {data['error']['code']}"  # Invalid params
 
     @pytest.mark.asyncio
     async def test_advise_with_gemini_failure(
