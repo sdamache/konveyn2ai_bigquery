@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from .models import JsonRpcError, JsonRpcErrorCode, JsonRpcRequest, JsonRpcResponse
+from .agent_manifest import AgentManifestGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -84,11 +85,13 @@ class JsonRpcMethodRegistry:
 class JsonRpcServer:
     """JSON-RPC 2.0 Server implementation."""
 
-    def __init__(self, title: str = "JSON-RPC Server", version: str = "1.0.0"):
+    def __init__(self, title: str = "JSON-RPC Server", version: str = "1.0.0", description: str = ""):
         self.title = title
         self.version = version
+        self.description = description
         self.registry = JsonRpcMethodRegistry()
         self._middleware: list[Callable[..., Any]] = []
+        self._manifest_generator = AgentManifestGenerator(title, version, description)
 
     def method(
         self, name: str, description: str = ""
@@ -97,6 +100,7 @@ class JsonRpcServer:
 
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             self.registry.register(name, func, description)
+            self._manifest_generator.register_method(name, func, description)
             return func
 
         return decorator
@@ -275,19 +279,22 @@ class JsonRpcServer:
         return JSONResponse(content=error_response.model_dump())
 
     def get_manifest(self) -> dict[str, Any]:
-        """Get the agent manifest for /.well-known/agent.json endpoint."""
-        return {
-            "name": self.title,
-            "version": self.version,
-            "protocol": "json-rpc-2.0",
-            "methods": self.registry.get_methods(),
-            "capabilities": [
-                "single-requests",
-                "batch-requests",
-                "notifications",
-                "error-handling",
-            ],
-        }
+        """Get the enhanced agent manifest for /.well-known/agent.json endpoint."""
+        return self._manifest_generator.to_dict()
+
+    def add_capability(self, name: str, version: str, description: str) -> None:
+        """Add a custom capability to the agent manifest."""
+        from .agent_manifest import AgentCapability
+        capability = AgentCapability(name=name, version=version, description=description)
+        self._manifest_generator.add_capability(capability)
+
+    def add_endpoint(self, name: str, url: str) -> None:
+        """Add a service endpoint to the agent manifest."""
+        self._manifest_generator.add_endpoint(name, url)
+
+    def set_metadata(self, key: str, value: Any) -> None:
+        """Set metadata in the agent manifest."""
+        self._manifest_generator.set_metadata(key, value)
 
 
 # Utility functions for common response patterns

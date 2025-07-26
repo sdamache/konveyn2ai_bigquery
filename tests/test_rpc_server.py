@@ -310,8 +310,11 @@ class TestJsonRpcServer:
         assert manifest["version"] == "1.0.0"
         assert manifest["protocol"] == "json-rpc-2.0"
         assert "test_method" in manifest["methods"]
-        assert "single-requests" in manifest["capabilities"]
-        assert "batch-requests" in manifest["capabilities"]
+
+        # Check capabilities in the new enhanced format
+        capability_names = [cap["name"] for cap in manifest["capabilities"]]
+        assert "single-requests" in capability_names
+        assert "batch-requests" in capability_names
 
 
 class TestUtilityFunctions:

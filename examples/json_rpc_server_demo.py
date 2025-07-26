@@ -17,11 +17,20 @@ from common.rpc_server import JsonRpcServer, logging_middleware  # noqa: E402
 # Create FastAPI app
 app = FastAPI(title="JSON-RPC Demo Server")
 
-# Create JSON-RPC server instance
-rpc_server = JsonRpcServer("Demo Calculator", "1.0.0")
+# Create JSON-RPC server instance with enhanced manifest
+rpc_server = JsonRpcServer(
+    title="Demo Calculator",
+    version="1.0.0",
+    description="A demonstration calculator service with JSON-RPC interface"
+)
 
 # Add middleware
 rpc_server.add_middleware(logging_middleware)
+
+# Add custom capabilities and metadata for enhanced manifest
+rpc_server.add_capability("arithmetic", "1.0", "Basic arithmetic operations")
+rpc_server.add_endpoint("health", "/health")
+rpc_server.set_metadata("demo", True)
 
 
 # Register JSON-RPC methods using decorator
