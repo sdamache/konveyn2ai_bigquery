@@ -4,16 +4,17 @@ Unit tests for GuardFort middleware core functionality.
 Tests request ID generation, propagation, timing, and basic middleware behavior.
 """
 
-import pytest
 import json
-import uuid
-from unittest.mock import patch, MagicMock
-from fastapi import FastAPI, Request
-from fastapi.testclient import TestClient
-from fastapi.responses import JSONResponse
-
-import sys
 import os
+import sys
+import uuid
+from unittest.mock import MagicMock, patch
+
+import pytest
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from fastapi.testclient import TestClient
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from guard_fort import GuardFort, init_guard_fort

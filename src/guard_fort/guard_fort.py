@@ -474,7 +474,8 @@ class ServiceIntegration:
             # In a real implementation, you'd use httpx, aiohttp, or similar
             health_status = {
                 "service_name": service_name,
-                "status": "healthy",  # This would come from actual HTTP call
+                "status": "healthy",  # This would come from actual HTTP call to health_url
+                "endpoint": health_url,
                 "response_time_ms": 50,  # This would be measured
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
@@ -505,7 +506,7 @@ class ServiceIntegration:
             raise ExternalServiceException(
                 f"Health check failed for service '{service_name}': {e}",
                 service_name=service_name
-            )
+            ) from e
     
     def get_service_info(self, service_name: str = None) -> Dict[str, Any]:
         """

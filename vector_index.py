@@ -113,7 +113,7 @@ def main():
         print(f"\n🔧 Creating new vector index: {index_name}")
         try:
             new_index = create_vector_index(index_name)
-            print(f"✅ Vector index setup completed successfully!")
+            print(f"✅ Vector index setup completed successfully! Index: {new_index.name}")
         except Exception as e:
             print(f"❌ Failed to create vector index: {str(e)}")
             sys.exit(1)

@@ -5,12 +5,13 @@ Tests validation, serialization/deserialization, and error handling
 for all Pydantic models in the common module.
 """
 
-import pytest
 import json
+import os
+import sys
+
+import pytest
 from pydantic import ValidationError
 
-import sys
-import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from common.models import (
