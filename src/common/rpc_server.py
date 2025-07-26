@@ -85,7 +85,12 @@ class JsonRpcMethodRegistry:
 class JsonRpcServer:
     """JSON-RPC 2.0 Server implementation."""
 
-    def __init__(self, title: str = "JSON-RPC Server", version: str = "1.0.0", description: str = ""):
+    def __init__(
+        self,
+        title: str = "JSON-RPC Server",
+        version: str = "1.0.0",
+        description: str = "",
+    ):
         self.title = title
         self.version = version
         self.description = description
@@ -285,7 +290,10 @@ class JsonRpcServer:
     def add_capability(self, name: str, version: str, description: str) -> None:
         """Add a custom capability to the agent manifest."""
         from .agent_manifest import AgentCapability
-        capability = AgentCapability(name=name, version=version, description=description)
+
+        capability = AgentCapability(
+            name=name, version=version, description=description
+        )
         self._manifest_generator.add_capability(capability)
 
     def add_endpoint(self, name: str, url: str) -> None:

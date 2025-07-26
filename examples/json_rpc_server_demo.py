@@ -21,7 +21,7 @@ app = FastAPI(title="JSON-RPC Demo Server")
 rpc_server = JsonRpcServer(
     title="Demo Calculator",
     version="1.0.0",
-    description="A demonstration calculator service with JSON-RPC interface"
+    description="A demonstration calculator service with JSON-RPC interface",
 )
 
 # Add middleware
