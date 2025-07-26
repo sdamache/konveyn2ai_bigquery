@@ -18,12 +18,17 @@ from pydantic import ValidationError  # noqa: E402
 from common.models import (  # noqa: E402
     AdviceRequest,
     AnswerResponse,
+    Document,
+    DocumentChunk,
     JsonRpcError,
     JsonRpcErrorCode,
     JsonRpcRequest,
     JsonRpcResponse,
     QueryRequest,
+    SearchQuery,
     SearchRequest,
+    SearchResult,
+    SearchType,
     Snippet,
 )
 
@@ -281,3 +286,183 @@ class TestModelSerialization:
 
         with pytest.raises(ValidationError):
             Snippet(file_path="test.py", content="code", extra_field="not allowed")
+
+
+class TestEnhancedVectorSearchModels:
+    """Test enhanced vector search models adapted from konveyor integration."""
+
+    def test_search_type_enum(self):
+        """Test SearchType enumeration."""
+        assert SearchType.VECTOR == "vector"
+        assert SearchType.KEYWORD == "keyword"
+        assert SearchType.HYBRID == "hybrid"
+        assert SearchType.SEMANTIC == "semantic"
+
+    def test_search_query_model(self):
+        """Test SearchQuery model with embedding support."""
+        # Basic text search
+        query = SearchQuery(text="authentication middleware")
+        assert query.text == "authentication middleware"
+        assert query.embedding is None
+        assert query.search_type == SearchType.HYBRID
+        assert query.top_k == 5
+        assert query.filters is None
+
+        # Vector search with embedding
+        embedding = [0.1] * 3072  # 3072-dimensional vector
+        query = SearchQuery(
+            text="test query",
+            embedding=embedding,
+            search_type=SearchType.VECTOR,
+            top_k=10,
+            filters={"file_type": "python"},
+        )
+        assert query.embedding == embedding
+        assert query.search_type == SearchType.VECTOR
+        assert query.top_k == 10
+        assert query.filters == {"file_type": "python"}
+
+        # Test validation
+        with pytest.raises(ValidationError):
+            SearchQuery(text="test", top_k=0)  # Invalid top_k
+
+        with pytest.raises(ValidationError):
+            SearchQuery(text="test", top_k=25)  # Invalid top_k
+
+    def test_search_result_model(self):
+        """Test SearchResult model."""
+        result = SearchResult(
+            id="result-123",
+            content="def authenticate(): pass",
+            score=0.85,
+            metadata={"language": "python", "file_path": "src/auth.py"},
+            chunk_id="chunk-123",
+            document_id="doc-456",
+            chunk_index=0,
+        )
+
+        assert result.id == "result-123"
+        assert result.content == "def authenticate(): pass"
+        assert result.score == 0.85
+        assert result.chunk_id == "chunk-123"
+        assert result.document_id == "doc-456"
+        assert result.chunk_index == 0
+        assert result.metadata == {"language": "python", "file_path": "src/auth.py"}
+
+        # Test score validation
+        with pytest.raises(ValidationError):
+            SearchResult(id="test", content="test", score=-0.1)  # Invalid score
+
+        with pytest.raises(ValidationError):
+            SearchResult(id="test", content="test", score=1.1)  # Invalid score
+
+    def test_document_chunk_model(self):
+        """Test DocumentChunk model."""
+        chunk = DocumentChunk(
+            content="class TestClass: pass",
+            document_id="doc-123",
+            chunk_index=0,
+            metadata={"start_line": 1, "end_line": 1},
+        )
+
+        assert chunk.content == "class TestClass: pass"
+        assert chunk.document_id == "doc-123"
+        assert chunk.chunk_index == 0
+        assert chunk.metadata == {"start_line": 1, "end_line": 1}
+        assert chunk.id is not None  # UUID should be generated
+        assert chunk.embedding is None
+
+        # Test with embedding
+        embedding = [0.2] * 3072
+        chunk_with_embedding = DocumentChunk(
+            content="test content",
+            document_id="doc-456",
+            chunk_index=1,
+            embedding=embedding,
+        )
+        assert chunk_with_embedding.embedding == embedding
+
+        # Test validation
+        with pytest.raises(ValidationError):
+            DocumentChunk(
+                content="test", document_id="doc", chunk_index=-1
+            )  # Invalid index
+
+    def test_document_model(self):
+        """Test Document model."""
+        doc = Document(
+            title="Test Document",
+            file_path="src/test.py",
+            filename="test.py",
+            status="processed",
+            content_type="text/x-python",
+            size_bytes=1024,
+            metadata={"language": "python", "lines": 50},
+        )
+
+        assert doc.title == "Test Document"
+        assert doc.file_path == "src/test.py"
+        assert doc.filename == "test.py"
+        assert doc.status == "processed"
+        assert doc.content_type == "text/x-python"
+        assert doc.size_bytes == 1024
+        assert doc.metadata == {"language": "python", "lines": 50}
+        assert doc.id is not None  # UUID should be generated
+        assert doc.created_at is not None  # Timestamp should be generated
+
+        # Test with minimal fields
+        minimal_doc = Document(title="Minimal", file_path="minimal.py")
+        assert minimal_doc.status == "pending"  # Default status
+        assert minimal_doc.filename is None
+        assert minimal_doc.updated_at is None
+
+        # Test validation
+        with pytest.raises(ValidationError):
+            Document(title="test", file_path="test.py", size_bytes=-1)  # Invalid size
+
+
+class TestEnhancedModelIntegration:
+    """Test integration between enhanced models and existing models."""
+
+    def test_search_query_with_json_rpc(self):
+        """Test SearchQuery integration with JSON-RPC protocol."""
+        search_params = {
+            "text": "authentication middleware",
+            "search_type": "hybrid",
+            "top_k": 5,
+        }
+
+        request = JsonRpcRequest(
+            id="req-search-123", method="search", params=search_params
+        )
+
+        # Verify the request can be created and serialized
+        json_str = request.to_json()
+        assert "authentication middleware" in json_str
+        assert "hybrid" in json_str
+
+    def test_search_result_serialization(self):
+        """Test SearchResult serialization for JSON-RPC responses."""
+        results = [
+            SearchResult(
+                id="result-1",
+                content="def auth(): pass",
+                score=0.9,
+                metadata={"file_path": "auth.py"},
+            ),
+            SearchResult(
+                id="result-2",
+                content="class Middleware: pass",
+                score=0.8,
+                metadata={"file_path": "middleware.py"},
+            ),
+        ]
+
+        response = JsonRpcResponse.create_success(
+            request_id="req-123", result={"results": [r.model_dump() for r in results]}
+        )
+
+        # Verify serialization works
+        json_str = response.to_json()
+        assert "def auth(): pass" in json_str
+        assert "class Middleware: pass" in json_str

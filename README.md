@@ -26,6 +26,83 @@ The project follows a three-tier architecture:
 - Manages workflow orchestration and task execution
 - Handles multi-agent coordination
 
+## 🗃️ Enhanced Data Models
+
+The project includes a comprehensive set of Pydantic data models that enable seamless communication between all three components:
+
+### Core Communication Models
+- **Snippet**: Code snippet representation with file path and content
+- **SearchRequest**: Basic search queries with configurable result limits
+- **AdviceRequest**: Role-based advice generation requests
+- **QueryRequest**: User queries with optional role context
+- **AnswerResponse**: Structured responses with sources and tracing
+
+### Advanced Vector Search Models
+- **SearchQuery**: Enhanced search with embedding support, multiple search types (VECTOR, KEYWORD, HYBRID, SEMANTIC), filters, and score thresholds
+- **SearchResult**: Comprehensive search results with relevance scoring, metadata, and document references
+- **DocumentChunk**: Document processing units with embedding storage and indexing support
+- **Document**: Full document lifecycle management with status tracking and metadata
+- **SearchType**: Enumeration supporting multiple search strategies
+
+### Usage Example
+```python
+from src.common.models import SearchQuery, SearchType, DocumentChunk
+
+# Create an advanced search query
+query = SearchQuery(
+    text="authentication middleware implementation",
+    search_type=SearchType.HYBRID,
+    top_k=10,
+    filters={"language": "python"},
+    min_score=0.7
+)
+
+# Process document chunks
+chunk = DocumentChunk(
+    content="def authenticate_request(token: str) -> bool:",
+    document_id="doc-123",
+    chunk_index=0,
+    metadata={"language": "python", "function": "authenticate_request"}
+)
+```
+
+### Integration Points
+- **JSON-RPC Protocol**: All models integrate seamlessly with the JSON-RPC 2.0 communication layer
+- **FastAPI Compatibility**: Full Pydantic v2 support for automatic API documentation and validation
+- **Three-Tier Architecture**: Models designed specifically for Amatya ↔ Janapada ↔ Svami communication
+- **Vector Search Ready**: Built-in support for 3072-dimensional embeddings and similarity search
+
+## 📊 Project Status
+
+### ✅ Completed Tasks
+- **Task 1**: Project Setup and Configuration - Complete
+- **Task 4**: Agent Manifest Generator - Complete
+- **Task 5**: Enhanced Data Models and Schemas - Complete
+  - ✅ Base data model structure with Pydantic v2
+  - ✅ Request models (SearchRequest, AdviceRequest, QueryRequest)
+  - ✅ Response models (AnswerResponse, SearchResult, DocumentChunk)
+  - ✅ Advanced vector search models with embedding support
+  - ✅ Comprehensive test coverage (28 tests, 100% pass rate)
+  - ✅ JSON-RPC protocol integration
+  - ✅ FastAPI compatibility and documentation
+
+### 🚧 In Progress
+- **Task 2**: Google Cloud Project Configuration
+- **Task 3**: Vector Index Setup
+
+### 📋 Upcoming Tasks
+- **Task 6**: Janapada Memory Service Implementation
+- **Task 7**: Amatya Advisor Service Implementation
+- **Task 8**: Svami Orchestrator Service Implementation
+- **Task 9**: Repository Ingestion Pipeline
+
+### 🎯 Dependencies Ready
+Task 5 completion has unblocked all service implementation tasks (6, 7, 8, 9) by providing:
+- Complete data model foundation
+- Vector search capabilities
+- Service communication protocols
+- Document processing structures
+
 ## 📋 Submission Checklist
 
 - [ ] All code in `src/` runs without errors

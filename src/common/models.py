@@ -9,8 +9,10 @@ This module contains:
 All models use Pydantic for validation and serialization.
 """
 
-from enum import IntEnum
+from enum import IntEnum, Enum
 from typing import Any, Optional
+import uuid
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -187,6 +189,160 @@ class JsonRpcResponse(BaseModel):
 
 
 # Shared data models for service communication
+
+# Enhanced vector search models (adapted from konveyor integration)
+
+
+class SearchType(str, Enum):
+    """Search type enumeration for vector search operations (adapted from konveyor)."""
+
+    VECTOR = "vector"
+    KEYWORD = "keyword"
+    HYBRID = "hybrid"
+    SEMANTIC = "semantic"
+
+
+class SearchQuery(BaseModel):
+    """Enhanced search query with embedding support (adapted from konveyor/core/search/interfaces.py)."""
+
+    text: str = Field(..., description="Search query text")
+    search_type: SearchType = Field(
+        default=SearchType.HYBRID, description="Type of search to perform"
+    )
+    top_k: int = Field(
+        default=5, ge=1, le=20, description="Number of results to return"
+    )
+    filters: Optional[dict[str, Any]] = Field(
+        None, description="Additional search filters"
+    )
+    min_score: Optional[float] = Field(
+        None, description="Minimum relevance score threshold"
+    )
+    embedding: Optional[list[float]] = Field(
+        None, description="Query embedding vector (3072 dimensions)"
+    )
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "text": "authentication middleware implementation",
+                "embedding": None,
+                "search_type": "hybrid",
+                "top_k": 5,
+                "filters": {"file_type": "python"},
+            }
+        },
+    )
+
+
+class SearchResult(BaseModel):
+    """Search result with relevance score (adapted from konveyor/core/search/interfaces.py)."""
+
+    id: str = Field(..., description="Unique result identifier")
+    content: str = Field(..., description="Result content")
+    score: float = Field(
+        ..., ge=0.0, le=1.0, description="Relevance score (0.0 to 1.0)"
+    )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict, description="Result metadata"
+    )
+    document_id: Optional[str] = Field(None, description="Parent document identifier")
+    chunk_id: Optional[str] = Field(None, description="Chunk identifier")
+    chunk_index: Optional[int] = Field(None, description="Chunk position in document")
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "id": "result-abc123",
+                "content": "def authenticate_request(token: str) -> bool:\n    return validate_token(token)",
+                "score": 0.85,
+                "metadata": {
+                    "language": "python",
+                    "lines": "15-20",
+                    "file_path": "src/auth/middleware.py",
+                },
+                "document_id": "doc-456",
+                "chunk_id": "chunk-123",
+                "chunk_index": 0,
+            }
+        },
+    )
+
+
+class DocumentChunk(BaseModel):
+    """Document chunk for processing and indexing (adapted from konveyor/core/search/interfaces.py)."""
+
+    id: str = Field(
+        default_factory=lambda: str(uuid.uuid4()), description="Unique chunk identifier"
+    )
+    content: str = Field(..., description="Chunk content")
+    document_id: str = Field(..., description="Parent document identifier")
+    chunk_index: int = Field(
+        ..., ge=0, description="Chunk position in document (0-based)"
+    )
+    embedding: Optional[list[float]] = Field(
+        None, description="Chunk embedding vector (3072 dimensions)"
+    )
+    metadata: Optional[dict[str, Any]] = Field(None, description="Chunk metadata")
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "id": "chunk-abc123",
+                "content": "class AuthenticationMiddleware:\n    def __init__(self):\n        pass",
+                "document_id": "doc-xyz789",
+                "chunk_index": 0,
+                "embedding": None,
+                "metadata": {"start_line": 1, "end_line": 3, "language": "python"},
+            }
+        },
+    )
+
+
+class Document(BaseModel):
+    """Document metadata model (adapted from konveyor/apps/documents/models.py)."""
+
+    id: str = Field(
+        default_factory=lambda: str(uuid.uuid4()),
+        description="Unique document identifier",
+    )
+    title: str = Field(..., description="Document title")
+    filename: Optional[str] = Field(None, description="Original filename")
+    file_path: str = Field(..., description="Full file path in repository")
+    status: str = Field(default="pending", description="Processing status")
+    content_type: Optional[str] = Field(None, description="MIME type of the document")
+    size_bytes: Optional[int] = Field(None, ge=0, description="File size in bytes")
+    created_at: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        description="Creation timestamp",
+    )
+    updated_at: Optional[str] = Field(None, description="Last update timestamp")
+    metadata: Optional[dict[str, Any]] = Field(
+        None, description="Additional document metadata"
+    )
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "id": "doc-abc123",
+                "title": "Authentication Middleware",
+                "filename": "auth_middleware.py",
+                "file_path": "src/auth/middleware.py",
+                "status": "processed",
+                "content_type": "text/x-python",
+                "size_bytes": 2048,
+                "created_at": "2025-01-26T10:30:00Z",
+                "metadata": {"language": "python", "lines": 85},
+            }
+        },
+    )
+
+
+# Original service communication models
 
 
 class Snippet(BaseModel):
