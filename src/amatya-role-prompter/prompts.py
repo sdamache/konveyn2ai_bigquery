@@ -197,9 +197,144 @@ As an experienced data scientist, provide a comprehensive onboarding guide focus
 6. **Model Deployment**: Cover model serving, monitoring, and A/B testing
 7. **Data Governance**: Explain data quality, privacy, and compliance requirements
 
-Include specific file references and focus on data-specific concerns like model performance, data quality, and reproducibility."""
+Include specific file references and focus on data-specific concerns like model performance, data quality, and reproducibility.""",
+
+            'product_manager': """You are a senior product manager helping onboard a new product manager to this project.
+
+You have access to the following code excerpts and documentation:
+
+{context}
+
+As an experienced product manager, provide a comprehensive onboarding guide focusing on:
+
+1. **Product Overview**: Explain the product vision, user personas, and key features
+2. **Technical Architecture**: Understand the system design and technical constraints
+3. **User Journey**: Map out user flows and interaction patterns
+4. **Feature Prioritization**: Explain how features are planned and prioritized
+5. **Metrics & Analytics**: Cover key performance indicators and measurement strategies
+6. **Stakeholder Management**: Identify key stakeholders and communication patterns
+7. **Release Process**: Understand deployment cycles and feature rollout strategies
+
+Include specific file references and focus on product-specific concerns like user experience, business impact, and technical feasibility.""",
+
+            'qa_engineer': """You are a senior QA engineer helping onboard a new QA engineer to this project.
+
+You have access to the following code excerpts and documentation:
+
+{context}
+
+As an experienced QA engineer, provide a comprehensive onboarding guide focusing on:
+
+1. **Testing Strategy**: Explain the overall testing approach and methodologies
+2. **Test Automation**: Cover automated testing frameworks and CI/CD integration
+3. **Test Coverage**: Identify critical paths and edge cases to test
+4. **Quality Metrics**: Understand quality gates and acceptance criteria
+5. **Bug Tracking**: Explain defect management and reporting processes
+6. **Performance Testing**: Cover load testing and performance benchmarks
+7. **Security Testing**: Identify security testing requirements and tools
+
+Include specific file references and focus on quality-specific concerns like test coverage, reliability, and user experience validation.""",
+
+            'technical_writer': """You are a senior technical writer helping onboard a new technical writer to this project.
+
+You have access to the following code excerpts and documentation:
+
+{context}
+
+As an experienced technical writer, provide a comprehensive onboarding guide focusing on:
+
+1. **Documentation Architecture**: Explain the documentation structure and organization
+2. **Content Strategy**: Understand the target audiences and content types
+3. **API Documentation**: Cover API reference and integration guides
+4. **User Guides**: Identify user-facing documentation needs
+5. **Developer Documentation**: Explain technical documentation for developers
+6. **Content Management**: Understand the documentation workflow and tools
+7. **Style Guidelines**: Cover writing standards and consistency requirements
+
+Include specific file references and focus on documentation-specific concerns like clarity, accuracy, and maintainability."""
         }
     
     def get_available_roles(self) -> List[str]:
         """Get list of available role templates."""
         return list(self.role_templates.keys())
+
+    def get_context_aware_prompt(self, role: str, chunks: List[Snippet]) -> str:
+        """
+        Get a context-aware prompt that adapts based on the code content.
+
+        Args:
+            role: User role
+            chunks: List of code snippets
+
+        Returns:
+            str: Context-aware prompt
+        """
+        # Analyze the code content to determine project characteristics
+        project_context = self._analyze_project_context(chunks)
+
+        # Get base template
+        base_prompt = self.construct_prompt(role, chunks)
+
+        # Add context-specific guidance
+        if project_context['has_api']:
+            base_prompt += "\n\n**API Integration Notes**: This project includes API endpoints. Pay special attention to request/response handling, authentication, and error management."
+
+        if project_context['has_database']:
+            base_prompt += "\n\n**Database Integration Notes**: This project includes database operations. Consider data modeling, migrations, and query optimization."
+
+        if project_context['has_auth']:
+            base_prompt += "\n\n**Security Notes**: This project includes authentication/authorization. Focus on security best practices and access control patterns."
+
+        if project_context['has_tests']:
+            base_prompt += "\n\n**Testing Notes**: This project includes test files. Review the testing strategy and ensure new code follows established patterns."
+
+        return base_prompt
+
+    def _analyze_project_context(self, chunks: List[Snippet]) -> Dict[str, bool]:
+        """
+        Analyze code chunks to understand project characteristics.
+
+        Args:
+            chunks: List of code snippets
+
+        Returns:
+            dict: Project characteristics
+        """
+        context = {
+            'has_api': False,
+            'has_database': False,
+            'has_auth': False,
+            'has_tests': False,
+            'has_frontend': False,
+            'has_docker': False
+        }
+
+        for chunk in chunks:
+            content_lower = chunk.content.lower()
+            file_path_lower = chunk.file_path.lower()
+
+            # Check for API patterns
+            if any(keyword in content_lower for keyword in ['@app.', 'fastapi', 'flask', 'router', 'endpoint']):
+                context['has_api'] = True
+
+            # Check for database patterns
+            if any(keyword in content_lower for keyword in ['database', 'db.', 'session', 'query', 'model', 'sqlalchemy']):
+                context['has_database'] = True
+
+            # Check for authentication patterns
+            if any(keyword in content_lower for keyword in ['auth', 'login', 'token', 'jwt', 'password', 'security']):
+                context['has_auth'] = True
+
+            # Check for test files
+            if any(keyword in file_path_lower for keyword in ['test_', '_test', 'tests/', 'spec_']):
+                context['has_tests'] = True
+
+            # Check for frontend patterns
+            if any(keyword in content_lower for keyword in ['react', 'vue', 'angular', 'component', 'jsx', 'tsx']):
+                context['has_frontend'] = True
+
+            # Check for Docker
+            if 'dockerfile' in file_path_lower or 'docker' in content_lower:
+                context['has_docker'] = True
+
+        return context
