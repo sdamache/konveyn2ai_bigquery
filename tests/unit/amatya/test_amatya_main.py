@@ -12,9 +12,8 @@ import os
 
 # Add the project root and the specific component directory to Python path
 project_root = os.path.join(os.path.dirname(__file__), "../../..")
-sys.path.append(project_root)
-sys.path.append(os.path.join(project_root, "src"))
-sys.path.append(os.path.join(project_root, "src/amatya-role-prompter"))
+amatya_path = os.path.join(project_root, "src/amatya-role-prompter")
+sys.path.insert(0, amatya_path)  # Insert at beginning to prioritize
 sys.path.append(os.path.join(project_root, "src/common"))
 
 from main import app
@@ -435,6 +434,11 @@ class TestAmatyaPromptEngineering:
 
 class TestAmatyaPerformance:
     """Test performance characteristics of Amatya service."""
+
+    @pytest.fixture
+    def client(self):
+        """Test client for Amatya service."""
+        return TestClient(app)
 
     @pytest.mark.slow
     def test_advise_performance(self, client, mock_gemini_setup, sample_snippets):

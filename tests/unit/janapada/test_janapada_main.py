@@ -13,9 +13,8 @@ import os
 
 # Add the project root and the specific component directory to Python path
 project_root = os.path.join(os.path.dirname(__file__), "../../..")
-sys.path.append(project_root)
-sys.path.append(os.path.join(project_root, "src"))
-sys.path.append(os.path.join(project_root, "src/janapada-memory"))
+janapada_path = os.path.join(project_root, "src/janapada-memory")
+sys.path.insert(0, janapada_path)  # Insert at beginning to prioritize
 sys.path.append(os.path.join(project_root, "src/common"))
 
 from main import app
@@ -58,8 +57,8 @@ class TestJanapadaMemory:
         assert data["version"] == "1.0.0"
         assert "methods" in data
 
-        # Check for search method
-        method_names = [method["name"] for method in data["methods"]]
+        # Check for search method - methods is a dict with method names as keys
+        method_names = list(data["methods"].keys())
         assert "search" in method_names
 
     @pytest.mark.asyncio
@@ -420,6 +419,11 @@ class TestJanapadaConfiguration:
 
 class TestJanapadaPerformance:
     """Test performance characteristics of Janapada service."""
+
+    @pytest.fixture
+    def client(self):
+        """Test client for Janapada service."""
+        return TestClient(app)
 
     @pytest.mark.slow
     def test_search_performance(self, client, mock_vertex_setup, mock_matching_engine):

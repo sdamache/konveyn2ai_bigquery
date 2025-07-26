@@ -13,13 +13,12 @@ import os
 
 # Add the project root and the specific component directory to Python path
 project_root = os.path.join(os.path.dirname(__file__), "../../..")
-sys.path.append(project_root)
-sys.path.append(os.path.join(project_root, "src"))
-sys.path.append(os.path.join(project_root, "src/svami-orchestrator"))
+svami_path = os.path.join(project_root, "src/svami-orchestrator")
+sys.path.insert(0, svami_path)  # Insert at beginning to prioritize
 sys.path.append(os.path.join(project_root, "src/common"))
 
 from main import app
-from models import QueryRequest
+from common.models import QueryRequest
 
 
 class TestSvamiOrchestrator:
@@ -33,14 +32,14 @@ class TestSvamiOrchestrator:
     @pytest.fixture
     def mock_janapada_client(self):
         """Mock Janapada JSON-RPC client."""
-        with patch("src.svami_orchestrator.main.janapada_client") as mock:
+        with patch("main.janapada_client") as mock:
             mock.call = AsyncMock()
             yield mock
 
     @pytest.fixture
     def mock_amatya_client(self):
         """Mock Amatya JSON-RPC client."""
-        with patch("src.svami_orchestrator.main.amatya_client") as mock:
+        with patch("main.amatya_client") as mock:
             mock.call = AsyncMock()
             yield mock
 
@@ -60,13 +59,13 @@ class TestSvamiOrchestrator:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["name"] == "Svami Orchestrator"
+        assert data["name"] == "Svami Orchestrator Service"
         assert data["version"] == "1.0.0"
         assert "methods" in data
         assert len(data["methods"]) > 0
 
-        # Check for answer method
-        method_names = [method["name"] for method in data["methods"]]
+        # Check for answer method - methods is a dict with method names as keys
+        method_names = list(data["methods"].keys())
         assert "answer" in method_names
 
     @pytest.mark.asyncio

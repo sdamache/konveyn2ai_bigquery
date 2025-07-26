@@ -15,6 +15,7 @@ Key Features:
 
 import os
 import asyncio
+import uuid
 from typing import Optional
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -116,6 +117,11 @@ async def register_external_services():
 def get_request_id(request: Request) -> str:
     """Dependency to get request ID from Guard-Fort middleware."""
     return getattr(request.state, "request_id", "unknown")
+
+
+def generate_request_id() -> str:
+    """Generate a unique request ID for testing purposes."""
+    return f"req-{uuid.uuid4().hex[:12]}"
 
 
 @app.get("/.well-known/agent.json")

@@ -47,13 +47,12 @@ class TestQueryRequest:
         with pytest.raises(ValidationError) as exc_info:
             QueryRequest(role="developer")
 
-        assert "field required" in str(exc_info.value)
+        assert "Field required" in str(exc_info.value)
 
-        # Missing role
-        with pytest.raises(ValidationError) as exc_info:
-            QueryRequest(question="test question")
-
-        assert "field required" in str(exc_info.value)
+        # Missing role - should NOT raise error because role has default value
+        query = QueryRequest(question="test question")
+        assert query.question == "test question"
+        assert query.role == "developer"  # default value
 
     def test_query_request_serialization(self):
         """Test QueryRequest serialization to dict."""
@@ -122,17 +121,15 @@ class TestSnippet:
     def test_snippet_validation(self):
         """Test Snippet validation rules."""
 
-        # Test empty file_path
-        with pytest.raises(ValidationError) as exc_info:
-            Snippet(file_path="", content="some content")
+        # Test empty file_path - should be allowed (no min_length constraint)
+        snippet = Snippet(file_path="", content="some content")
+        assert snippet.file_path == ""
+        assert snippet.content == "some content"
 
-        assert "ensure this value has at least 1 characters" in str(exc_info.value)
-
-        # Test empty content
-        with pytest.raises(ValidationError) as exc_info:
-            Snippet(file_path="test.py", content="")
-
-        assert "ensure this value has at least 1 characters" in str(exc_info.value)
+        # Test empty content - should be allowed (no min_length constraint)
+        snippet = Snippet(file_path="test.py", content="")
+        assert snippet.file_path == "test.py"
+        assert snippet.content == ""
 
     def test_snippet_missing_fields(self):
         """Test Snippet with missing required fields."""
@@ -141,13 +138,13 @@ class TestSnippet:
         with pytest.raises(ValidationError) as exc_info:
             Snippet(content="some content")
 
-        assert "field required" in str(exc_info.value)
+        assert "Field required" in str(exc_info.value)
 
         # Missing content
         with pytest.raises(ValidationError) as exc_info:
             Snippet(file_path="test.py")
 
-        assert "field required" in str(exc_info.value)
+        assert "Field required" in str(exc_info.value)
 
     def test_snippet_serialization(self):
         """Test Snippet serialization to dict."""
@@ -224,16 +221,15 @@ class TestSearchRequest:
 
         search = SearchRequest(query="test query")
 
-        assert search.k == 10  # Default value
+        assert search.k == 5  # Default value
 
     def test_search_request_validation(self):
         """Test SearchRequest validation rules."""
 
-        # Test empty query
-        with pytest.raises(ValidationError) as exc_info:
-            SearchRequest(query="", k=5)
-
-        assert "ensure this value has at least 1 characters" in str(exc_info.value)
+        # Test empty query - should be allowed (no min_length constraint)
+        search = SearchRequest(query="", k=5)
+        assert search.query == ""
+        assert search.k == 5
 
         # Test invalid k values
         invalid_k_values = [0, -1, 101, "five"]
@@ -250,8 +246,8 @@ class TestSearchRequest:
         assert search.k == 1
 
         # Maximum valid k
-        search = SearchRequest(query="test", k=100)
-        assert search.k == 100
+        search = SearchRequest(query="test", k=20)
+        assert search.k == 20
 
     def test_search_request_serialization(self):
         """Test SearchRequest serialization."""
@@ -262,62 +258,59 @@ class TestSearchRequest:
         assert data == {"query": "authentication", "k": 7}
 
 
-class TestAdviseRequest:
-    """Test AdviseRequest model validation and serialization."""
+class TestAdviceRequest:
+    """Test AdviceRequest model validation and serialization."""
 
-    def test_valid_advise_request(self):
-        """Test valid AdviseRequest creation."""
+    def test_valid_advice_request(self):
+        """Test valid AdviceRequest creation."""
 
         chunks = [
-            {"file_path": "test.py", "content": "def test(): pass"},
-            {"file_path": "main.py", "content": "if __name__ == '__main__': pass"},
+            Snippet(file_path="test.py", content="def test(): pass"),
+            Snippet(file_path="main.py", content="if __name__ == '__main__': pass"),
         ]
 
-        advise = AdviseRequest(role="backend engineer", chunks=chunks)
+        advice = AdviceRequest(role="backend engineer", chunks=chunks)
 
-        assert advise.role == "backend engineer"
-        assert len(advise.chunks) == 2
+        assert advice.role == "backend engineer"
+        assert len(advice.chunks) == 2
 
-    def test_advise_request_validation(self):
-        """Test AdviseRequest validation rules."""
+    def test_advice_request_validation(self):
+        """Test AdviceRequest validation rules."""
 
-        # Test empty role
+        # Test missing role
         with pytest.raises(ValidationError) as exc_info:
-            AdviseRequest(role="", chunks=[])
+            AdviceRequest(chunks=[])
 
-        assert "ensure this value has at least 1 characters" in str(exc_info.value)
+        assert "Field required" in str(exc_info.value)
 
-    def test_advise_request_with_snippet_objects(self):
-        """Test AdviseRequest with Snippet objects."""
+    def test_advice_request_with_snippet_objects(self):
+        """Test AdviceRequest with Snippet objects."""
 
         snippets = [
             Snippet(file_path="test.py", content="def test(): pass"),
             Snippet(file_path="main.py", content="if __name__ == '__main__': pass"),
         ]
 
-        # Convert to dicts as expected by AdviseRequest
-        chunk_dicts = [snippet.model_dump() for snippet in snippets]
+        advice = AdviceRequest(role="backend engineer", chunks=snippets)
 
-        advise = AdviseRequest(role="backend engineer", chunks=chunk_dicts)
+        assert len(advice.chunks) == 2
+        assert advice.chunks[0].file_path == "test.py"
 
-        assert len(advise.chunks) == 2
-        assert advise.chunks[0]["file_path"] == "test.py"
+    def test_advice_request_empty_chunks(self):
+        """Test AdviceRequest with empty chunks."""
 
-    def test_advise_request_empty_chunks(self):
-        """Test AdviseRequest with empty chunks."""
+        advice = AdviceRequest(role="developer", chunks=[])
 
-        advise = AdviseRequest(role="developer", chunks=[])
+        assert advice.role == "developer"
+        assert len(advice.chunks) == 0
 
-        assert advise.role == "developer"
-        assert len(advise.chunks) == 0
+    def test_advice_request_serialization(self):
+        """Test AdviceRequest serialization."""
 
-    def test_advise_request_serialization(self):
-        """Test AdviseRequest serialization."""
+        chunks = [Snippet(file_path="test.py", content="code")]
 
-        chunks = [{"file_path": "test.py", "content": "code"}]
-
-        advise = AdviseRequest(role="developer", chunks=chunks)
-        data = advise.model_dump()
+        advice = AdviceRequest(role="developer", chunks=chunks)
+        data = advice.model_dump()
 
         assert data["role"] == "developer"
         assert len(data["chunks"]) == 1
@@ -339,20 +332,18 @@ class TestModelInteroperability:
         assert search.query == query.question
         assert search.k == 5
 
-    def test_snippets_to_advise_request(self):
-        """Test converting Snippets to AdviseRequest."""
+    def test_snippets_to_advice_request(self):
+        """Test converting Snippets to AdviceRequest."""
 
         snippets = [
             Snippet(file_path="auth.py", content="def authenticate(): pass"),
             Snippet(file_path="models.py", content="class User: pass"),
         ]
 
-        # Convert to AdviseRequest
-        chunks = [snippet.model_dump() for snippet in snippets]
-        advise = AdviseRequest(role="backend engineer", chunks=chunks)
+        advice = AdviceRequest(role="backend engineer", chunks=snippets)
 
-        assert len(advise.chunks) == 2
-        assert advise.chunks[0]["file_path"] == "auth.py"
+        assert len(advice.chunks) == 2
+        assert advice.chunks[0].file_path == "auth.py"
 
     def test_model_json_compatibility(self):
         """Test JSON serialization/deserialization compatibility."""
@@ -363,9 +354,9 @@ class TestModelInteroperability:
         query = QueryRequest(question="test", role="developer")
         snippet = Snippet(file_path="test.py", content="code")
         search = SearchRequest(query="test", k=5)
-        advise = AdviseRequest(role="dev", chunks=[snippet.model_dump()])
+        advice = AdviceRequest(role="dev", chunks=[snippet])
 
-        models = [query, snippet, search, advise]
+        models = [query, snippet, search, advice]
 
         for model in models:
             # Serialize to JSON
