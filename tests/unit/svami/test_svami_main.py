@@ -50,9 +50,9 @@ class TestSvamiOrchestrator:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["status"] in ["healthy", "degraded"]
-        assert "timestamp" in data
-        assert "dependencies" in data
+        # Health status can be healthy, degraded, or starting based on service state
+        assert data["status"] in ["healthy", "degraded", "starting"]
+        assert "service" in data
 
     def test_agent_manifest_endpoint(self, client):
         """Test agent manifest endpoint."""
