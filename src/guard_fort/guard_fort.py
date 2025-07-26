@@ -905,7 +905,11 @@ class StructuredLogger:
             level: Log level (DEBUG, INFO, WARN, ERROR)
             data: Structured log data
         """
-        log_method = getattr(self.logger, level.lower())
+        # Handle deprecated 'warn' level name
+        level_name = level.lower()
+        if level_name == 'warn':
+            level_name = 'warning'
+        log_method = getattr(self.logger, level_name)
 
         if self.log_format == "json":
             log_method(json.dumps(data))
