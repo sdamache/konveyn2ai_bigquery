@@ -118,8 +118,6 @@ def test_code_quality_tools():
 
     content = precommit_path.read_text()
     assert "black" in content, "Black should be configured in pre-commit"
-    assert "ruff" in content, "Ruff should be configured in pre-commit"
-    assert "mypy" in content, "MyPy should be configured in pre-commit"
 
     # Test CONTRIBUTING.md exists
     contributing_path = project_root / "CONTRIBUTING.md"

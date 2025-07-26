@@ -75,7 +75,10 @@ class JsonRpcRequest(BaseModel):
     """JSON-RPC 2.0 request object."""
 
     jsonrpc: str = Field(default="2.0", description="JSON-RPC version")
-    id: str = Field(..., description="Request identifier for correlation")
+    id: Optional[str] = Field(
+        None,
+        description="Request identifier for correlation (optional for notifications)",
+    )
     method: str = Field(..., description="Method name to invoke")
     params: dict[str, Any] = Field(
         default_factory=dict, description="Method parameters"

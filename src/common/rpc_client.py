@@ -1,9 +1,12 @@
-import httpx
 import uuid
 from contextlib import asynccontextmanager
+from typing import Any, Optional, Union
+
+import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from .models import JsonRpcRequest, JsonRpcResponse, JsonRpcError
+from .models import JsonRpcError, JsonRpcRequest, JsonRpcResponse
+
 
 class JsonRpcClient:
     def __init__(self, url: str, timeout: int = 30, max_retries: int = 3):
@@ -12,16 +15,22 @@ class JsonRpcClient:
         self.max_retries = max_retries
 
     @asynccontextmanager
-    async def session(self):
+    async def session(self) -> Any:
         async with httpx.AsyncClient() as client:
             yield client
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-    async def call(self, method: str, params: dict, id: str | int | None = None) -> JsonRpcResponse:
+    @retry(
+        stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
+    async def call(
+        self, method: str, params: dict[str, Any], id: Optional[Union[str, int]] = None
+    ) -> JsonRpcResponse:
         if id is None:
             id = str(uuid.uuid4())
 
-        request = JsonRpcRequest(id=id, method=method, params=params)
+        request = JsonRpcRequest(
+            id=str(id) if id is not None else None, method=method, params=params
+        )
 
         async with self.session() as client:
             try:
@@ -33,8 +42,14 @@ class JsonRpcClient:
                 response.raise_for_status()
                 return JsonRpcResponse(**response.json())
             except httpx.HTTPStatusError as e:
-                error = JsonRpcError(code=-32000, message=f"HTTP Error: {e.response.status_code}", data={"reason": str(e)})
+                error = JsonRpcError(
+                    code=-32000,
+                    message=f"HTTP Error: {e.response.status_code}",
+                    data={"reason": str(e)},
+                )
                 return JsonRpcResponse(id=id, error=error)
             except httpx.RequestError as e:
-                error = JsonRpcError(code=-32000, message=f"Request Error: {e}", data={"reason": str(e)})
+                error = JsonRpcError(
+                    code=-32000, message=f"Request Error: {e}", data={"reason": str(e)}
+                )
                 return JsonRpcResponse(id=id, error=error)
