@@ -157,7 +157,9 @@ class TestGuardFortCore:
             "/error", headers={"Authorization": "Bearer demo-token"}
         )
 
-        assert response.status_code == 400  # GuardFort treats ValueError as client error
+        assert (
+            response.status_code == 400
+        )  # GuardFort treats ValueError as client error
         assert "X-Request-ID" in response.headers
 
         data = response.json()
@@ -205,7 +207,9 @@ class TestGuardFortCore:
         assert request_log_call["status_code"] == 200
         assert "duration_ms" in request_log_call
         assert request_log_call["duration_ms"] > 0
-        assert request_log_call["query_params"] == "param=value" or "param" in str(request_log_call["query_params"])
+        assert request_log_call["query_params"] == "param=value" or "param" in str(
+            request_log_call["query_params"]
+        )
 
     @patch("logging.Logger.warning")
     def test_exception_logging(self, mock_log_warning):
@@ -214,7 +218,9 @@ class TestGuardFortCore:
             "/error", headers={"Authorization": "Bearer demo-token"}
         )
 
-        assert response.status_code == 400  # GuardFort treats ValueError as client error
+        assert (
+            response.status_code == 400
+        )  # GuardFort treats ValueError as client error
 
         # Verify exception logging was called
         assert mock_log_warning.called

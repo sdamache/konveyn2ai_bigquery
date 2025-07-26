@@ -907,8 +907,8 @@ class StructuredLogger:
         """
         # Handle deprecated 'warn' level name
         level_name = level.lower()
-        if level_name == 'warn':
-            level_name = 'warning'
+        if level_name == "warn":
+            level_name = "warning"
         log_method = getattr(self.logger, level_name)
 
         if self.log_format == "json":
