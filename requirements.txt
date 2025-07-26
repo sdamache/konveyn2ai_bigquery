@@ -1,29 +1,44 @@
+# KonveyN2AI Dependencies - PINNED VERSIONS FOR CONSISTENCY
+#
+# CRITICAL: All versions are pinned (==) to prevent CI/CD conflicts
+# Lessons learned from Task 1 protocol violations:
+# - Unpinned versions caused version conflicts and pipeline failures
+# - Multiple fix commits were required due to dependency mismatches
+# - "Test locally first" protocol prevents these issues
+#
+# Reference: .memory/tasks/task-1-project-setup.md - Protocol Violations section
+# Exception context: Git consolidation exception for hackathon time constraints
+# Date: 2025-07-26
+
 # Core Google Cloud AI Platform dependencies
-google-cloud-aiplatform>=1.38.0
-google-generativeai>=0.3.0
+google-cloud-aiplatform==1.42.1
+google-generativeai==0.4.0
 
 # Web framework and API
-streamlit>=1.28.0
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
+streamlit==1.30.0
+fastapi==0.108.0
+uvicorn[standard]==0.25.0
 
 # Data processing and numerical computing
-numpy>=1.24.0
-pandas>=2.0.0
+numpy==1.26.3
+pandas==2.2.0
 
 # Environment and configuration management
-python-dotenv>=1.0.0
-pydantic>=2.5.0
+python-dotenv==1.0.0
+pydantic==2.6.1
 
 # Development and code quality tools (pinned versions for consistency)
-pytest==7.4.3
+pytest==7.4.4
+pytest-asyncio==0.23.3
 black==23.12.1
-ruff==0.1.9
+ruff==0.1.15
 pre-commit==3.6.0
 mypy==1.8.0
 isort==5.13.2
-bandit==1.7.5
+bandit==1.7.6
 
 # Additional utilities for hackathon development
-requests>=2.31.0
-aiohttp>=3.9.0
+requests==2.31.0
+aiohttp==3.9.3
+tenacity==8.2.3
+httpx==0.26.0
