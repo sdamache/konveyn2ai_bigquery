@@ -51,7 +51,7 @@ class TestGuardFortCore:
     
     def test_request_id_generation(self):
         """Test that request ID is generated when not provided."""
-        response = self.client.get("/test")
+        response = self.client.get("/test", headers={"Authorization": "Bearer demo-token"})
         
         assert response.status_code == 200
         assert "X-Request-ID" in response.headers
@@ -76,7 +76,10 @@ class TestGuardFortCore:
         
         response = self.client.get(
             "/test",
-            headers={"X-Request-ID": test_request_id}
+            headers={
+                "X-Request-ID": test_request_id,
+                "Authorization": "Bearer demo-token"
+            }
         )
         
         assert response.status_code == 200
@@ -88,7 +91,7 @@ class TestGuardFortCore:
     
     def test_service_headers(self):
         """Test that GuardFort adds service identification headers."""
-        response = self.client.get("/test")
+        response = self.client.get("/test", headers={"Authorization": "Bearer demo-token"})
         
         assert response.status_code == 200
         assert response.headers["X-Service"] == "test-service"
@@ -103,33 +106,53 @@ class TestGuardFortCore:
         data = response.json()
         assert data["status"] == "healthy"
     
-    def test_demo_authentication(self):
-        """Test the demo authentication mechanism."""
-        # Test with Bearer token (should pass)
+    def test_enhanced_authentication(self):
+        """Test the enhanced authentication mechanism."""
+        # Test with valid demo Bearer token
         response = self.client.get(
             "/test",
             headers={"Authorization": "Bearer demo-token"}
         )
         assert response.status_code == 200
         
-        # Test without auth header (should pass in demo mode)
-        response = self.client.get("/test")
+        # Test with valid JWT format
+        response = self.client.get(
+            "/test",
+            headers={"Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ"}
+        )
         assert response.status_code == 200
         
-        # Test with invalid auth format (should fail)
+        # Test with valid API key
         response = self.client.get(
-            "/test", 
-            headers={"Authorization": "Invalid format"}
+            "/test",
+            headers={"Authorization": "ApiKey demo-api-key"}
         )
-        assert response.status_code == 401
+        assert response.status_code == 200
         
+        # Test without auth header (should fail)
+        response = self.client.get("/test")
+        assert response.status_code == 401
         data = response.json()
         assert data["error"] == "authentication_required"
         assert "request_id" in data
+        
+        # Test with invalid auth scheme
+        response = self.client.get(
+            "/test", 
+            headers={"Authorization": "Invalid demo-token"}
+        )
+        assert response.status_code == 401
+        
+        # Test with malformed auth header
+        response = self.client.get(
+            "/test",
+            headers={"Authorization": "Bearer"}
+        )
+        assert response.status_code == 401
     
     def test_exception_handling(self):
         """Test that exceptions are caught and handled properly."""
-        response = self.client.get("/error")
+        response = self.client.get("/error", headers={"Authorization": "Bearer demo-token"})
         
         assert response.status_code == 500
         assert "X-Request-ID" in response.headers
@@ -146,7 +169,7 @@ class TestGuardFortCore:
     @patch('logging.Logger.info')
     def test_request_logging(self, mock_log_info):
         """Test that requests are logged with proper structure."""
-        response = self.client.get("/test?param=value")
+        response = self.client.get("/test?param=value", headers={"Authorization": "Bearer demo-token"})
         
         assert response.status_code == 200
         
@@ -182,7 +205,7 @@ class TestGuardFortCore:
     @patch('logging.Logger.error')
     def test_exception_logging(self, mock_log_error):
         """Test that exceptions are logged with proper context."""
-        response = self.client.get("/error")
+        response = self.client.get("/error", headers={"Authorization": "Bearer demo-token"})
         
         assert response.status_code == 500
         
@@ -210,7 +233,7 @@ class TestGuardFortCore:
     def test_timing_functionality(self):
         """Test that request timing is captured and logged."""
         with patch('logging.Logger.info') as mock_log:
-            response = self.client.get("/test")
+            response = self.client.get("/test", headers={"Authorization": "Bearer demo-token"})
             
             assert response.status_code == 200
             
@@ -229,6 +252,44 @@ class TestGuardFortCore:
             assert "duration_ms" in request_log_data
             assert isinstance(request_log_data["duration_ms"], (int, float))
             assert request_log_data["duration_ms"] >= 0
+    
+    def test_security_headers(self):
+        """Test that security headers are added to responses."""
+        response = self.client.get("/test", headers={"Authorization": "Bearer demo-token"})
+        
+        assert response.status_code == 200
+        
+        # Check for security headers
+        assert "Content-Security-Policy" in response.headers
+        assert "X-XSS-Protection" in response.headers
+        assert "X-Content-Type-Options" in response.headers
+        assert "X-Frame-Options" in response.headers
+        assert "Referrer-Policy" in response.headers
+        assert "Permissions-Policy" in response.headers
+        assert "Strict-Transport-Security" in response.headers
+        
+        # Verify specific values
+        assert response.headers["X-XSS-Protection"] == "1; mode=block"
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
+        assert response.headers["X-Frame-Options"] == "DENY"
+        assert "default-src 'self'" in response.headers["Content-Security-Policy"]
+    
+    def test_security_headers_disabled(self):
+        """Test that security headers can be disabled."""
+        app = FastAPI()
+        
+        @app.get("/test")
+        async def test_endpoint():
+            return {"message": "test"}
+        
+        GuardFort(app, service_name="no-security-test", security_headers=False)
+        client = TestClient(app)
+        
+        response = client.get("/test", headers={"Authorization": "Bearer demo-token"})
+        
+        assert response.status_code == 200
+        assert "Content-Security-Policy" not in response.headers
+        assert "X-XSS-Protection" not in response.headers
 
 
 class TestGuardFortUtilities:
@@ -242,12 +303,18 @@ class TestGuardFortUtilities:
             app=app,
             service_name="utility-test",
             enable_auth=False,
-            log_level="ERROR"
+            log_level="ERROR",
+            cors_origins=["https://example.com"],
+            auth_schemes=["Bearer"],
+            security_headers=False
         )
         
         assert isinstance(guard_fort, GuardFort)
         assert guard_fort.service_name == "utility-test"
         assert guard_fort.enable_auth is False
+        assert guard_fort.cors_origins == ["https://example.com"]
+        assert guard_fort.auth_schemes == ["Bearer"]
+        assert guard_fort.security_headers is False
         
         # Verify middleware was registered by checking app middleware stack
         assert len(app.user_middleware) > 0
@@ -303,6 +370,110 @@ class TestGuardFortIntegration:
         assert response2.json()["request_id"] == id2
         assert response1.headers["X-Request-ID"] == id1
         assert response2.headers["X-Request-ID"] == id2
+
+
+class TestGuardFortSecurity:
+    """Test GuardFort security features in detail."""
+    
+    def test_authentication_schemes(self):
+        """Test different authentication schemes."""
+        app = FastAPI()
+        
+        @app.get("/test")
+        async def test_endpoint():
+            return {"message": "authenticated"}
+        
+        # Test with only Bearer scheme allowed
+        GuardFort(app, service_name="bearer-only", auth_schemes=["Bearer"])
+        client = TestClient(app)
+        
+        # Bearer should work
+        response = client.get("/test", headers={"Authorization": "Bearer demo-token"})
+        assert response.status_code == 200
+        
+        # ApiKey should fail
+        response = client.get("/test", headers={"Authorization": "ApiKey demo-api-key"})
+        assert response.status_code == 401
+    
+    def test_custom_allowed_paths(self):
+        """Test custom paths that bypass authentication."""
+        app = FastAPI()
+        
+        @app.get("/test")
+        async def test_endpoint():
+            return {"message": "test"}
+        
+        @app.get("/public")
+        async def public_endpoint():
+            return {"message": "public"}
+        
+        GuardFort(
+            app, 
+            service_name="custom-paths",
+            allowed_paths=["/health", "/public"]
+        )
+        client = TestClient(app)
+        
+        # Public path should work without auth
+        response = client.get("/public")
+        assert response.status_code == 200
+        
+        # Test path should require auth
+        response = client.get("/test")
+        assert response.status_code == 401
+    
+    def test_token_validation_methods(self):
+        """Test different token validation methods."""
+        app = FastAPI()
+        
+        @app.get("/test")
+        async def test_endpoint():
+            return {"message": "authenticated"}
+        
+        GuardFort(app, service_name="token-validation")
+        client = TestClient(app)
+        
+        # Test demo tokens
+        for token in ["demo-token", "konveyn2ai-token", "hackathon-demo"]:
+            response = client.get("/test", headers={"Authorization": f"Bearer {token}"})
+            assert response.status_code == 200
+        
+        # Test JWT format
+        jwt_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ"
+        response = client.get("/test", headers={"Authorization": f"Bearer {jwt_token}"})
+        assert response.status_code == 200
+        
+        # Test minimum length token
+        response = client.get("/test", headers={"Authorization": "Bearer 12345678"})
+        assert response.status_code == 200
+        
+        # Test too short token
+        response = client.get("/test", headers={"Authorization": "Bearer short"})
+        assert response.status_code == 401
+    
+    def test_api_key_validation(self):
+        """Test API key validation."""
+        app = FastAPI()
+        
+        @app.get("/test")
+        async def test_endpoint():
+            return {"message": "authenticated"}
+        
+        GuardFort(app, service_name="api-key-test")
+        client = TestClient(app)
+        
+        # Test demo API keys
+        for api_key in ["konveyn2ai-api-key-demo", "hackathon-api-key", "demo-api-key"]:
+            response = client.get("/test", headers={"Authorization": f"ApiKey {api_key}"})
+            assert response.status_code == 200
+        
+        # Test valid format API key
+        response = client.get("/test", headers={"Authorization": "ApiKey abcdef1234567890"})
+        assert response.status_code == 200
+        
+        # Test invalid format API key
+        response = client.get("/test", headers={"Authorization": "ApiKey short"})
+        assert response.status_code == 401
 
 
 if __name__ == "__main__":

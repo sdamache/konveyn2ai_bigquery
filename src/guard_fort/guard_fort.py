@@ -14,9 +14,11 @@ import uuid
 import time
 import logging
 import json
-from typing import Callable, Optional, Dict, Any
+import re
+from typing import Callable, Optional, Dict, Any, List, Union
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 
@@ -33,7 +35,14 @@ class GuardFort:
         app: FastAPI,
         service_name: str = "konveyn2ai-service",
         enable_auth: bool = True,
-        log_level: str = "INFO"
+        log_level: str = "INFO",
+        cors_origins: List[str] = ["*"],
+        cors_methods: List[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        cors_headers: List[str] = ["*"],
+        auth_header_name: str = "Authorization",
+        auth_schemes: List[str] = ["Bearer", "ApiKey"],
+        allowed_paths: List[str] = ["/health", "/", "/docs", "/openapi.json"],
+        security_headers: bool = True
     ):
         """
         Initialize GuardFort middleware with FastAPI application.
@@ -43,10 +52,24 @@ class GuardFort:
             service_name: Name of the service for logging
             enable_auth: Whether to enable authentication checks
             log_level: Logging level (DEBUG, INFO, WARN, ERROR)
+            cors_origins: List of allowed CORS origins
+            cors_methods: List of allowed CORS methods
+            cors_headers: List of allowed CORS headers
+            auth_header_name: Name of the authentication header
+            auth_schemes: List of supported authentication schemes
+            allowed_paths: List of paths that bypass authentication
+            security_headers: Whether to add security headers
         """
         self.app = app
         self.service_name = service_name
         self.enable_auth = enable_auth
+        self.cors_origins = cors_origins
+        self.cors_methods = cors_methods
+        self.cors_headers = cors_headers
+        self.auth_header_name = auth_header_name
+        self.auth_schemes = auth_schemes
+        self.allowed_paths = allowed_paths
+        self.security_headers = security_headers
         
         # Configure structured logging
         self.logger = logging.getLogger(f"guard_fort.{service_name}")
@@ -62,10 +85,25 @@ class GuardFort:
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
         
+        # Configure CORS if needed
+        self._configure_cors()
+        
         # Register middleware with FastAPI
         self._register_middleware()
         
         self.logger.info(f'"GuardFort middleware initialized for {service_name}"')
+    
+    def _configure_cors(self):
+        """Configure CORS middleware if origins are specified."""
+        if self.cors_origins and self.cors_origins != ["*"]:
+            self.app.add_middleware(
+                CORSMiddleware,
+                allow_origins=self.cors_origins,
+                allow_credentials=True,
+                allow_methods=self.cors_methods,
+                allow_headers=self.cors_headers,
+            )
+            self.logger.info(f'"CORS configured for origins: {self.cors_origins}"')
     
     def _register_middleware(self):
         """Register the GuardFort middleware with the FastAPI application."""
@@ -110,6 +148,10 @@ class GuardFort:
             # Add GuardFort headers to response
             self._add_response_headers(response, request_id)
             
+            # Add security headers if enabled
+            if self.security_headers:
+                self._add_security_headers(response)
+            
             # Log successful request
             self._log_request(request, response, duration, request_id)
             
@@ -151,20 +193,123 @@ class GuardFort:
         Returns:
             Dict with 'valid' boolean and 'reason' string
         """
-        # For demo/hackathon purposes, implement stubbed authentication
-        # In production, this would validate JWT tokens, API keys, etc.
+        # Allow health check and public endpoints without authentication
+        if request.url.path in self.allowed_paths:
+            return {"valid": True, "reason": "allowed_path"}
         
-        auth_header = request.headers.get("Authorization", "")
+        auth_header = request.headers.get(self.auth_header_name, "")
         
-        # Allow health check endpoints without authentication
-        if request.url.path in ["/health", "/", "/docs", "/openapi.json"]:
-            return {"valid": True, "reason": "health_check"}
+        if not auth_header:
+            return {"valid": False, "reason": "missing_auth_header"}
         
-        # For demo: accept any Bearer token or allow requests without auth
-        if auth_header.startswith("Bearer ") or not auth_header:
-            return {"valid": True, "reason": "demo_mode"}
+        # Validate authentication scheme
+        auth_valid = self._validate_auth_scheme(auth_header)
+        if not auth_valid["valid"]:
+            return auth_valid
         
-        return {"valid": False, "reason": "invalid_auth_format"}
+        # Extract and validate token
+        token_valid = self._validate_token(auth_header)
+        return token_valid
+    
+    def _validate_auth_scheme(self, auth_header: str) -> Dict[str, Any]:
+        """
+        Validate the authentication scheme format.
+        
+        Args:
+            auth_header: Authorization header value
+            
+        Returns:
+            Dict with validation result
+        """
+        for scheme in self.auth_schemes:
+            if auth_header.startswith(f"{scheme} "):
+                return {"valid": True, "reason": f"valid_{scheme.lower()}_scheme"}
+        
+        return {
+            "valid": False, 
+            "reason": f"invalid_auth_scheme_expected_{self.auth_schemes}"
+        }
+    
+    def _validate_token(self, auth_header: str) -> Dict[str, Any]:
+        """
+        Validate the authentication token.
+        
+        Args:
+            auth_header: Authorization header value
+            
+        Returns:
+            Dict with validation result
+        """
+        # Extract token from header
+        try:
+            scheme, token = auth_header.split(" ", 1)
+        except ValueError:
+            return {"valid": False, "reason": "malformed_auth_header"}
+        
+        if scheme == "Bearer":
+            return self._validate_bearer_token(token)
+        elif scheme == "ApiKey":
+            return self._validate_api_key(token)
+        else:
+            return {"valid": False, "reason": f"unsupported_scheme_{scheme}"}
+    
+    def _validate_bearer_token(self, token: str) -> Dict[str, Any]:
+        """
+        Validate Bearer token (JWT or similar).
+        
+        Args:
+            token: Bearer token value
+            
+        Returns:
+            Dict with validation result
+        """
+        # For demo/hackathon: Accept specific demo tokens or validate format
+        demo_tokens = [
+            "demo-token",
+            "konveyn2ai-token", 
+            "hackathon-demo",
+            "test-token"
+        ]
+        
+        if token in demo_tokens:
+            return {"valid": True, "reason": "demo_token"}
+        
+        # Basic JWT format validation (3 parts separated by dots)
+        if re.match(r'^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$', token):
+            # In production, would verify JWT signature and claims
+            return {"valid": True, "reason": "jwt_format_valid"}
+        
+        # Minimum token length check
+        if len(token) >= 8:
+            return {"valid": True, "reason": "token_length_valid"}
+        
+        return {"valid": False, "reason": "invalid_bearer_token"}
+    
+    def _validate_api_key(self, api_key: str) -> Dict[str, Any]:
+        """
+        Validate API key.
+        
+        Args:
+            api_key: API key value
+            
+        Returns:
+            Dict with validation result
+        """
+        # For demo/hackathon: Accept demo API keys
+        demo_api_keys = [
+            "konveyn2ai-api-key-demo",
+            "hackathon-api-key",
+            "demo-api-key"
+        ]
+        
+        if api_key in demo_api_keys:
+            return {"valid": True, "reason": "demo_api_key"}
+        
+        # Basic API key format validation (alphanumeric, minimum length)
+        if re.match(r'^[A-Za-z0-9_-]{16,}$', api_key):
+            return {"valid": True, "reason": "api_key_format_valid"}
+        
+        return {"valid": False, "reason": "invalid_api_key"}
     
     def _add_response_headers(self, response: Response, request_id: str):
         """
@@ -177,6 +322,48 @@ class GuardFort:
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Service"] = self.service_name
         response.headers["X-GuardFort-Version"] = "1.0.0"
+    
+    def _add_security_headers(self, response: Response):
+        """
+        Add security headers to the response.
+        
+        Args:
+            response: FastAPI response object
+        """
+        # Content Security Policy
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' https://fonts.gstatic.com; "
+            "img-src 'self' data: https:; "
+            "connect-src 'self' https://api.konveyn2ai.com; "
+            "frame-ancestors 'none'"
+        )
+        
+        # XSS Protection
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        
+        # Content Type Options
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        
+        # Frame Options
+        response.headers["X-Frame-Options"] = "DENY"
+        
+        # Referrer Policy
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        
+        # Permissions Policy
+        response.headers["Permissions-Policy"] = (
+            "geolocation=(), microphone=(), camera=(), "
+            "payment=(), usb=(), magnetometer=(), gyroscope=(), "
+            "accelerometer=(), ambient-light-sensor=()"
+        )
+        
+        # Strict Transport Security (HTTPS only)
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains; preload"
+        )
     
     def _log_request(
         self, 
@@ -291,7 +478,13 @@ def init_guard_fort(
     app: FastAPI, 
     service_name: str,
     enable_auth: bool = True,
-    log_level: str = "INFO"
+    log_level: str = "INFO",
+    cors_origins: List[str] = ["*"],
+    cors_methods: List[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    cors_headers: List[str] = ["*"],
+    auth_schemes: List[str] = ["Bearer", "ApiKey"],
+    allowed_paths: List[str] = ["/health", "/", "/docs", "/openapi.json"],
+    security_headers: bool = True
 ) -> GuardFort:
     """
     Utility function to easily initialize GuardFort middleware.
@@ -301,17 +494,39 @@ def init_guard_fort(
         service_name: Name of the service
         enable_auth: Whether to enable authentication
         log_level: Logging level
+        cors_origins: List of allowed CORS origins
+        cors_methods: List of allowed CORS methods
+        cors_headers: List of allowed CORS headers
+        auth_schemes: List of supported authentication schemes
+        allowed_paths: List of paths that bypass authentication
+        security_headers: Whether to add security headers
         
     Returns:
         GuardFort instance
         
-    Example:
+    Examples:
+        # Basic usage
         app = FastAPI()
         guard_fort = init_guard_fort(app, "amatya-role-prompter")
+        
+        # With custom CORS and auth settings
+        guard_fort = init_guard_fort(
+            app, 
+            "janapada-memory",
+            cors_origins=["https://konveyn2ai.com"],
+            auth_schemes=["Bearer"],
+            security_headers=True
+        )
     """
     return GuardFort(
         app=app,
         service_name=service_name,
         enable_auth=enable_auth,
-        log_level=log_level
+        log_level=log_level,
+        cors_origins=cors_origins,
+        cors_methods=cors_methods,
+        cors_headers=cors_headers,
+        auth_schemes=auth_schemes,
+        allowed_paths=allowed_paths,
+        security_headers=security_headers
     )
