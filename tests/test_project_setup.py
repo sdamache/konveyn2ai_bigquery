@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 # Add src directory to Python path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 # Project root for file path testing
 project_root = Path(__file__).parent.parent
@@ -60,6 +60,7 @@ def test_imports():
     try:
         # Test that we can import from the common module
         from common.config import config
+
         assert config is not None
     except ImportError as e:
         raise AssertionError(f"Import failed: {e}") from e
