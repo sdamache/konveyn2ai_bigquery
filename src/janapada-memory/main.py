@@ -81,9 +81,7 @@ async def startup_event():
             vertexai.init(project=project_id, location=location)
 
             # Load the text embedding model (updated to working model)
-            embedding_model = TextEmbeddingModel.from_pretrained(
-                "text-embedding-004"
-            )
+            embedding_model = TextEmbeddingModel.from_pretrained("text-embedding-004")
             logger.info("✅ Vertex AI TextEmbeddingModel initialized successfully")
         else:
             logger.warning("⚠️ Vertex AI not available - using fallback mode")
@@ -106,7 +104,9 @@ async def startup_event():
                 index_name=f"projects/{project_id}/locations/{location}/indexes/{vector_index_id}"
             )
 
-            logger.info(f"✅ Matching Engine index loaded: {matching_engine_index.display_name}")
+            logger.info(
+                f"✅ Matching Engine index loaded: {matching_engine_index.display_name}"
+            )
             logger.info(f"   Index ID: {vector_index_id}")
         else:
             logger.warning("⚠️ Vertex AI not available - Matching Engine unavailable")
@@ -190,11 +190,15 @@ def search_with_matching_engine(query: str, k: int) -> List[Snippet]:
         return get_mock_snippets(query, k)
 
     if not matching_engine_index:
-        logger.warning("Matching Engine not available - falling back to enhanced mock data")
+        logger.warning(
+            "Matching Engine not available - falling back to enhanced mock data"
+        )
         return get_enhanced_mock_snippets(query, query_embedding, k)
 
     try:
-        logger.info(f"🔍 Performing vector search with {len(query_embedding)} dimensional embedding")
+        logger.info(
+            f"🔍 Performing vector search with {len(query_embedding)} dimensional embedding"
+        )
 
         # Note: For hackathon demo, we simulate vector search results
         # In production, this would use matching_engine_index.find_neighbors()
@@ -225,7 +229,9 @@ def search_with_matching_engine(query: str, k: int) -> List[Snippet]:
         return get_enhanced_mock_snippets(query, query_embedding, k)
 
 
-def get_enhanced_mock_snippets(query: str, query_embedding: List[float], k: int) -> List[Snippet]:
+def get_enhanced_mock_snippets(
+    query: str, query_embedding: List[float], k: int
+) -> List[Snippet]:
     """Enhanced mock snippets that show embedding was generated successfully."""
     enhanced_snippets = [
         Snippet(
@@ -354,14 +360,16 @@ async def health_check():
         "components": {
             "vertex_ai_available": VERTEX_AI_AVAILABLE,
             "embedding_model": embedding_status,
-            "embedding_dimensions": 768 if embedding_model else None,  # Updated for text-embedding-004
-            "embedding_model_name": "text-embedding-004"
+            "embedding_dimensions": 768
             if embedding_model
-            else None,
+            else None,  # Updated for text-embedding-004
+            "embedding_model_name": "text-embedding-004" if embedding_model else None,
             "matching_engine": "ready"
             if matching_engine_index is not None
             else "unavailable",
-            "matching_engine_index_id": os.environ.get("VECTOR_INDEX_ID", "805460437066842112")
+            "matching_engine_index_id": os.environ.get(
+                "VECTOR_INDEX_ID", "805460437066842112"
+            )
             if matching_engine_index is not None
             else None,
             "faiss_fallback": "placeholder" if faiss_index is None else "ready",
@@ -369,7 +377,8 @@ async def health_check():
         "features": {
             "embedding_generation": embedding_model is not None,
             "embedding_caching": True,
-            "vector_search": matching_engine_index is not None,  # True when Matching Engine available
+            "vector_search": matching_engine_index
+            is not None,  # True when Matching Engine available
             "fallback_search": True,
         },
     }
