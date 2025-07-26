@@ -1,0 +1,23 @@
+# Svami Orchestrator - Workflow orchestration and coordination
+# Core dependencies for multi-agent coordination
+
+# Web framework and API
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+streamlit>=1.28.0
+
+# Google AI Platform integration
+google-cloud-aiplatform>=1.38.0
+google-generativeai>=0.3.0
+
+# Data validation and configuration
+pydantic>=2.5.0
+python-dotenv>=1.0.0
+
+# HTTP client for service communication
+requests>=2.31.0
+aiohttp>=3.9.0
+
+# Data processing for coordination
+numpy>=1.24.0
+pandas>=2.0.0
