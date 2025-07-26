@@ -82,9 +82,9 @@ class TestAmatyaRolePrompter:
 
         # Verify advice result
         result = data["result"]
-        assert "advice" in result
-        assert len(result["advice"]) > 0
-        assert isinstance(result["advice"], str)
+        assert "answer" in result
+        assert len(result["answer"]) > 0
+        assert isinstance(result["answer"], str)
 
     def test_advise_jsonrpc_invalid_method(self, client):
         """Test JSON-RPC with invalid method."""
@@ -199,7 +199,7 @@ class TestAmatyaRolePrompter:
 
             if "result" in data:
                 # Advice should be tailored to the role
-                advice = data["result"]["advice"]
+                advice = data["result"]["answer"]
                 assert len(advice) > 0
 
     def test_empty_chunks_handling(self, client, mock_gemini_setup):
@@ -220,7 +220,7 @@ class TestAmatyaRolePrompter:
         # Should handle empty chunks gracefully
         if "result" in data:
             # Should provide general advice when no specific code is available
-            advice = data["result"]["advice"]
+            advice = data["result"]["answer"]
             assert len(advice) > 0
         else:
             # Or return appropriate error
