@@ -5,7 +5,12 @@ This module tests that the project structure is correct and basic
 imports work as expected.
 """
 
+import os
+import sys
 from pathlib import Path
+
+# Add src directory to Python path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 # Project root for file path testing
 project_root = Path(__file__).parent.parent
@@ -53,9 +58,8 @@ def test_python_files_exist():
 def test_imports():
     """Test that basic imports work."""
     try:
-        # Test that we can import from the installed package
-        from src.common.config import config
-
+        # Test that we can import from the common module
+        from common.config import config
         assert config is not None
     except ImportError as e:
         raise AssertionError(f"Import failed: {e}") from e
@@ -63,7 +67,7 @@ def test_imports():
 
 def test_config_loading():
     """Test that configuration can be loaded."""
-    from src.common.config import config
+    from common.config import config
 
     # Test that config object exists
     assert config is not None
@@ -148,7 +152,7 @@ def test_configuration_management():
     ), "Usage examples should be provided"
 
     # Test that config validation works
-    from src.common.config import config
+    from common.config import config
 
     # Test environment detection methods exist
     assert hasattr(config, "is_development"), "is_development method should exist"
