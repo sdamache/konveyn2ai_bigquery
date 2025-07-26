@@ -14,9 +14,34 @@ import os
 # Add the project root and the specific component directory to Python path
 project_root = os.path.join(os.path.dirname(__file__), "../../..")
 svami_path = os.path.join(project_root, "src/svami-orchestrator")
-sys.path.insert(0, svami_path)  # Insert at beginning to prioritize
-sys.path.append(os.path.join(project_root, "src/common"))
+src_path = os.path.join(project_root, "src")
 
+# Ensure paths are absolute and clean
+svami_path = os.path.abspath(svami_path)
+src_path = os.path.abspath(src_path)
+
+# Remove any existing paths to avoid conflicts
+paths_to_remove = [
+    p
+    for p in sys.path
+    if "amatya-role-prompter" in p
+    or "janapada-memory" in p
+    or "svami-orchestrator" in p
+    or p.endswith("/src")
+]
+for path in paths_to_remove:
+    sys.path.remove(path)
+
+# Insert at beginning to prioritize - src path allows 'common' package import
+sys.path.insert(0, svami_path)
+sys.path.insert(1, src_path)
+
+# Force fresh import to avoid module caching conflicts
+import importlib
+import sys
+
+if "main" in sys.modules:
+    importlib.reload(sys.modules["main"])
 from main import app
 from common.models import QueryRequest
 
@@ -221,11 +246,10 @@ class TestSvamiOrchestrator:
     def test_request_id_injection(self, client):
         """Test that request ID is properly injected into requests."""
 
-        with patch(
-            "src.svami_orchestrator.main.janapada_client"
-        ) as mock_janapada, patch(
-            "src.svami_orchestrator.main.amatya_client"
-        ) as mock_amatya:
+        with (
+            patch("src.svami_orchestrator.main.janapada_client") as mock_janapada,
+            patch("src.svami_orchestrator.main.amatya_client") as mock_amatya,
+        ):
             mock_janapada.call = AsyncMock(return_value={"snippets": []})
             mock_amatya.call = AsyncMock(return_value={"advice": "test advice"})
 

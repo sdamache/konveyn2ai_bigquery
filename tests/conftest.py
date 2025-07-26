@@ -157,7 +157,17 @@ def mock_gemini_ai():
 @pytest.fixture
 async def async_client():
     """Async HTTP client for integration tests."""
-    async with httpx.AsyncClient(timeout=TEST_CONFIG["test_timeout"]) as client:
+    client = httpx.AsyncClient(timeout=TEST_CONFIG["test_timeout"])
+    try:
+        yield client
+    finally:
+        await client.aclose()
+
+
+@pytest.fixture
+def integration_client():
+    """Synchronous HTTP client for integration tests."""
+    with httpx.Client(timeout=TEST_CONFIG["test_timeout"]) as client:
         yield client
 
 

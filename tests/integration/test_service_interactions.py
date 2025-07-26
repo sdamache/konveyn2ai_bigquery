@@ -21,7 +21,7 @@ class TestServiceCommunication:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_svami_to_janapada_communication(
-        self, async_client, mock_vertex_ai, mock_matching_engine, sample_snippets
+        self, mock_vertex_ai, mock_matching_engine, sample_snippets
     ):
         """Test Svami calling Janapada for search."""
 
@@ -44,9 +44,14 @@ class TestServiceCommunication:
                 "params": {"query": "authentication implementation", "k": 5},
             }
 
-            response = await async_client.post(
-                f"{SERVICES['janapada']}/", json=jsonrpc_request
-            )
+            # Create async client directly in test
+            async with httpx.AsyncClient(timeout=30.0) as async_client:
+                # Create async client directly in test
+
+                async with httpx.AsyncClient(timeout=30.0) as async_client:
+                    response = await async_client.post(
+                        f"{SERVICES['janapada']}/", json=jsonrpc_request
+                    )
 
             # Verify communication
             mock_post.assert_called_once()
@@ -56,9 +61,7 @@ class TestServiceCommunication:
 
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_svami_to_amatya_communication(
-        self, async_client, mock_gemini_ai, sample_snippets
-    ):
+    async def test_svami_to_amatya_communication(self, mock_gemini_ai, sample_snippets):
         """Test Svami calling Amatya for advice."""
 
         # Mock Amatya response
@@ -82,9 +85,14 @@ class TestServiceCommunication:
                 "params": {"role": "backend engineer", "chunks": sample_snippets},
             }
 
-            response = await async_client.post(
-                f"{SERVICES['amatya']}/", json=jsonrpc_request
-            )
+            # Create async client directly in test
+            async with httpx.AsyncClient(timeout=30.0) as async_client:
+                # Create async client directly in test
+
+                async with httpx.AsyncClient(timeout=30.0) as async_client:
+                    response = await async_client.post(
+                        f"{SERVICES['amatya']}/", json=jsonrpc_request
+                    )
 
             # Verify communication
             mock_post.assert_called_once()
@@ -96,7 +104,6 @@ class TestServiceCommunication:
     @pytest.mark.asyncio
     async def test_end_to_end_workflow(
         self,
-        async_client,
         mock_vertex_ai,
         mock_matching_engine,
         mock_gemini_ai,
@@ -135,11 +142,14 @@ class TestServiceCommunication:
                 "role": "backend engineer",
             }
 
-            response = await async_client.post(
-                f"{SERVICES['svami']}/answer",
-                json=query_request,
-                headers={"Authorization": "Bearer test-token"},
-            )
+            # Create async client directly in test
+
+            async with httpx.AsyncClient(timeout=30.0) as async_client:
+                response = await async_client.post(
+                    f"{SERVICES['svami']}/answer",
+                    json=query_request,
+                    headers={"Authorization": "Bearer test-token"},
+                )
 
             # Verify end-to-end response
             assert response.status_code == 200
@@ -172,7 +182,7 @@ class TestServiceFailureHandling:
 
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_janapada_service_unavailable(self, async_client, mock_gemini_ai):
+    async def test_janapada_service_unavailable(self, mock_gemini_ai):
         """Test behavior when Janapada service is unavailable."""
 
         with patch("httpx.AsyncClient.post") as mock_post:
@@ -199,11 +209,14 @@ class TestServiceFailureHandling:
                 "role": "backend engineer",
             }
 
-            response = await async_client.post(
-                f"{SERVICES['svami']}/answer",
-                json=query_request,
-                headers={"Authorization": "Bearer test-token"},
-            )
+            # Create async client directly in test
+
+            async with httpx.AsyncClient(timeout=30.0) as async_client:
+                response = await async_client.post(
+                    f"{SERVICES['svami']}/answer",
+                    json=query_request,
+                    headers={"Authorization": "Bearer test-token"},
+                )
 
             # Should still return response with graceful degradation
             assert response.status_code == 200
@@ -216,7 +229,7 @@ class TestServiceFailureHandling:
     @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_amatya_service_unavailable(
-        self, async_client, mock_vertex_ai, mock_matching_engine, sample_snippets
+        self, mock_vertex_ai, mock_matching_engine, sample_snippets
     ):
         """Test behavior when Amatya service is unavailable."""
 
@@ -242,11 +255,14 @@ class TestServiceFailureHandling:
                 "role": "backend engineer",
             }
 
-            response = await async_client.post(
-                f"{SERVICES['svami']}/answer",
-                json=query_request,
-                headers={"Authorization": "Bearer test-token"},
-            )
+            # Create async client directly in test
+
+            async with httpx.AsyncClient(timeout=30.0) as async_client:
+                response = await async_client.post(
+                    f"{SERVICES['svami']}/answer",
+                    json=query_request,
+                    headers={"Authorization": "Bearer test-token"},
+                )
 
             # Should return error when advice generation fails
             assert response.status_code == 500
@@ -255,7 +271,7 @@ class TestServiceFailureHandling:
 
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_partial_service_failures(self, async_client):
+    async def test_partial_service_failures(self):
         """Test handling of partial service failures and timeouts."""
 
         with patch("httpx.AsyncClient.post") as mock_post:
@@ -283,11 +299,14 @@ class TestServiceFailureHandling:
                 "role": "backend engineer",
             }
 
-            response = await async_client.post(
-                f"{SERVICES['svami']}/answer",
-                json=query_request,
-                headers={"Authorization": "Bearer test-token"},
-            )
+            # Create async client directly in test
+
+            async with httpx.AsyncClient(timeout=30.0) as async_client:
+                response = await async_client.post(
+                    f"{SERVICES['svami']}/answer",
+                    json=query_request,
+                    headers={"Authorization": "Bearer test-token"},
+                )
 
             # Should handle timeouts gracefully
             assert response.status_code in [200, 500]
@@ -298,7 +317,7 @@ class TestServiceHealthMonitoring:
 
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_all_services_healthy(self, async_client):
+    async def test_all_services_healthy(self):
         """Test health check when all services are healthy."""
 
         with patch("httpx.AsyncClient.get") as mock_get:
@@ -308,7 +327,10 @@ class TestServiceHealthMonitoring:
             healthy_response.json.return_value = {"status": "healthy"}
             mock_get.return_value = healthy_response
 
-            response = await async_client.get(f"{SERVICES['svami']}/health")
+            # Create async client directly in test
+
+            async with httpx.AsyncClient(timeout=30.0) as async_client:
+                response = await async_client.get(f"{SERVICES['svami']}/health")
 
             assert response.status_code == 200
             data = response.json()
@@ -318,7 +340,7 @@ class TestServiceHealthMonitoring:
 
     @pytest.mark.integration
     @pytest.mark.asyncio
-    async def test_dependency_health_reporting(self, async_client):
+    async def test_dependency_health_reporting(self):
         """Test health reporting of dependency services."""
 
         with patch("httpx.AsyncClient.get") as mock_get:
@@ -336,7 +358,10 @@ class TestServiceHealthMonitoring:
 
             mock_get.side_effect = mock_health_response
 
-            response = await async_client.get(f"{SERVICES['svami']}/health")
+            # Create async client directly in test
+
+            async with httpx.AsyncClient(timeout=30.0) as async_client:
+                response = await async_client.get(f"{SERVICES['svami']}/health")
 
             assert response.status_code == 200
             data = response.json()
@@ -357,7 +382,6 @@ class TestRequestTracking:
     @pytest.mark.asyncio
     async def test_request_id_propagation(
         self,
-        async_client,
         mock_vertex_ai,
         mock_matching_engine,
         mock_gemini_ai,
@@ -399,11 +423,14 @@ class TestRequestTracking:
                 "role": "backend engineer",
             }
 
-            response = await async_client.post(
-                f"{SERVICES['svami']}/answer",
-                json=query_request,
-                headers={"Authorization": "Bearer test-token"},
-            )
+            # Create async client directly in test
+
+            async with httpx.AsyncClient(timeout=30.0) as async_client:
+                response = await async_client.post(
+                    f"{SERVICES['svami']}/answer",
+                    json=query_request,
+                    headers={"Authorization": "Bearer test-token"},
+                )
 
             assert response.status_code == 200
             data = response.json()
@@ -420,7 +447,6 @@ class TestRequestTracking:
     @pytest.mark.asyncio
     async def test_unique_request_ids(
         self,
-        async_client,
         mock_vertex_ai,
         mock_matching_engine,
         mock_gemini_ai,
@@ -444,11 +470,14 @@ class TestRequestTracking:
             for i in range(10):
                 query_request = {"question": f"Question {i}", "role": "developer"}
 
-                response = await async_client.post(
-                    f"{SERVICES['svami']}/answer",
-                    json=query_request,
-                    headers={"Authorization": "Bearer test-token"},
-                )
+                # Create async client directly in test
+
+                async with httpx.AsyncClient(timeout=30.0) as async_client:
+                    response = await async_client.post(
+                        f"{SERVICES['svami']}/answer",
+                        json=query_request,
+                        headers={"Authorization": "Bearer test-token"},
+                    )
 
                 assert response.status_code == 200
                 data = response.json()
@@ -470,7 +499,7 @@ class TestServiceLoadTesting:
     @pytest.mark.slow
     @pytest.mark.asyncio
     async def test_concurrent_requests(
-        self, async_client, mock_vertex_ai, mock_matching_engine, mock_gemini_ai
+        self, mock_vertex_ai, mock_matching_engine, mock_gemini_ai
     ):
         """Test handling of concurrent requests across services."""
 
@@ -508,11 +537,14 @@ class TestServiceLoadTesting:
                     "role": "developer",
                 }
 
-                response = await async_client.post(
-                    f"{SERVICES['svami']}/answer",
-                    json=query_request,
-                    headers={"Authorization": "Bearer test-token"},
-                )
+                # Create async client directly in test
+
+                async with httpx.AsyncClient(timeout=30.0) as async_client:
+                    response = await async_client.post(
+                        f"{SERVICES['svami']}/answer",
+                        json=query_request,
+                        headers={"Authorization": "Bearer test-token"},
+                    )
 
                 return request_id, response.status_code, response.json()
 
@@ -533,7 +565,7 @@ class TestServiceLoadTesting:
     @pytest.mark.slow
     @pytest.mark.asyncio
     async def test_service_performance_benchmarks(
-        self, async_client, mock_vertex_ai, mock_matching_engine, mock_gemini_ai
+        self, mock_vertex_ai, mock_matching_engine, mock_gemini_ai
     ):
         """Test performance benchmarks for service interactions."""
 
@@ -567,11 +599,14 @@ class TestServiceLoadTesting:
                     "role": "developer",
                 }
 
-                response = await async_client.post(
-                    f"{SERVICES['svami']}/answer",
-                    json=query_request,
-                    headers={"Authorization": "Bearer test-token"},
-                )
+                # Create async client directly in test
+
+                async with httpx.AsyncClient(timeout=30.0) as async_client:
+                    response = await async_client.post(
+                        f"{SERVICES['svami']}/answer",
+                        json=query_request,
+                        headers={"Authorization": "Bearer test-token"},
+                    )
 
                 assert response.status_code == 200
 

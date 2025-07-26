@@ -14,9 +14,34 @@ import os
 # Add the project root and the specific component directory to Python path
 project_root = os.path.join(os.path.dirname(__file__), "../../..")
 janapada_path = os.path.join(project_root, "src/janapada-memory")
-sys.path.insert(0, janapada_path)  # Insert at beginning to prioritize
-sys.path.append(os.path.join(project_root, "src/common"))
+src_path = os.path.join(project_root, "src")
 
+# Ensure paths are absolute and clean
+janapada_path = os.path.abspath(janapada_path)
+src_path = os.path.abspath(src_path)
+
+# Remove any existing paths to avoid conflicts
+paths_to_remove = [
+    p
+    for p in sys.path
+    if "amatya-role-prompter" in p
+    or "janapada-memory" in p
+    or "svami-orchestrator" in p
+    or p.endswith("/src")
+]
+for path in paths_to_remove:
+    sys.path.remove(path)
+
+# Insert at beginning to prioritize - src path allows 'common' package import
+sys.path.insert(0, janapada_path)
+sys.path.insert(1, src_path)
+
+# Force fresh import to avoid module caching conflicts
+import importlib
+import sys
+
+if "main" in sys.modules:
+    importlib.reload(sys.modules["main"])
 from main import app
 
 
@@ -424,6 +449,15 @@ class TestJanapadaPerformance:
     def client(self):
         """Test client for Janapada service."""
         return TestClient(app)
+
+    @pytest.fixture
+    def mock_vertex_setup(self, mock_env_vars, mock_google_credentials, mock_vertex_ai):
+        """Set up mocked Vertex AI environment."""
+        return {
+            "env": mock_env_vars,
+            "credentials": mock_google_credentials,
+            "vertex": mock_vertex_ai,
+        }
 
     @pytest.mark.slow
     def test_search_performance(self, client, mock_vertex_setup, mock_matching_engine):
