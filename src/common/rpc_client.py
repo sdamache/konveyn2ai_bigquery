@@ -1,6 +1,7 @@
 import httpx
 import uuid
 from contextlib import asynccontextmanager
+from typing import Any, Dict, Optional, Union
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from .models import JsonRpcRequest, JsonRpcResponse, JsonRpcError
@@ -12,16 +13,16 @@ class JsonRpcClient:
         self.max_retries = max_retries
 
     @asynccontextmanager
-    async def session(self):
+    async def session(self) -> Any:
         async with httpx.AsyncClient() as client:
             yield client
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
-    async def call(self, method: str, params: dict, id: str | int | None = None) -> JsonRpcResponse:
+    async def call(self, method: str, params: Dict[str, Any], id: Optional[Union[str, int]] = None) -> JsonRpcResponse:
         if id is None:
             id = str(uuid.uuid4())
 
-        request = JsonRpcRequest(id=id, method=method, params=params)
+        request = JsonRpcRequest(id=str(id) if id is not None else None, method=method, params=params)
 
         async with self.session() as client:
             try:

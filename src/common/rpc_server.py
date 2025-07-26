@@ -26,10 +26,10 @@ class JsonRpcMethodRegistry:
     """Registry for JSON-RPC method handlers."""
     
     def __init__(self):
-        self._methods: Dict[str, Callable] = {}
+        self._methods: Dict[str, Callable[..., Any]] = {}
         self._method_schemas: Dict[str, Dict[str, Any]] = {}
     
-    def register(self, method_name: str, handler: Callable, description: str = "") -> None:
+    def register(self, method_name: str, handler: Callable[..., Any], description: str = "") -> None:
         """Register a method handler with optional description."""
         if method_name in self._methods:
             raise ValueError(f"Method '{method_name}' is already registered")
@@ -41,7 +41,7 @@ class JsonRpcMethodRegistry:
         self._method_schemas[method_name] = self._extract_method_schema(handler, description)
         logger.info(f"Registered JSON-RPC method: {method_name}")
     
-    def get_handler(self, method_name: str) -> Optional[Callable]:
+    def get_handler(self, method_name: str) -> Optional[Callable[..., Any]]:
         """Get a registered method handler."""
         return self._methods.get(method_name)
     
@@ -49,7 +49,7 @@ class JsonRpcMethodRegistry:
         """Get all registered methods with their schemas."""
         return self._method_schemas.copy()
     
-    def _extract_method_schema(self, handler: Callable, description: str) -> Dict[str, Any]:
+    def _extract_method_schema(self, handler: Callable[..., Any], description: str) -> Dict[str, Any]:
         """Extract method schema from handler function signature."""
         sig = signature(handler)
         params = {}
@@ -80,16 +80,16 @@ class JsonRpcServer:
         self.title = title
         self.version = version
         self.registry = JsonRpcMethodRegistry()
-        self._middleware: List[Callable] = []
+        self._middleware: List[Callable[..., Any]] = []
     
     def method(self, name: str, description: str = ""):
         """Decorator to register a JSON-RPC method."""
-        def decorator(func: Callable) -> Callable:
+        def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             self.registry.register(name, func, description)
             return func
         return decorator
     
-    def add_middleware(self, middleware: Callable) -> None:
+    def add_middleware(self, middleware: Callable[..., Any]) -> None:
         """Add middleware function that processes requests/responses."""
         self._middleware.append(middleware)
     
@@ -166,7 +166,8 @@ class JsonRpcServer:
                     rpc_request.id,
                     JsonRpcError(
                         code=JsonRpcErrorCode.METHOD_NOT_FOUND,
-                        message=f"Method not found: {rpc_request.method}"
+                        message=f"Method not found: {rpc_request.method}",
+                        data=None
                     )
                 )
             
@@ -249,7 +250,7 @@ class JsonRpcServer:
         """Create an error response as JSONResponse."""
         error_response = JsonRpcResponse.create_error(
             request_id or "unknown",
-            JsonRpcError(code=code, message=message)
+            JsonRpcError(code=code, message=message, data=None)
         )
         return JSONResponse(content=error_response.model_dump())
     
@@ -299,7 +300,7 @@ async def request_id_propagation_middleware(rpc_request: JsonRpcRequest, http_re
 
 _global_server = None
 
-def rpc_method(name: str, description: str = ""):
+def rpc_method(name: str, description: str = "") -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Global decorator to register JSON-RPC methods."""
     global _global_server
     if _global_server is None:

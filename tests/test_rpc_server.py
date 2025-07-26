@@ -3,21 +3,22 @@ Tests for JSON-RPC 2.0 Server implementation.
 """
 
 import json
+from unittest.mock import AsyncMock, Mock
+
 import pytest
-from unittest.mock import Mock, AsyncMock
 from fastapi import Request
 from fastapi.testclient import TestClient
 
+from src.common.models import JsonRpcError, JsonRpcErrorCode, JsonRpcRequest, JsonRpcResponse
 from src.common.rpc_server import (
-    JsonRpcServer, 
     JsonRpcMethodRegistry,
-    create_success_response,
+    JsonRpcServer,
     create_error_response,
+    create_success_response,
+    get_global_server,
     logging_middleware,
     rpc_method,
-    get_global_server
 )
-from src.common.models import JsonRpcRequest, JsonRpcResponse, JsonRpcError, JsonRpcErrorCode
 
 
 class TestJsonRpcMethodRegistry:
