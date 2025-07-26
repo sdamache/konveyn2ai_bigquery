@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools==45", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "konveyn2ai"
