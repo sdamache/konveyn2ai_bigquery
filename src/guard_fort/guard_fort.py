@@ -16,13 +16,565 @@ import logging
 import json
 import re
 import statistics
+import traceback
 from collections import defaultdict, deque
 from datetime import datetime, timezone
-from typing import Callable, Optional, Dict, Any, List, Union
-from fastapi import FastAPI, Request, Response
+from typing import Callable, Optional, Dict, Any, List, Union, Type
+from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.status import HTTP_400_BAD_REQUEST, HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN, HTTP_404_NOT_FOUND, HTTP_422_UNPROCESSABLE_ENTITY, HTTP_429_TOO_MANY_REQUESTS, HTTP_500_INTERNAL_SERVER_ERROR, HTTP_502_BAD_GATEWAY, HTTP_503_SERVICE_UNAVAILABLE, HTTP_504_GATEWAY_TIMEOUT
+
+
+# Custom Exception Classes for GuardFort
+class GuardFortException(Exception):
+    """Base exception class for GuardFort middleware."""
+    
+    def __init__(self, message: str, status_code: int = HTTP_500_INTERNAL_SERVER_ERROR, error_code: str = None):
+        self.message = message
+        self.status_code = status_code
+        self.error_code = error_code or self.__class__.__name__.lower().replace('exception', '_error')
+        super().__init__(self.message)
+
+
+class AuthenticationException(GuardFortException):
+    """Exception raised for authentication failures."""
+    
+    def __init__(self, message: str = "Authentication failed", reason: str = None):
+        self.reason = reason
+        super().__init__(message, HTTP_401_UNAUTHORIZED, "authentication_error")
+
+
+class AuthorizationException(GuardFortException):
+    """Exception raised for authorization failures."""
+    
+    def __init__(self, message: str = "Access denied", resource: str = None):
+        self.resource = resource
+        super().__init__(message, HTTP_403_FORBIDDEN, "authorization_error")
+
+
+class ValidationException(GuardFortException):
+    """Exception raised for request validation errors."""
+    
+    def __init__(self, message: str = "Request validation failed", field: str = None):
+        self.field = field
+        super().__init__(message, HTTP_422_UNPROCESSABLE_ENTITY, "validation_error")
+
+
+class RateLimitException(GuardFortException):
+    """Exception raised when rate limits are exceeded."""
+    
+    def __init__(self, message: str = "Rate limit exceeded", retry_after: int = None):
+        self.retry_after = retry_after
+        super().__init__(message, HTTP_429_TOO_MANY_REQUESTS, "rate_limit_error")
+
+
+class ServiceUnavailableException(GuardFortException):
+    """Exception raised when a service is unavailable."""
+    
+    def __init__(self, message: str = "Service temporarily unavailable", service_name: str = None):
+        self.service_name = service_name
+        super().__init__(message, HTTP_503_SERVICE_UNAVAILABLE, "service_unavailable")
+
+
+class ExternalServiceException(GuardFortException):
+    """Exception raised when external service calls fail."""
+    
+    def __init__(self, message: str = "External service error", service_name: str = None, upstream_status: int = None):
+        self.service_name = service_name
+        self.upstream_status = upstream_status
+        super().__init__(message, HTTP_502_BAD_GATEWAY, "external_service_error")
+
+
+class ConfigurationException(GuardFortException):
+    """Exception raised for configuration errors."""
+    
+    def __init__(self, message: str = "Configuration error", config_key: str = None):
+        self.config_key = config_key
+        super().__init__(message, HTTP_500_INTERNAL_SERVER_ERROR, "configuration_error")
+
+
+class ExceptionHandler:
+    """
+    Advanced exception handling system for GuardFort middleware.
+    
+    Provides comprehensive exception categorization, logging, and response generation
+    with sanitized error details for production environments.
+    """
+    
+    def __init__(self, 
+                 service_name: str,
+                 structured_logger: 'StructuredLogger',
+                 metrics_collector: 'MetricsCollector' = None,
+                 debug_mode: bool = False,
+                 include_stack_trace: bool = False):
+        """
+        Initialize exception handler.
+        
+        Args:
+            service_name: Name of the service for logging
+            structured_logger: Logger instance for exception logging
+            metrics_collector: Metrics collector for error tracking
+            debug_mode: Whether to include debug information in responses
+            include_stack_trace: Whether to include stack traces in logs
+        """
+        self.service_name = service_name
+        self.structured_logger = structured_logger
+        self.metrics_collector = metrics_collector
+        self.debug_mode = debug_mode
+        self.include_stack_trace = include_stack_trace
+        
+        # Exception type mappings for better categorization
+        self.exception_mappings = {
+            HTTPException: self._handle_http_exception,
+            GuardFortException: self._handle_guardfort_exception,
+            ValidationError: self._handle_validation_exception,
+            KeyError: self._handle_key_exception,
+            ValueError: self._handle_value_exception,
+            ConnectionError: self._handle_connection_exception,
+            TimeoutError: self._handle_timeout_exception,
+            PermissionError: self._handle_permission_exception,
+        }
+    
+    def handle_exception(self, 
+                        exception: Exception, 
+                        request: Request, 
+                        request_id: str) -> JSONResponse:
+        """
+        Handle any exception and return appropriate JSON response.
+        
+        Args:
+            exception: The exception that occurred
+            request: FastAPI request object
+            request_id: Request ID for tracing
+            
+        Returns:
+            JSONResponse with appropriate status code and error details
+        """
+        # Get exception handler based on type
+        handler = self._get_exception_handler(exception)
+        
+        # Handle the exception
+        error_data = handler(exception, request, request_id)
+        
+        # Log the exception
+        self._log_exception(exception, request, request_id, error_data)
+        
+        # Record metrics if available
+        if self.metrics_collector:
+            endpoint_key = f"{request.method}:{request.url.path}"
+            self.metrics_collector.record_error(
+                request_id, 
+                endpoint_key, 
+                type(exception).__name__, 
+                str(exception)
+            )
+        
+        # Create response
+        return self._create_error_response(error_data, request_id)
+    
+    def _get_exception_handler(self, exception: Exception) -> Callable:
+        """Get the appropriate handler for an exception type."""
+        for exc_type, handler in self.exception_mappings.items():
+            if isinstance(exception, exc_type):
+                return handler
+        return self._handle_generic_exception
+    
+    def _handle_http_exception(self,
+                              exception: HTTPException,
+                              request: Request,
+                              request_id: str) -> Dict[str, Any]:
+        """Handle FastAPI HTTPException."""
+        headers = getattr(exception, 'headers', {})
+        if headers is None:
+            headers = {}
+        return {
+            "error_code": f"http_{exception.status_code}",
+            "message": exception.detail,
+            "status_code": exception.status_code,
+            "category": "http_error",
+            "headers": headers
+        }
+    
+    def _handle_guardfort_exception(self, 
+                                   exception: GuardFortException, 
+                                   request: Request, 
+                                   request_id: str) -> Dict[str, Any]:
+        """Handle custom GuardFort exceptions."""
+        error_data = {
+            "error_code": exception.error_code,
+            "message": exception.message,
+            "status_code": exception.status_code,
+            "category": "guardfort_error"
+        }
+        
+        # Add exception-specific details
+        if isinstance(exception, AuthenticationException) and exception.reason:
+            error_data["details"] = {"reason": exception.reason}
+        elif isinstance(exception, AuthorizationException) and exception.resource:
+            error_data["details"] = {"resource": exception.resource}
+        elif isinstance(exception, ValidationException) and exception.field:
+            error_data["details"] = {"field": exception.field}
+        elif isinstance(exception, RateLimitException) and exception.retry_after:
+            error_data["details"] = {"retry_after": exception.retry_after}
+            error_data["headers"] = {"Retry-After": str(exception.retry_after)}
+        elif isinstance(exception, ExternalServiceException):
+            error_data["details"] = {
+                "service_name": exception.service_name,
+                "upstream_status": exception.upstream_status
+            }
+        elif isinstance(exception, ConfigurationException) and exception.config_key:
+            error_data["details"] = {"config_key": exception.config_key}
+        
+        return error_data
+    
+    def _handle_validation_exception(self, 
+                                   exception: Exception, 
+                                   request: Request, 
+                                   request_id: str) -> Dict[str, Any]:
+        """Handle validation errors (e.g., Pydantic ValidationError)."""
+        return {
+            "error_code": "validation_error",
+            "message": "Request validation failed",
+            "status_code": HTTP_422_UNPROCESSABLE_ENTITY,
+            "category": "validation_error",
+            "details": {"validation_errors": str(exception)} if self.debug_mode else {}
+        }
+    
+    def _handle_key_exception(self, 
+                            exception: KeyError, 
+                            request: Request, 
+                            request_id: str) -> Dict[str, Any]:
+        """Handle KeyError exceptions."""
+        return {
+            "error_code": "key_error",
+            "message": "Required key not found" if not self.debug_mode else f"Key not found: {exception}",
+            "status_code": HTTP_400_BAD_REQUEST,
+            "category": "client_error"
+        }
+    
+    def _handle_value_exception(self, 
+                              exception: ValueError, 
+                              request: Request, 
+                              request_id: str) -> Dict[str, Any]:
+        """Handle ValueError exceptions."""
+        return {
+            "error_code": "value_error",
+            "message": "Invalid value provided" if not self.debug_mode else str(exception),
+            "status_code": HTTP_400_BAD_REQUEST,
+            "category": "client_error"
+        }
+    
+    def _handle_connection_exception(self, 
+                                   exception: ConnectionError, 
+                                   request: Request, 
+                                   request_id: str) -> Dict[str, Any]:
+        """Handle connection errors."""
+        return {
+            "error_code": "connection_error",
+            "message": "Service connection failed",
+            "status_code": HTTP_502_BAD_GATEWAY,
+            "category": "external_error"
+        }
+    
+    def _handle_timeout_exception(self, 
+                                exception: TimeoutError, 
+                                request: Request, 
+                                request_id: str) -> Dict[str, Any]:
+        """Handle timeout errors."""
+        return {
+            "error_code": "timeout_error",
+            "message": "Request timeout",
+            "status_code": HTTP_504_GATEWAY_TIMEOUT,
+            "category": "timeout_error"
+        }
+    
+    def _handle_permission_exception(self, 
+                                   exception: PermissionError, 
+                                   request: Request, 
+                                   request_id: str) -> Dict[str, Any]:
+        """Handle permission errors."""
+        return {
+            "error_code": "permission_error",
+            "message": "Permission denied",
+            "status_code": HTTP_403_FORBIDDEN,
+            "category": "authorization_error"
+        }
+    
+    def _handle_generic_exception(self, 
+                                exception: Exception, 
+                                request: Request, 
+                                request_id: str) -> Dict[str, Any]:
+        """Handle any unhandled exception."""
+        return {
+            "error_code": "internal_server_error",
+            "message": "An internal error occurred" if not self.debug_mode else str(exception),
+            "status_code": HTTP_500_INTERNAL_SERVER_ERROR,
+            "category": "server_error"
+        }
+    
+    def _log_exception(self, 
+                      exception: Exception, 
+                      request: Request, 
+                      request_id: str, 
+                      error_data: Dict[str, Any]):
+        """Log exception with comprehensive context."""
+        log_data = {
+            "event_type": "exception_handled",
+            "request_id": request_id,
+            "exception_type": type(exception).__name__,
+            "exception_message": str(exception),
+            "error_code": error_data.get("error_code"),
+            "status_code": error_data.get("status_code"),
+            "category": error_data.get("category"),
+            "method": request.method,
+            "path": request.url.path,
+            "query_params": dict(request.query_params) if request.query_params else None,
+            "user_agent": request.headers.get("User-Agent", "unknown"),
+            "remote_addr": request.client.host if request.client else "unknown",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        
+        # Add stack trace if enabled
+        if self.include_stack_trace:
+            log_data["stack_trace"] = traceback.format_exc()
+        
+        # Add debug details if in debug mode
+        if self.debug_mode and "details" in error_data:
+            log_data["error_details"] = error_data["details"]
+        
+        # Log with appropriate level based on error category
+        log_level = "ERROR"
+        if error_data.get("category") in ["client_error", "validation_error"]:
+            log_level = "WARN"
+        elif error_data.get("status_code", 500) < 500:
+            log_level = "WARN"
+        
+        self.structured_logger.log_request(log_level, log_data)
+    
+    def _create_error_response(self, 
+                              error_data: Dict[str, Any], 
+                              request_id: str) -> JSONResponse:
+        """Create standardized error response."""
+        content = {
+            "error": error_data["error_code"],
+            "message": error_data["message"],
+            "request_id": request_id,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        
+        # Add details if available and appropriate
+        if "details" in error_data and (self.debug_mode or error_data.get("category") != "server_error"):
+            content["details"] = error_data["details"]
+        
+        headers = {
+            "X-Request-ID": request_id,
+            "X-Service": self.service_name
+        }
+        
+        # Add any custom headers
+        if "headers" in error_data and error_data["headers"]:
+            headers.update(error_data["headers"])
+        
+        return JSONResponse(
+            status_code=error_data["status_code"],
+            content=content,
+            headers=headers
+        )
+
+
+# Import ValidationError after defining custom exceptions to avoid circular imports
+try:
+    from pydantic import ValidationError
+except ImportError:
+    # Create a placeholder if Pydantic is not available
+    class ValidationError(Exception):
+        pass
+
+
+class ServiceIntegration:
+    """
+    Utility class for service integration and communication helpers.
+    
+    Provides common functionality for service-to-service communication,
+    health checks, and integration patterns.
+    """
+    
+    def __init__(self, 
+                 service_name: str,
+                 structured_logger: 'StructuredLogger',
+                 timeout: float = 30.0):
+        """
+        Initialize service integration utilities.
+        
+        Args:
+            service_name: Name of the current service
+            structured_logger: Logger instance for integration logging
+            timeout: Default timeout for service calls
+        """
+        self.service_name = service_name
+        self.structured_logger = structured_logger
+        self.timeout = timeout
+        self.service_registry = {}
+    
+    def register_service(self, 
+                        service_name: str, 
+                        base_url: str, 
+                        health_endpoint: str = "/health",
+                        timeout: float = None):
+        """
+        Register a service for integration.
+        
+        Args:
+            service_name: Name of the service to register
+            base_url: Base URL of the service
+            health_endpoint: Health check endpoint path
+            timeout: Service-specific timeout override
+        """
+        self.service_registry[service_name] = {
+            "base_url": base_url.rstrip("/"),
+            "health_endpoint": health_endpoint,
+            "timeout": timeout or self.timeout,
+            "last_health_check": None,
+            "is_healthy": None
+        }
+        
+        self.structured_logger.log_request("INFO", {
+            "event_type": "service_registered",
+            "service_name": service_name,
+            "base_url": base_url,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+    
+    async def check_service_health(self, service_name: str) -> Dict[str, Any]:
+        """
+        Check the health of a registered service.
+        
+        Args:
+            service_name: Name of the service to check
+            
+        Returns:
+            Dictionary with health status information
+            
+        Raises:
+            ServiceUnavailableException: If service is not registered or unhealthy
+        """
+        if service_name not in self.service_registry:
+            raise ServiceUnavailableException(
+                f"Service '{service_name}' is not registered",
+                service_name=service_name
+            )
+        
+        service_config = self.service_registry[service_name]
+        health_url = f"{service_config['base_url']}{service_config['health_endpoint']}"
+        
+        try:
+            # This is a placeholder for actual HTTP client implementation
+            # In a real implementation, you'd use httpx, aiohttp, or similar
+            health_status = {
+                "service_name": service_name,
+                "status": "healthy",  # This would come from actual HTTP call
+                "response_time_ms": 50,  # This would be measured
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            
+            service_config["last_health_check"] = datetime.now(timezone.utc)
+            service_config["is_healthy"] = health_status["status"] == "healthy"
+            
+            self.structured_logger.log_request("INFO", {
+                "event_type": "service_health_check",
+                "service_name": service_name,
+                "health_status": health_status,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            })
+            
+            return health_status
+            
+        except Exception as e:
+            service_config["is_healthy"] = False
+            service_config["last_health_check"] = datetime.now(timezone.utc)
+            
+            self.structured_logger.log_request("ERROR", {
+                "event_type": "service_health_check_failed",
+                "service_name": service_name,
+                "error": str(e),
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            })
+            
+            raise ExternalServiceException(
+                f"Health check failed for service '{service_name}': {e}",
+                service_name=service_name
+            )
+    
+    def get_service_info(self, service_name: str = None) -> Dict[str, Any]:
+        """
+        Get information about registered services.
+        
+        Args:
+            service_name: Specific service name, or None for all services
+            
+        Returns:
+            Dictionary with service information
+        """
+        if service_name:
+            if service_name not in self.service_registry:
+                raise ServiceUnavailableException(
+                    f"Service '{service_name}' is not registered",
+                    service_name=service_name
+                )
+            return {service_name: self.service_registry[service_name]}
+        
+        return dict(self.service_registry)
+    
+    def create_service_request_context(self, 
+                                     request_id: str, 
+                                     source_service: str = None) -> Dict[str, str]:
+        """
+        Create context headers for service-to-service requests.
+        
+        Args:
+            request_id: Current request ID for tracing
+            source_service: Name of the calling service
+            
+        Returns:
+            Dictionary of headers to include in service requests
+        """
+        return {
+            "X-Request-ID": request_id,
+            "X-Source-Service": source_service or self.service_name,
+            "X-Correlation-ID": str(uuid.uuid4()),
+            "User-Agent": f"{self.service_name}/1.0.0"
+        }
+    
+    def validate_service_response(self, 
+                                response_data: Dict[str, Any], 
+                                expected_fields: List[str] = None) -> bool:
+        """
+        Validate a service response structure.
+        
+        Args:
+            response_data: Response data to validate
+            expected_fields: List of required fields
+            
+        Returns:
+            True if response is valid
+            
+        Raises:
+            ValidationException: If response is invalid
+        """
+        if not isinstance(response_data, dict):
+            raise ValidationException("Response must be a dictionary")
+        
+        if expected_fields:
+            missing_fields = [field for field in expected_fields if field not in response_data]
+            if missing_fields:
+                raise ValidationException(
+                    f"Missing required fields: {missing_fields}",
+                    field=missing_fields[0]
+                )
+        
+        return True
 
 
 class MetricsCollector:
@@ -436,7 +988,7 @@ class GuardFort:
     """
     
     def __init__(
-        self, 
+        self,
         app: FastAPI,
         service_name: str = "konveyn2ai-service",
         enable_auth: bool = True,
@@ -452,7 +1004,8 @@ class GuardFort:
         enable_metrics: bool = True,
         metrics_retention_minutes: int = 60,
         performance_thresholds: Dict[str, float] = None,
-        include_trace_logs: bool = True
+        include_trace_logs: bool = True,
+        debug_mode: bool = False
     ):
         """
         Initialize GuardFort middleware with FastAPI application.
@@ -486,7 +1039,8 @@ class GuardFort:
         self.allowed_paths = allowed_paths
         self.security_headers = security_headers
         self.enable_metrics = enable_metrics
-        
+        self.debug_mode = debug_mode
+
         # Set up performance thresholds with defaults
         self.performance_thresholds = performance_thresholds or {
             "response_time_ms": 5000,  # 5 seconds
@@ -515,6 +1069,21 @@ class GuardFort:
         else:
             self.metrics = None
         
+        # Initialize advanced exception handler
+        self.exception_handler = ExceptionHandler(
+            service_name=service_name,
+            structured_logger=self.structured_logger,
+            metrics_collector=self.metrics,
+            debug_mode=self.debug_mode,
+            include_stack_trace=include_trace_logs
+        )
+        
+        # Initialize service integration utilities
+        self.service_integration = ServiceIntegration(
+            service_name=service_name,
+            structured_logger=self.structured_logger
+        )
+        
         # Configure CORS if needed
         self._configure_cors()
         
@@ -537,10 +1106,19 @@ class GuardFort:
     
     def _register_middleware(self):
         """Register the GuardFort middleware with the FastAPI application."""
-        
+
         @self.app.middleware("http")
         async def guard_fort_middleware(request: Request, call_next: Callable):
             return await self._process_request(request, call_next)
+
+        # Register exception handler for HTTPException to ensure GuardFort handles them
+        @self.app.exception_handler(HTTPException)
+        async def http_exception_handler(request: Request, exc: HTTPException):
+            # Generate or extract request ID
+            request_id = self._get_or_generate_request_id(request)
+
+            # Use GuardFort's exception handler for consistent error formatting
+            return self.exception_handler.handle_exception(exc, request, request_id)
     
     async def _process_request(self, request: Request, call_next: Callable) -> Response:
         """
@@ -650,29 +1228,20 @@ class GuardFort:
             # Calculate duration even for failed requests
             duration = time.time() - start_time
             
-            # Record error metrics
+            # Record request metrics with appropriate status code
+            status_code = getattr(e, 'status_code', 500)
             if self.metrics:
-                endpoint_key = f"{request.method}:{request.url.path}"
-                self.metrics.record_error(
-                    request_id, 
-                    endpoint_key, 
-                    type(e).__name__, 
-                    str(e)
-                )
                 self.metrics.record_request_end(
                     request.method,
                     request.url.path,
-                    500,
+                    status_code,
                     duration,
                     request.headers.get("User-Agent"),
                     request.client.host if request.client else None
                 )
             
-            # Log the exception with enhanced data
-            self._log_exception_enhanced(request, request_id, duration, e)
-            
-            # Return sanitized error response
-            return self._create_error_response(request_id, e)
+            # Use advanced exception handler
+            return self.exception_handler.handle_exception(e, request, request_id)
     
     def _get_or_generate_request_id(self, request: Request) -> str:
         """
@@ -1090,6 +1659,120 @@ class GuardFort:
         if path not in self.allowed_paths:
             self.allowed_paths.append(path)
     
+    def register_external_service(self, 
+                                service_name: str, 
+                                base_url: str, 
+                                health_endpoint: str = "/health"):
+        """
+        Register an external service for integration and health monitoring.
+        
+        Args:
+            service_name: Name of the service to register
+            base_url: Base URL of the service
+            health_endpoint: Health check endpoint path
+        """
+        self.service_integration.register_service(
+            service_name=service_name,
+            base_url=base_url,
+            health_endpoint=health_endpoint
+        )
+        
+        self.structured_logger.log_request("INFO", {
+            "event_type": "external_service_registered",
+            "service_name": service_name,
+            "base_url": base_url,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+    
+    async def check_service_health(self, service_name: str) -> Dict[str, Any]:
+        """
+        Check the health of a registered external service.
+        
+        Args:
+            service_name: Name of the service to check
+            
+        Returns:
+            Dictionary with health status information
+        """
+        return await self.service_integration.check_service_health(service_name)
+    
+    def get_service_registry(self) -> Dict[str, Any]:
+        """
+        Get information about all registered services.
+        
+        Returns:
+            Dictionary with all service registration information
+        """
+        return self.service_integration.get_service_info()
+    
+    def create_service_headers(self, request_id: str, source_service: str = None) -> Dict[str, str]:
+        """
+        Create headers for service-to-service communication.
+        
+        Args:
+            request_id: Current request ID for tracing
+            source_service: Name of the calling service
+            
+        Returns:
+            Dictionary of headers for service requests
+        """
+        return self.service_integration.create_service_request_context(
+            request_id=request_id,
+            source_service=source_service
+        )
+    
+    def add_service_status_endpoint(self, path: str = "/services"):
+        """
+        Add an endpoint that shows the status of all registered services.
+        
+        Args:
+            path: URL path for the services status endpoint
+        """
+        @self.app.get(path)
+        async def get_services_status():
+            """Return status information for all registered services."""
+            services_info = self.get_service_registry()
+            
+            status_data = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "service": self.service_name,
+                "registered_services": {},
+                "summary": {
+                    "total_services": len(services_info),
+                    "healthy_services": 0,
+                    "unhealthy_services": 0
+                }
+            }
+            
+            for service_name, config in services_info.items():
+                service_status = {
+                    "base_url": config["base_url"],
+                    "health_endpoint": config["health_endpoint"],
+                    "last_health_check": config["last_health_check"].isoformat() if config["last_health_check"] else None,
+                    "is_healthy": config["is_healthy"]
+                }
+                
+                # Try to get current health status
+                try:
+                    health_result = await self.check_service_health(service_name)
+                    service_status.update(health_result)
+                    if health_result.get("status") == "healthy":
+                        status_data["summary"]["healthy_services"] += 1
+                    else:
+                        status_data["summary"]["unhealthy_services"] += 1
+                except Exception as e:
+                    service_status["status"] = "unhealthy"
+                    service_status["error"] = str(e)
+                    status_data["summary"]["unhealthy_services"] += 1
+                
+                status_data["registered_services"][service_name] = service_status
+            
+            return status_data
+        
+        # Add the services path to allowed paths (no auth required)
+        if path not in self.allowed_paths:
+            self.allowed_paths.append(path)
+    
     def _create_auth_error_response(self, request_id: str, reason: str) -> JSONResponse:
         """
         Create standardized authentication error response.
@@ -1158,7 +1841,9 @@ def init_guard_fort(
     performance_thresholds: Dict[str, float] = None,
     include_trace_logs: bool = True,
     add_metrics_endpoint: bool = True,
-    add_health_endpoint: bool = True
+    add_health_endpoint: bool = True,
+    add_service_status_endpoint: bool = True,
+    debug_mode: bool = False
 ) -> GuardFort:
     """
     Utility function to easily initialize GuardFort middleware.
@@ -1181,6 +1866,8 @@ def init_guard_fort(
         include_trace_logs: Whether to include trace information in logs
         add_metrics_endpoint: Whether to automatically add /metrics endpoint
         add_health_endpoint: Whether to automatically add /health endpoint
+        add_service_status_endpoint: Whether to automatically add /services endpoint
+        debug_mode: Whether to enable debug mode for detailed error responses
         
     Returns:
         GuardFort instance
@@ -1229,7 +1916,8 @@ def init_guard_fort(
         enable_metrics=enable_metrics,
         metrics_retention_minutes=metrics_retention_minutes,
         performance_thresholds=performance_thresholds,
-        include_trace_logs=include_trace_logs
+        include_trace_logs=include_trace_logs,
+        debug_mode=debug_mode
     )
     
     # Add endpoints if requested
@@ -1238,5 +1926,8 @@ def init_guard_fort(
     
     if add_health_endpoint:
         guard_fort.add_health_endpoint()
+    
+    if add_service_status_endpoint:
+        guard_fort.add_service_status_endpoint()
     
     return guard_fort
