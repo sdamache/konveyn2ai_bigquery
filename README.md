@@ -232,6 +232,13 @@ cd src/svami-orchestrator && python main.py
 ```
 
 ### 🧪 Test the System
+
+#### Option 1: Live Demo Website (No Setup Required)
+🌐 **[Try KonveyN2AI Live Demo](https://konveyn2ai-website.vercel.app/)**
+
+Experience the multi-agent system instantly through our web interface - perfect for exploring capabilities before local setup.
+
+#### Option 2: Local API Testing
 ```bash
 # Test the complete multi-agent workflow
 curl -X POST http://localhost:8080/answer \

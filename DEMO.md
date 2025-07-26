@@ -190,7 +190,15 @@ curl -X POST http://localhost:8080/answer \
 
 ## 🚀 Try It Yourself
 
-### Quick Start Commands
+### Option 1: Live Demo Website (Recommended)
+🌐 **[Try KonveyN2AI Live Demo](https://konveyn2ai-website.vercel.app/)**
+
+Experience the multi-agent system directly through our web interface:
+- No setup required - just open the link and start asking questions
+- Test different developer roles and see real-time responses
+- Explore the authentication middleware example from the demo
+
+### Option 2: Local Development Setup
 ```bash
 # Start the system
 docker-compose up -d
