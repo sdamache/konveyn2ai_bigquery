@@ -17,6 +17,7 @@ import uvicorn
 
 # Import common modules
 import sys
+
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from common.rpc_server import JsonRpcServer
@@ -33,8 +34,7 @@ except ImportError:
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -47,21 +47,21 @@ config: AmataConfig = None
 async def lifespan(app: FastAPI):
     """Application lifespan manager for startup and shutdown."""
     global advisor_service, config
-    
+
     logger.info("Starting Amatya Role Prompter service...")
-    
+
     try:
         # Initialize configuration
         config = AmataConfig()
         logger.info("Configuration loaded successfully")
-        
+
         # Initialize advisor service
         advisor_service = AdvisorService(config)
         await advisor_service.initialize()
         logger.info("Advisor service initialized successfully")
-        
+
         yield
-        
+
     except Exception as e:
         logger.error(f"Failed to initialize service: {e}")
         raise
@@ -77,7 +77,7 @@ app = FastAPI(
     title="Amatya Role Prompter",
     description="LLM-powered advice generation with role-specific prompting",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Add CORS middleware
@@ -94,14 +94,14 @@ guard_fort = GuardFort(
     app,
     service_name="amatya-role-prompter",
     enable_auth=True,
-    allowed_paths=["/health", "/", "/docs", "/openapi.json", "/.well-known/agent.json"]
+    allowed_paths=["/health", "/", "/docs", "/openapi.json", "/.well-known/agent.json"],
 )
 
 # Create JSON-RPC server
 rpc_server = JsonRpcServer(
     title="Amatya Role Prompter",
     version="1.0.0",
-    description="LLM-powered advice generation with role-specific prompting"
+    description="LLM-powered advice generation with role-specific prompting",
 )
 
 
@@ -170,7 +170,7 @@ async def health_check():
                     "status": "healthy",
                     "service": "amatya-role-prompter",
                     "version": "1.0.0",
-                    "mode": "vertex_ai" if advisor_service.llm_model else "mock"
+                    "mode": "vertex_ai" if advisor_service.llm_model else "mock",
                 }
             else:
                 return JSONResponse(
@@ -179,8 +179,8 @@ async def health_check():
                         "status": "unhealthy",
                         "service": "amatya-role-prompter",
                         "version": "1.0.0",
-                        "error": "Advisor service not ready"
-                    }
+                        "error": "Advisor service not ready",
+                    },
                 )
         else:
             # Service not initialized yet (e.g., during startup or testing)
@@ -188,7 +188,7 @@ async def health_check():
                 "status": "starting",
                 "service": "amatya-role-prompter",
                 "version": "1.0.0",
-                "message": "Service is starting up"
+                "message": "Service is starting up",
             }
     except Exception as e:
         logger.error(f"Health check failed: {e}")
@@ -198,8 +198,8 @@ async def health_check():
                 "status": "unhealthy",
                 "service": "amatya-role-prompter",
                 "version": "1.0.0",
-                "error": str(e)
-            }
+                "error": str(e),
+            },
         )
 
 
@@ -220,7 +220,7 @@ async def agent_manifest():
                     "properties": {
                         "role": {
                             "type": "string",
-                            "description": "User role (e.g., 'backend_developer', 'security_engineer')"
+                            "description": "User role (e.g., 'backend_developer', 'security_engineer')",
                         },
                         "chunks": {
                             "type": "array",
@@ -229,30 +229,28 @@ async def agent_manifest():
                                 "type": "object",
                                 "properties": {
                                     "file_path": {"type": "string"},
-                                    "content": {"type": "string"}
+                                    "content": {"type": "string"},
                                 },
-                                "required": ["file_path", "content"]
-                            }
-                        }
+                                "required": ["file_path", "content"],
+                            },
+                        },
                     },
-                    "required": ["role", "chunks"]
-                }
+                    "required": ["role", "chunks"],
+                },
             }
         ],
         "endpoints": {
             "rpc": "/",
             "health": "/health",
-            "manifest": "/.well-known/agent.json"
-        }
+            "manifest": "/.well-known/agent.json",
+        },
     }
 
 
 # Development server
 if __name__ == "__main__":
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8001,
-        reload=True,
-        log_level="info"
-    )
+    # Use 0.0.0.0 for development to allow external connections
+    # In production, this should be configured via environment variables
+    host = os.getenv("HOST", "0.0.0.0")  # nosec B104
+    port = int(os.getenv("PORT", "8001"))
+    uvicorn.run("main:app", host=host, port=port, reload=True, log_level="info")

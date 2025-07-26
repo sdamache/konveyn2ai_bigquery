@@ -14,6 +14,7 @@ from vertexai.language_models import TextGenerationModel
 
 # Import common modules
 import sys
+
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from common.models import AdviceRequest, Snippet
@@ -31,16 +32,16 @@ logger = logging.getLogger(__name__)
 
 class AdvisorService:
     """Service for generating role-specific advice using Vertex AI."""
-    
+
     def __init__(self, config: AmataConfig):
         """Initialize the advisor service."""
         self.config = config
         self.llm_model: Optional[TextGenerationModel] = None
         self.prompt_constructor = PromptConstructor()
         self._initialized = False
-        
+
         logger.info(f"AdvisorService initialized with model: {config.model_name}")
-    
+
     async def initialize(self):
         """Initialize Vertex AI and load the model."""
         try:
@@ -48,15 +49,14 @@ class AdvisorService:
             credentials_available = self._check_credentials()
 
             if not credentials_available:
-                logger.warning("Google Cloud credentials not available - running in mock mode")
+                logger.warning(
+                    "Google Cloud credentials not available - running in mock mode"
+                )
                 self._initialized = True
                 return
 
             # Initialize Vertex AI
-            vertexai.init(
-                project=self.config.project_id,
-                location=self.config.location
-            )
+            vertexai.init(project=self.config.project_id, location=self.config.location)
             logger.info(f"Vertex AI initialized for project {self.config.project_id}")
 
             # Load the text generation model with retry logic
@@ -70,7 +70,7 @@ class AdvisorService:
             # For demo purposes, continue with fallback mode
             logger.warning("Continuing in fallback mode without Vertex AI")
             self._initialized = True
-    
+
     async def cleanup(self):
         """Cleanup resources."""
         self._initialized = False
@@ -89,12 +89,15 @@ class AdvisorService:
             # Check for default credentials (gcloud auth)
             try:
                 import google.auth
+
                 credentials, project = google.auth.default()
                 if credentials:
                     logger.info("Found default Google Cloud credentials")
                     return True
-            except Exception:
-                pass
+            except Exception as e:
+                # Intentionally ignore credential check failures - this is expected
+                # when running in environments without Google Cloud setup
+                logger.debug(f"Default credentials check failed: {e}")  # nosec B110
 
             # Check for API key
             api_key = os.getenv("GOOGLE_API_KEY")
@@ -116,7 +119,7 @@ class AdvisorService:
                 # Run the synchronous model loading in a thread pool
                 self.llm_model = await asyncio.get_event_loop().run_in_executor(
                     None,
-                    lambda: TextGenerationModel.from_pretrained(self.config.model_name)
+                    lambda: TextGenerationModel.from_pretrained(self.config.model_name),
                 )
                 logger.info(f"Loaded model: {self.config.model_name}")
                 return
@@ -127,11 +130,11 @@ class AdvisorService:
                     logger.error("Failed to load model after all retries")
                     raise
                 await asyncio.sleep(2 * (attempt + 1))  # Exponential backoff
-    
+
     async def is_healthy(self) -> bool:
         """Check if the service is healthy and ready."""
         return self._initialized and self.llm_model is not None
-    
+
     async def generate_advice(self, request: AdviceRequest) -> str:
         """
         Generate role-specific advice based on the request.
@@ -148,11 +151,12 @@ class AdvisorService:
         try:
             # Construct the prompt
             prompt = self.prompt_constructor.construct_prompt(
-                role=request.role,
-                chunks=request.chunks
+                role=request.role, chunks=request.chunks
             )
 
-            logger.info(f"Generating advice for role '{request.role}' with {len(request.chunks)} chunks")
+            logger.info(
+                f"Generating advice for role '{request.role}' with {len(request.chunks)} chunks"
+            )
 
             # Check if we have a real model or are in mock mode
             if self.llm_model is not None:
@@ -164,17 +168,21 @@ class AdvisorService:
                     return response.text.strip()
                 else:
                     logger.warning("Empty response from LLM, using fallback")
-                    return self._generate_fallback_response(request.role, request.chunks)
+                    return self._generate_fallback_response(
+                        request.role, request.chunks
+                    )
             else:
                 # Mock mode - generate enhanced fallback response
                 logger.info("Generating advice in mock mode (no Vertex AI)")
-                return self._generate_enhanced_mock_response(request.role, request.chunks, prompt)
+                return self._generate_enhanced_mock_response(
+                    request.role, request.chunks, prompt
+                )
 
         except Exception as e:
             logger.error(f"Error generating advice: {e}")
             # Return fallback response on error
             return self._generate_fallback_response(request.role, request.chunks)
-    
+
     async def _generate_with_retry(self, prompt: str, max_retries: int = 3):
         """Generate response with retry logic."""
         for attempt in range(max_retries):
@@ -183,31 +191,30 @@ class AdvisorService:
                 response = await asyncio.get_event_loop().run_in_executor(
                     None,
                     lambda: self.llm_model.predict(
-                        prompt,
-                        **self.config.get_vertex_ai_config()
-                    )
+                        prompt, **self.config.get_vertex_ai_config()
+                    ),
                 )
                 return response
-                
+
             except Exception as e:
                 logger.warning(f"Attempt {attempt + 1} failed: {e}")
                 if attempt == max_retries - 1:
                     raise
                 await asyncio.sleep(1 * (attempt + 1))  # Exponential backoff
-    
+
     def _generate_fallback_response(self, role: str, chunks: List[Snippet]) -> str:
         """
         Generate a fallback response when LLM fails.
-        
+
         Args:
             role: User role
             chunks: Code snippets
-            
+
         Returns:
             str: Fallback advice in markdown format
         """
         file_references = [chunk.file_path for chunk in chunks[:3]]
-        
+
         fallback_advice = f"""# Onboarding Guide for {role.replace('_', ' ').title()}
 
 I apologize, but I'm experiencing technical difficulties generating a detailed response. Here's a basic guide based on the available information:
@@ -235,11 +242,13 @@ I apologize, but I'm experiencing technical difficulties generating a detailed r
 
 Please try your query again later for more detailed, AI-generated guidance.
 """
-        
+
         logger.info(f"Generated fallback response for role '{role}'")
         return fallback_advice
 
-    def _generate_enhanced_mock_response(self, role: str, chunks: List[Snippet], prompt: str) -> str:
+    def _generate_enhanced_mock_response(
+        self, role: str, chunks: List[Snippet], prompt: str
+    ) -> str:
         """
         Generate an enhanced mock response for demo purposes.
 
@@ -252,10 +261,10 @@ Please try your query again later for more detailed, AI-generated guidance.
             str: Enhanced mock advice in markdown format
         """
         file_references = [chunk.file_path for chunk in chunks]
-        role_title = role.replace('_', ' ').title()
+        role_title = role.replace("_", " ").title()
 
         # Create a more sophisticated mock response based on the role
-        if 'backend' in role.lower():
+        if "backend" in role.lower():
             mock_advice = f"""# Backend Developer Onboarding Guide
 
 Welcome to the KonveyN2AI project! As a **{role_title}**, you'll be working with our three-tier architecture.
@@ -298,7 +307,7 @@ This project follows a microservices architecture with three main components:
 
 *This is a demo response - full AI-powered guidance available with proper Vertex AI setup.*
 """
-        elif 'security' in role.lower():
+        elif "security" in role.lower():
             mock_advice = f"""# Security Engineer Onboarding Guide
 
 Welcome to KonveyN2AI security review! As a **{role_title}**, focus on these security aspects.
