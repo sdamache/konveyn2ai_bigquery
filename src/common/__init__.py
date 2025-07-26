@@ -21,6 +21,14 @@ from .models import (
     SearchRequest,
     Snippet,
 )
+from .agent_manifest import (
+    AgentCapability,
+    AgentDiscovery,
+    AgentManifest,
+    AgentManifestGenerator,
+    MethodSchema,
+    ParameterSchema,
+)
 
 __version__ = "1.0.0"
 __all__ = [
@@ -33,4 +41,10 @@ __all__ = [
     "AdviceRequest",
     "QueryRequest",
     "AnswerResponse",
+    "AgentCapability",
+    "AgentDiscovery",
+    "AgentManifest",
+    "AgentManifestGenerator",
+    "MethodSchema",
+    "ParameterSchema",
 ]
