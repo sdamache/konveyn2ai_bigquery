@@ -1,0 +1,35 @@
+# Pre-commit hooks configuration for KonveyN2AI - HACKATHON MODE
+# Streamlined for demo-ready functionality over perfect style
+# Focuses on critical errors that break functionality, not cosmetic issues
+
+repos:
+  # Essential pre-commit hooks only (hackathon mode)
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-yaml
+      - id: check-merge-conflict
+      - id: debug-statements  # Critical: prevents debug statements in production
+
+  # Local tools using versions from requirements.txt
+  - repo: local
+    hooks:
+      # Black code formatting
+      - id: black
+        name: black
+        entry: black
+        language: system
+        types: [python]
+        args: [--line-length=88]
+
+
+
+      # Security scanning with Bandit
+      - id: bandit
+        name: bandit
+        entry: bandit
+        language: system
+        types: [python]
+        args: [--recursive, --format, txt]
+        files: ^src/.*\.py$
+        exclude: ^src/.*/test_.*\.py$

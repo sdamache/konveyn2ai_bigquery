@@ -1,0 +1,37 @@
+[run]
+# Coverage configuration for KonveyN2AI
+source = src
+omit = 
+    */tests/*
+    */test_*
+    */__pycache__/*
+    */venv/*
+    */env/*
+    */.env/*
+    */build/*
+    */dist/*
+    */.*
+
+[report]
+# Report configuration
+precision = 2
+show_missing = True
+skip_covered = False
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if self.debug:
+    if settings.DEBUG
+    raise AssertionError
+    raise NotImplementedError
+    if 0:
+    if __name__ == .__main__.:
+    class .*\bProtocol\):
+    @(abc\.)?abstractmethod
+
+[html]
+directory = htmlcov
+title = KonveyN2AI Test Coverage Report
+
+[xml]
+output = coverage.xml

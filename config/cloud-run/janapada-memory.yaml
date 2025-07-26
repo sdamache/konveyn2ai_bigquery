@@ -1,0 +1,54 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: janapada-memory
+  annotations:
+    run.googleapis.com/ingress: all
+    run.googleapis.com/execution-environment: gen2
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/execution-environment: gen2
+        run.googleapis.com/cpu-throttling: "false"
+        autoscaling.knative.dev/maxScale: "10"
+    spec:
+      serviceAccountName: konveyn2ai-vertex-ai@konveyn2ai.iam.gserviceaccount.com
+      containerConcurrency: 10
+      timeoutSeconds: 300
+      containers:
+      - image: us-central1-docker.pkg.dev/konveyn2ai/konveyn2ai-repo/janapada-memory:latest
+        ports:
+        - name: http1
+          containerPort: 8080
+        env:
+        - name: PROJECT_ID
+          value: "konveyn2ai"
+        - name: REGION
+          value: "us-central1"
+        - name: SERVICE_NAME
+          value: "janapada-memory"
+        - name: VECTOR_INDEX_ID
+          value: "805460437066842112"
+        resources:
+          limits:
+            cpu: "2"
+            memory: "4Gi"
+          requests:
+            cpu: "1"
+            memory: "2Gi"
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 15
+          timeoutSeconds: 5
+          periodSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          timeoutSeconds: 5
+          periodSeconds: 60
+          failureThreshold: 3

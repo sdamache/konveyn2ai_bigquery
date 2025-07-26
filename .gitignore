@@ -1,0 +1,140 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dev-debug.log
+
+# Dependency directories
+node_modules/
+
+# Environment variables
+.env
+.env.dev
+
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS specific
+.DS_Store
+
+# Task Master
+.taskmaster/
+
+# Cursor
+.cursor/
+
+# Claude-code
+claude.md
+
+# Augment-memories
+Augment-memories.md
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# Claude Code
+.claude/
+CLAUDE.md
+
+# MCP configuration (development tooling)
+.mcp.json
+
+# GitHub development instructions (not project code)
+.github/
+
+# Rules files (contain duplicate info)
+.rules
+
+# Project files
+GEMINI.md
+
+# Living memory system (internal development tracking)
+.memory/
+
+# Google Cloud Service Account Keys (SECURITY CRITICAL)
+credentials/
+*.json
+!.env.example
+!.taskmaster/**/*.json
+konveyn2ai-*.json
+service-account-key.json
+google-credentials.json
