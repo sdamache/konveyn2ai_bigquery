@@ -29,6 +29,7 @@ description = "KonveyN2AI - Agentic AI Application with 3-tier architecture for 
 authors = ["KonveyN2AI Team <team@konveyn2ai.dev>"]
 readme = "README.md"
 license = "MIT"
+packages = [{include = "src"}]
 
 [tool.poetry.dependencies]
 python = ">=3.9,<4.0"

@@ -60,6 +60,8 @@ The project follows a three-tier architecture:
    **Option A: Using pip (recommended for quick setup)**
    ```bash
    pip install -r requirements.txt
+   # Install package in development mode for proper imports
+   pip install -e .
    ```
 
    **Option B: Using Poetry (recommended for development)**
