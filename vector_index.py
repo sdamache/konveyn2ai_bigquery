@@ -19,6 +19,7 @@ VECTOR_DIMENSIONS = 3072
 APPROXIMATE_NEIGHBORS_COUNT = 150
 DISTANCE_MEASURE_TYPE = "COSINE_DISTANCE"
 
+
 def check_credentials():
     """Check if Google Cloud credentials are properly configured"""
     try:
@@ -34,6 +35,7 @@ def check_credentials():
         print("2. Run: gcloud auth application-default login")
         print("3. Or set GOOGLE_APPLICATION_CREDENTIALS environment variable")
         return False
+
 
 def list_existing_indexes():
     """List all existing vector indexes in the project"""
@@ -53,6 +55,7 @@ def list_existing_indexes():
     except Exception as e:
         print(f"Error listing indexes: {str(e)}")
         return []
+
 
 def create_vector_index(index_display_name="konveyn2ai-code-index"):
     """Create vector index for the KonveyN2AI three-component architecture"""
@@ -80,6 +83,7 @@ def create_vector_index(index_display_name="konveyn2ai-code-index"):
     except Exception as e:
         print(f"❌ Error creating vector index: {str(e)}")
         raise
+
 
 def main():
     """Main function to set up Google Cloud AI Platform vector index"""
@@ -113,7 +117,9 @@ def main():
         print(f"\n🔧 Creating new vector index: {index_name}")
         try:
             new_index = create_vector_index(index_name)
-            print(f"✅ Vector index setup completed successfully! Index: {new_index.name}")
+            print(
+                f"✅ Vector index setup completed successfully! Index: {new_index.name}"
+            )
         except Exception as e:
             print(f"❌ Failed to create vector index: {str(e)}")
             sys.exit(1)
@@ -125,6 +131,6 @@ def main():
     print("4. Set up orchestration in svami-orchestrator/")
     print("5. Test integration with sample data")
 
+
 if __name__ == "__main__":
     main()
-

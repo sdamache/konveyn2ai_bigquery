@@ -7,10 +7,10 @@ This demo shows how to set up a JSON-RPC server with FastAPI and register method
 import os
 import sys
 
-# Add src directory to path for imports
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
-
 from fastapi import FastAPI, Request
+
+# Add src directory to path for imports
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from common.rpc_server import JsonRpcServer, logging_middleware
 
@@ -49,7 +49,7 @@ def get_info(request_id: str, context: dict) -> dict:
     return {
         "request_id": request_id,
         "server": "Demo Calculator",
-        "has_http_context": "http_request" in context
+        "has_http_context": "http_request" in context,
     }
 
 
@@ -79,28 +79,35 @@ async def root():
     return {
         "service": "JSON-RPC Demo Server",
         "version": "1.0.0",
-        "endpoints": {
-            "rpc": "/rpc",
-            "manifest": "/.well-known/agent.json"
-        },
+        "endpoints": {"rpc": "/rpc", "manifest": "/.well-known/agent.json"},
         "methods": list(rpc_server.registry.get_methods().keys()),
         "examples": {
             "single_request": {
                 "jsonrpc": "2.0",
                 "id": "1",
                 "method": "add",
-                "params": {"a": 5, "b": 3}
+                "params": {"a": 5, "b": 3},
             },
             "batch_request": [
-                {"jsonrpc": "2.0", "id": "1", "method": "add", "params": {"a": 1, "b": 2}},
-                {"jsonrpc": "2.0", "id": "2", "method": "multiply", "params": {"x": 3, "y": 4}}
+                {
+                    "jsonrpc": "2.0",
+                    "id": "1",
+                    "method": "add",
+                    "params": {"a": 1, "b": 2},
+                },
+                {
+                    "jsonrpc": "2.0",
+                    "id": "2",
+                    "method": "multiply",
+                    "params": {"x": 3, "y": 4},
+                },
             ],
             "notification": {
                 "jsonrpc": "2.0",
                 "method": "notify_example",
-                "params": {"action": "log_event"}
-            }
-        }
+                "params": {"action": "log_event"},
+            },
+        },
     }
 
 

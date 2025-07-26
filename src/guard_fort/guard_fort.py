@@ -19,7 +19,7 @@ import traceback
 import uuid
 from collections import defaultdict, deque
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Optional
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -41,10 +41,17 @@ from starlette.status import (
 class GuardFortException(Exception):
     """Base exception class for GuardFort middleware."""
 
-    def __init__(self, message: str, status_code: int = HTTP_500_INTERNAL_SERVER_ERROR, error_code: str = None):
+    def __init__(
+        self,
+        message: str,
+        status_code: int = HTTP_500_INTERNAL_SERVER_ERROR,
+        error_code: str = None,
+    ):
         self.message = message
         self.status_code = status_code
-        self.error_code = error_code or self.__class__.__name__.lower().replace('exception', '_error')
+        self.error_code = error_code or self.__class__.__name__.lower().replace(
+            "exception", "_error"
+        )
         super().__init__(self.message)
 
 
@@ -83,7 +90,9 @@ class RateLimitException(GuardFortException):
 class ServiceUnavailableException(GuardFortException):
     """Exception raised when a service is unavailable."""
 
-    def __init__(self, message: str = "Service temporarily unavailable", service_name: str = None):
+    def __init__(
+        self, message: str = "Service temporarily unavailable", service_name: str = None
+    ):
         self.service_name = service_name
         super().__init__(message, HTTP_503_SERVICE_UNAVAILABLE, "service_unavailable")
 
@@ -91,7 +100,12 @@ class ServiceUnavailableException(GuardFortException):
 class ExternalServiceException(GuardFortException):
     """Exception raised when external service calls fail."""
 
-    def __init__(self, message: str = "External service error", service_name: str = None, upstream_status: int = None):
+    def __init__(
+        self,
+        message: str = "External service error",
+        service_name: str = None,
+        upstream_status: int = None,
+    ):
         self.service_name = service_name
         self.upstream_status = upstream_status
         super().__init__(message, HTTP_502_BAD_GATEWAY, "external_service_error")
@@ -108,20 +122,22 @@ class ConfigurationException(GuardFortException):
 class ExceptionHandler:
     """
     Advanced exception handling system for GuardFort middleware.
-    
+
     Provides comprehensive exception categorization, logging, and response generation
     with sanitized error details for production environments.
     """
 
-    def __init__(self,
-                 service_name: str,
-                 structured_logger: 'StructuredLogger',
-                 metrics_collector: 'MetricsCollector' = None,
-                 debug_mode: bool = False,
-                 include_stack_trace: bool = False):
+    def __init__(
+        self,
+        service_name: str,
+        structured_logger: "StructuredLogger",
+        metrics_collector: "MetricsCollector" = None,
+        debug_mode: bool = False,
+        include_stack_trace: bool = False,
+    ):
         """
         Initialize exception handler.
-        
+
         Args:
             service_name: Name of the service for logging
             structured_logger: Logger instance for exception logging
@@ -147,18 +163,17 @@ class ExceptionHandler:
             PermissionError: self._handle_permission_exception,
         }
 
-    def handle_exception(self,
-                        exception: Exception,
-                        request: Request,
-                        request_id: str) -> JSONResponse:
+    def handle_exception(
+        self, exception: Exception, request: Request, request_id: str
+    ) -> JSONResponse:
         """
         Handle any exception and return appropriate JSON response.
-        
+
         Args:
             exception: The exception that occurred
             request: FastAPI request object
             request_id: Request ID for tracing
-            
+
         Returns:
             JSONResponse with appropriate status code and error details
         """
@@ -175,10 +190,7 @@ class ExceptionHandler:
         if self.metrics_collector:
             endpoint_key = f"{request.method}:{request.url.path}"
             self.metrics_collector.record_error(
-                request_id,
-                endpoint_key,
-                type(exception).__name__,
-                str(exception)
+                request_id, endpoint_key, type(exception).__name__, str(exception)
             )
 
         # Create response
@@ -191,12 +203,11 @@ class ExceptionHandler:
                 return handler
         return self._handle_generic_exception
 
-    def _handle_http_exception(self,
-                              exception: HTTPException,
-                              request: Request,
-                              request_id: str) -> Dict[str, Any]:
+    def _handle_http_exception(
+        self, exception: HTTPException, request: Request, request_id: str
+    ) -> dict[str, Any]:
         """Handle FastAPI HTTPException."""
-        headers = getattr(exception, 'headers', {})
+        headers = getattr(exception, "headers", {})
         if headers is None:
             headers = {}
         return {
@@ -204,19 +215,18 @@ class ExceptionHandler:
             "message": exception.detail,
             "status_code": exception.status_code,
             "category": "http_error",
-            "headers": headers
+            "headers": headers,
         }
 
-    def _handle_guardfort_exception(self,
-                                   exception: GuardFortException,
-                                   request: Request,
-                                   request_id: str) -> Dict[str, Any]:
+    def _handle_guardfort_exception(
+        self, exception: GuardFortException, request: Request, request_id: str
+    ) -> dict[str, Any]:
         """Handle custom GuardFort exceptions."""
         error_data = {
             "error_code": exception.error_code,
             "message": exception.message,
             "status_code": exception.status_code,
-            "category": "guardfort_error"
+            "category": "guardfort_error",
         }
 
         # Add exception-specific details
@@ -232,103 +242,104 @@ class ExceptionHandler:
         elif isinstance(exception, ExternalServiceException):
             error_data["details"] = {
                 "service_name": exception.service_name,
-                "upstream_status": exception.upstream_status
+                "upstream_status": exception.upstream_status,
             }
         elif isinstance(exception, ConfigurationException) and exception.config_key:
             error_data["details"] = {"config_key": exception.config_key}
 
         return error_data
 
-    def _handle_validation_exception(self,
-                                   exception: Exception,
-                                   request: Request,
-                                   request_id: str) -> Dict[str, Any]:
+    def _handle_validation_exception(
+        self, exception: Exception, request: Request, request_id: str
+    ) -> dict[str, Any]:
         """Handle validation errors (e.g., Pydantic ValidationError)."""
         return {
             "error_code": "validation_error",
             "message": "Request validation failed",
             "status_code": HTTP_422_UNPROCESSABLE_ENTITY,
             "category": "validation_error",
-            "details": {"validation_errors": str(exception)} if self.debug_mode else {}
+            "details": {"validation_errors": str(exception)} if self.debug_mode else {},
         }
 
-    def _handle_key_exception(self,
-                            exception: KeyError,
-                            request: Request,
-                            request_id: str) -> Dict[str, Any]:
+    def _handle_key_exception(
+        self, exception: KeyError, request: Request, request_id: str
+    ) -> dict[str, Any]:
         """Handle KeyError exceptions."""
         return {
             "error_code": "key_error",
-            "message": "Required key not found" if not self.debug_mode else f"Key not found: {exception}",
+            "message": "Required key not found"
+            if not self.debug_mode
+            else f"Key not found: {exception}",
             "status_code": HTTP_400_BAD_REQUEST,
-            "category": "client_error"
+            "category": "client_error",
         }
 
-    def _handle_value_exception(self,
-                              exception: ValueError,
-                              request: Request,
-                              request_id: str) -> Dict[str, Any]:
+    def _handle_value_exception(
+        self, exception: ValueError, request: Request, request_id: str
+    ) -> dict[str, Any]:
         """Handle ValueError exceptions."""
         return {
             "error_code": "value_error",
-            "message": "Invalid value provided" if not self.debug_mode else str(exception),
+            "message": "Invalid value provided"
+            if not self.debug_mode
+            else str(exception),
             "status_code": HTTP_400_BAD_REQUEST,
-            "category": "client_error"
+            "category": "client_error",
         }
 
-    def _handle_connection_exception(self,
-                                   exception: ConnectionError,
-                                   request: Request,
-                                   request_id: str) -> Dict[str, Any]:
+    def _handle_connection_exception(
+        self, exception: ConnectionError, request: Request, request_id: str
+    ) -> dict[str, Any]:
         """Handle connection errors."""
         return {
             "error_code": "connection_error",
             "message": "Service connection failed",
             "status_code": HTTP_502_BAD_GATEWAY,
-            "category": "external_error"
+            "category": "external_error",
         }
 
-    def _handle_timeout_exception(self,
-                                exception: TimeoutError,
-                                request: Request,
-                                request_id: str) -> Dict[str, Any]:
+    def _handle_timeout_exception(
+        self, exception: TimeoutError, request: Request, request_id: str
+    ) -> dict[str, Any]:
         """Handle timeout errors."""
         return {
             "error_code": "timeout_error",
             "message": "Request timeout",
             "status_code": HTTP_504_GATEWAY_TIMEOUT,
-            "category": "timeout_error"
+            "category": "timeout_error",
         }
 
-    def _handle_permission_exception(self,
-                                   exception: PermissionError,
-                                   request: Request,
-                                   request_id: str) -> Dict[str, Any]:
+    def _handle_permission_exception(
+        self, exception: PermissionError, request: Request, request_id: str
+    ) -> dict[str, Any]:
         """Handle permission errors."""
         return {
             "error_code": "permission_error",
             "message": "Permission denied",
             "status_code": HTTP_403_FORBIDDEN,
-            "category": "authorization_error"
+            "category": "authorization_error",
         }
 
-    def _handle_generic_exception(self,
-                                exception: Exception,
-                                request: Request,
-                                request_id: str) -> Dict[str, Any]:
+    def _handle_generic_exception(
+        self, exception: Exception, request: Request, request_id: str
+    ) -> dict[str, Any]:
         """Handle any unhandled exception."""
         return {
             "error_code": "internal_server_error",
-            "message": "An internal error occurred" if not self.debug_mode else str(exception),
+            "message": "An internal error occurred"
+            if not self.debug_mode
+            else str(exception),
             "status_code": HTTP_500_INTERNAL_SERVER_ERROR,
-            "category": "server_error"
+            "category": "server_error",
         }
 
-    def _log_exception(self,
-                      exception: Exception,
-                      request: Request,
-                      request_id: str,
-                      error_data: Dict[str, Any]):
+    def _log_exception(
+        self,
+        exception: Exception,
+        request: Request,
+        request_id: str,
+        error_data: dict[str, Any],
+    ):
         """Log exception with comprehensive context."""
         log_data = {
             "event_type": "exception_handled",
@@ -340,10 +351,12 @@ class ExceptionHandler:
             "category": error_data.get("category"),
             "method": request.method,
             "path": request.url.path,
-            "query_params": dict(request.query_params) if request.query_params else None,
+            "query_params": dict(request.query_params)
+            if request.query_params
+            else None,
             "user_agent": request.headers.get("User-Agent", "unknown"),
             "remote_addr": request.client.host if request.client else "unknown",
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
         # Add stack trace if enabled
@@ -363,34 +376,31 @@ class ExceptionHandler:
 
         self.structured_logger.log_request(log_level, log_data)
 
-    def _create_error_response(self,
-                              error_data: Dict[str, Any],
-                              request_id: str) -> JSONResponse:
+    def _create_error_response(
+        self, error_data: dict[str, Any], request_id: str
+    ) -> JSONResponse:
         """Create standardized error response."""
         content = {
             "error": error_data["error_code"],
             "message": error_data["message"],
             "request_id": request_id,
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
         # Add details if available and appropriate
-        if "details" in error_data and (self.debug_mode or error_data.get("category") != "server_error"):
+        if "details" in error_data and (
+            self.debug_mode or error_data.get("category") != "server_error"
+        ):
             content["details"] = error_data["details"]
 
-        headers = {
-            "X-Request-ID": request_id,
-            "X-Service": self.service_name
-        }
+        headers = {"X-Request-ID": request_id, "X-Service": self.service_name}
 
         # Add any custom headers
         if "headers" in error_data and error_data["headers"]:
             headers.update(error_data["headers"])
 
         return JSONResponse(
-            status_code=error_data["status_code"],
-            content=content,
-            headers=headers
+            status_code=error_data["status_code"], content=content, headers=headers
         )
 
 
@@ -406,18 +416,20 @@ except ImportError:
 class ServiceIntegration:
     """
     Utility class for service integration and communication helpers.
-    
+
     Provides common functionality for service-to-service communication,
     health checks, and integration patterns.
     """
 
-    def __init__(self,
-                 service_name: str,
-                 structured_logger: 'StructuredLogger',
-                 timeout: float = 30.0):
+    def __init__(
+        self,
+        service_name: str,
+        structured_logger: "StructuredLogger",
+        timeout: float = 30.0,
+    ):
         """
         Initialize service integration utilities.
-        
+
         Args:
             service_name: Name of the current service
             structured_logger: Logger instance for integration logging
@@ -428,14 +440,16 @@ class ServiceIntegration:
         self.timeout = timeout
         self.service_registry = {}
 
-    def register_service(self,
-                        service_name: str,
-                        base_url: str,
-                        health_endpoint: str = "/health",
-                        timeout: float = None):
+    def register_service(
+        self,
+        service_name: str,
+        base_url: str,
+        health_endpoint: str = "/health",
+        timeout: float = None,
+    ):
         """
         Register a service for integration.
-        
+
         Args:
             service_name: Name of the service to register
             base_url: Base URL of the service
@@ -447,33 +461,35 @@ class ServiceIntegration:
             "health_endpoint": health_endpoint,
             "timeout": timeout or self.timeout,
             "last_health_check": None,
-            "is_healthy": None
+            "is_healthy": None,
         }
 
-        self.structured_logger.log_request("INFO", {
-            "event_type": "service_registered",
-            "service_name": service_name,
-            "base_url": base_url,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        })
+        self.structured_logger.log_request(
+            "INFO",
+            {
+                "event_type": "service_registered",
+                "service_name": service_name,
+                "base_url": base_url,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        )
 
-    async def check_service_health(self, service_name: str) -> Dict[str, Any]:
+    async def check_service_health(self, service_name: str) -> dict[str, Any]:
         """
         Check the health of a registered service.
-        
+
         Args:
             service_name: Name of the service to check
-            
+
         Returns:
             Dictionary with health status information
-            
+
         Raises:
             ServiceUnavailableException: If service is not registered or unhealthy
         """
         if service_name not in self.service_registry:
             raise ServiceUnavailableException(
-                f"Service '{service_name}' is not registered",
-                service_name=service_name
+                f"Service '{service_name}' is not registered", service_name=service_name
             )
 
         service_config = self.service_registry[service_name]
@@ -487,18 +503,21 @@ class ServiceIntegration:
                 "status": "healthy",  # This would come from actual HTTP call to health_url
                 "endpoint": health_url,
                 "response_time_ms": 50,  # This would be measured
-                "timestamp": datetime.now(timezone.utc).isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
 
             service_config["last_health_check"] = datetime.now(timezone.utc)
             service_config["is_healthy"] = health_status["status"] == "healthy"
 
-            self.structured_logger.log_request("INFO", {
-                "event_type": "service_health_check",
-                "service_name": service_name,
-                "health_status": health_status,
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            })
+            self.structured_logger.log_request(
+                "INFO",
+                {
+                    "event_type": "service_health_check",
+                    "service_name": service_name,
+                    "health_status": health_status,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+            )
 
             return health_status
 
@@ -506,25 +525,28 @@ class ServiceIntegration:
             service_config["is_healthy"] = False
             service_config["last_health_check"] = datetime.now(timezone.utc)
 
-            self.structured_logger.log_request("ERROR", {
-                "event_type": "service_health_check_failed",
-                "service_name": service_name,
-                "error": str(e),
-                "timestamp": datetime.now(timezone.utc).isoformat()
-            })
+            self.structured_logger.log_request(
+                "ERROR",
+                {
+                    "event_type": "service_health_check_failed",
+                    "service_name": service_name,
+                    "error": str(e),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+            )
 
             raise ExternalServiceException(
                 f"Health check failed for service '{service_name}': {e}",
-                service_name=service_name
+                service_name=service_name,
             ) from e
 
-    def get_service_info(self, service_name: str = None) -> Dict[str, Any]:
+    def get_service_info(self, service_name: str = None) -> dict[str, Any]:
         """
         Get information about registered services.
-        
+
         Args:
             service_name: Specific service name, or None for all services
-            
+
         Returns:
             Dictionary with service information
         """
@@ -532,22 +554,22 @@ class ServiceIntegration:
             if service_name not in self.service_registry:
                 raise ServiceUnavailableException(
                     f"Service '{service_name}' is not registered",
-                    service_name=service_name
+                    service_name=service_name,
                 )
             return {service_name: self.service_registry[service_name]}
 
         return dict(self.service_registry)
 
-    def create_service_request_context(self,
-                                     request_id: str,
-                                     source_service: str = None) -> Dict[str, str]:
+    def create_service_request_context(
+        self, request_id: str, source_service: str = None
+    ) -> dict[str, str]:
         """
         Create context headers for service-to-service requests.
-        
+
         Args:
             request_id: Current request ID for tracing
             source_service: Name of the calling service
-            
+
         Returns:
             Dictionary of headers to include in service requests
         """
@@ -555,22 +577,22 @@ class ServiceIntegration:
             "X-Request-ID": request_id,
             "X-Source-Service": source_service or self.service_name,
             "X-Correlation-ID": str(uuid.uuid4()),
-            "User-Agent": f"{self.service_name}/1.0.0"
+            "User-Agent": f"{self.service_name}/1.0.0",
         }
 
-    def validate_service_response(self,
-                                response_data: Dict[str, Any],
-                                expected_fields: List[str] = None) -> bool:
+    def validate_service_response(
+        self, response_data: dict[str, Any], expected_fields: list[str] = None
+    ) -> bool:
         """
         Validate a service response structure.
-        
+
         Args:
             response_data: Response data to validate
             expected_fields: List of required fields
-            
+
         Returns:
             True if response is valid
-            
+
         Raises:
             ValidationException: If response is invalid
         """
@@ -578,11 +600,13 @@ class ServiceIntegration:
             raise ValidationException("Response must be a dictionary")
 
         if expected_fields:
-            missing_fields = [field for field in expected_fields if field not in response_data]
+            missing_fields = [
+                field for field in expected_fields if field not in response_data
+            ]
             if missing_fields:
                 raise ValidationException(
                     f"Missing required fields: {missing_fields}",
-                    field=missing_fields[0]
+                    field=missing_fields[0],
                 )
 
         return True
@@ -591,7 +615,7 @@ class ServiceIntegration:
 class MetricsCollector:
     """
     Advanced metrics collection system for GuardFort middleware.
-    
+
     Tracks performance metrics, error rates, and request patterns
     with configurable retention and aggregation periods.
     """
@@ -599,7 +623,7 @@ class MetricsCollector:
     def __init__(self, retention_minutes: int = 60, max_samples: int = 1000):
         """
         Initialize metrics collector.
-        
+
         Args:
             retention_minutes: How long to keep metrics data
             max_samples: Maximum number of samples to retain per metric
@@ -641,16 +665,18 @@ class MetricsCollector:
         if self.concurrent_requests > self.peak_concurrent_requests:
             self.peak_concurrent_requests = self.concurrent_requests
 
-    def record_request_end(self,
-                          method: str,
-                          path: str,
-                          status_code: int,
-                          duration: float,
-                          user_agent: str = None,
-                          ip_address: str = None):
+    def record_request_end(
+        self,
+        method: str,
+        path: str,
+        status_code: int,
+        duration: float,
+        user_agent: str = None,
+        ip_address: str = None,
+    ):
         """
         Record request completion metrics.
-        
+
         Args:
             method: HTTP method
             path: Request path
@@ -689,7 +715,7 @@ class MetricsCollector:
     def record_auth_result(self, success: bool, reason: str = None):
         """
         Record authentication attempt result.
-        
+
         Args:
             success: Whether authentication succeeded
             reason: Failure reason if unsuccessful
@@ -701,10 +727,12 @@ class MetricsCollector:
             if reason:
                 self.auth_failure_reasons[reason] += 1
 
-    def record_error(self, request_id: str, endpoint: str, error_type: str, error_message: str):
+    def record_error(
+        self, request_id: str, endpoint: str, error_type: str, error_message: str
+    ):
         """
         Record detailed error information.
-        
+
         Args:
             request_id: Request ID for tracing
             endpoint: Endpoint where error occurred
@@ -716,14 +744,14 @@ class MetricsCollector:
             "request_id": request_id,
             "endpoint": endpoint,
             "error_type": error_type,
-            "error_message": error_message
+            "error_message": error_message,
         }
         self.error_details.append(error_detail)
 
-    def get_metrics_summary(self) -> Dict[str, Any]:
+    def get_metrics_summary(self) -> dict[str, Any]:
         """
         Get comprehensive metrics summary.
-        
+
         Returns:
             Dictionary containing all collected metrics
         """
@@ -738,7 +766,7 @@ class MetricsCollector:
                     "avg_duration_ms": round(statistics.mean(durations) * 1000, 2),
                     "min_duration_ms": round(min(durations) * 1000, 2),
                     "max_duration_ms": round(max(durations) * 1000, 2),
-                    "median_duration_ms": round(statistics.median(durations) * 1000, 2)
+                    "median_duration_ms": round(statistics.median(durations) * 1000, 2),
                 }
                 all_durations.extend(durations)
 
@@ -748,9 +776,19 @@ class MetricsCollector:
             overall_stats = {
                 "total_requests": len(all_durations),
                 "avg_response_time_ms": round(statistics.mean(all_durations) * 1000, 2),
-                "median_response_time_ms": round(statistics.median(all_durations) * 1000, 2),
-                "p95_response_time_ms": round(statistics.quantiles(all_durations, n=20)[18] * 1000, 2) if len(all_durations) >= 20 else None,
-                "p99_response_time_ms": round(statistics.quantiles(all_durations, n=100)[98] * 1000, 2) if len(all_durations) >= 100 else None
+                "median_response_time_ms": round(
+                    statistics.median(all_durations) * 1000, 2
+                ),
+                "p95_response_time_ms": round(
+                    statistics.quantiles(all_durations, n=20)[18] * 1000, 2
+                )
+                if len(all_durations) >= 20
+                else None,
+                "p99_response_time_ms": round(
+                    statistics.quantiles(all_durations, n=100)[98] * 1000, 2
+                )
+                if len(all_durations) >= 100
+                else None,
             }
 
         # Error rate calculation
@@ -764,46 +802,52 @@ class MetricsCollector:
                 "overall": overall_stats,
                 "by_endpoint": endpoint_stats,
                 "concurrent_requests": self.concurrent_requests,
-                "peak_concurrent_requests": self.peak_concurrent_requests
+                "peak_concurrent_requests": self.peak_concurrent_requests,
             },
             "requests": {
                 "total_count": total_requests,
                 "by_endpoint": dict(self.request_counts),
                 "by_status_code": dict(self.status_code_counts),
-                "error_rate_percent": round(error_rate, 2)
+                "error_rate_percent": round(error_rate, 2),
             },
             "authentication": {
                 "success_count": self.auth_success_count,
                 "failure_count": self.auth_failure_count,
                 "failure_reasons": dict(self.auth_failure_reasons),
                 "success_rate_percent": round(
-                    (self.auth_success_count / (self.auth_success_count + self.auth_failure_count) * 100)
-                    if (self.auth_success_count + self.auth_failure_count) > 0 else 0, 2
-                )
+                    (
+                        self.auth_success_count
+                        / (self.auth_success_count + self.auth_failure_count)
+                        * 100
+                    )
+                    if (self.auth_success_count + self.auth_failure_count) > 0
+                    else 0,
+                    2,
+                ),
             },
             "usage_patterns": {
                 "top_endpoints": sorted(
-                    self.endpoint_usage.items(),
-                    key=lambda x: x[1],
-                    reverse=True
+                    self.endpoint_usage.items(), key=lambda x: x[1], reverse=True
                 )[:10],
                 "unique_user_agents": len(self.user_agent_counts),
                 "unique_ip_addresses": len(self.ip_address_counts),
                 "top_user_agents": sorted(
-                    self.user_agent_counts.items(),
-                    key=lambda x: x[1],
-                    reverse=True
-                )[:5]
+                    self.user_agent_counts.items(), key=lambda x: x[1], reverse=True
+                )[:5],
             },
             "errors": {
                 "total_count": total_errors,
                 "by_endpoint": dict(self.error_counts),
-                "recent_errors": list(self.error_details)[-10:]  # Last 10 errors
+                "recent_errors": list(self.error_details)[-10:],  # Last 10 errors
             },
             "time_patterns": {
-                "hourly_distribution": dict(list(self.hourly_request_counts.items())[-24:]),  # Last 24 hours
-                "daily_distribution": dict(list(self.daily_request_counts.items())[-7:])    # Last 7 days
-            }
+                "hourly_distribution": dict(
+                    list(self.hourly_request_counts.items())[-24:]
+                ),  # Last 24 hours
+                "daily_distribution": dict(
+                    list(self.daily_request_counts.items())[-7:]
+                ),  # Last 7 days
+            },
         }
 
 
@@ -813,14 +857,16 @@ class StructuredLogger:
     and configurable log levels per component.
     """
 
-    def __init__(self,
-                 service_name: str,
-                 log_level: str = "INFO",
-                 log_format: str = "json",
-                 include_trace: bool = True):
+    def __init__(
+        self,
+        service_name: str,
+        log_level: str = "INFO",
+        log_format: str = "json",
+        include_trace: bool = True,
+    ):
         """
         Initialize structured logger.
-        
+
         Args:
             service_name: Name of the service
             log_level: Default logging level
@@ -851,10 +897,10 @@ class StructuredLogger:
         else:
             return SimpleFormatter(self.service_name)
 
-    def log_request(self, level: str, data: Dict[str, Any]):
+    def log_request(self, level: str, data: dict[str, Any]):
         """
         Log request with structured data.
-        
+
         Args:
             level: Log level (DEBUG, INFO, WARN, ERROR)
             data: Structured log data
@@ -869,7 +915,7 @@ class StructuredLogger:
     def log_auth_event(self, success: bool, reason: str = None, request_id: str = None):
         """
         Log authentication event.
-        
+
         Args:
             success: Whether authentication succeeded
             reason: Authentication result reason
@@ -880,16 +926,18 @@ class StructuredLogger:
             "success": success,
             "reason": reason,
             "request_id": request_id,
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
         level = "INFO" if success else "WARN"
         self.log_request(level, data)
 
-    def log_performance_alert(self, metric: str, value: float, threshold: float, request_id: str = None):
+    def log_performance_alert(
+        self, metric: str, value: float, threshold: float, request_id: str = None
+    ):
         """
         Log performance threshold breach.
-        
+
         Args:
             metric: Performance metric name
             value: Current value
@@ -902,15 +950,17 @@ class StructuredLogger:
             "value": value,
             "threshold": threshold,
             "request_id": request_id,
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
         self.log_request("WARN", data)
 
-    def log_security_event(self, event_type: str, details: Dict[str, Any], request_id: str = None):
+    def log_security_event(
+        self, event_type: str, details: dict[str, Any], request_id: str = None
+    ):
         """
         Log security-related event.
-        
+
         Args:
             event_type: Type of security event
             details: Event details
@@ -921,7 +971,7 @@ class StructuredLogger:
             "security_event_type": event_type,
             "details": details,
             "request_id": request_id,
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
         self.log_request("WARN", data)
@@ -937,27 +987,50 @@ class JsonFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         log_data = {
-            "timestamp": datetime.fromtimestamp(record.created, timezone.utc).isoformat(),
+            "timestamp": datetime.fromtimestamp(
+                record.created, timezone.utc
+            ).isoformat(),
             "level": record.levelname,
             "service": self.service_name,
             "logger": record.name,
-            "message": record.getMessage()
+            "message": record.getMessage(),
         }
 
         if self.include_trace:
-            log_data.update({
-                "module": record.module,
-                "function": record.funcName,
-                "line": record.lineno
-            })
+            log_data.update(
+                {
+                    "module": record.module,
+                    "function": record.funcName,
+                    "line": record.lineno,
+                }
+            )
 
         # Add any extra fields from the log record
-        if hasattr(record, '__dict__'):
+        if hasattr(record, "__dict__"):
             for key, value in record.__dict__.items():
-                if key not in ['name', 'msg', 'args', 'levelname', 'levelno', 'pathname',
-                              'filename', 'module', 'exc_info', 'exc_text', 'stack_info',
-                              'lineno', 'funcName', 'created', 'msecs', 'relativeCreated',
-                              'thread', 'threadName', 'processName', 'process', 'getMessage']:
+                if key not in [
+                    "name",
+                    "msg",
+                    "args",
+                    "levelname",
+                    "levelno",
+                    "pathname",
+                    "filename",
+                    "module",
+                    "exc_info",
+                    "exc_text",
+                    "stack_info",
+                    "lineno",
+                    "funcName",
+                    "created",
+                    "msecs",
+                    "relativeCreated",
+                    "thread",
+                    "threadName",
+                    "processName",
+                    "process",
+                    "getMessage",
+                ]:
                     log_data[key] = value
 
         return json.dumps(log_data)
@@ -985,15 +1058,13 @@ class SimpleFormatter(logging.Formatter):
     """Simple log formatter for basic output."""
 
     def __init__(self, service_name: str):
-        super().__init__(
-            f"%(asctime)s - {service_name} - %(levelname)s - %(message)s"
-        )
+        super().__init__(f"%(asctime)s - {service_name} - %(levelname)s - %(message)s")
 
 
 class GuardFort:
     """
     Core GuardFort middleware class for KonveyN2AI services.
-    
+
     Provides request tracing, timing, authentication, and logging
     across all three components (Amatya, Janapada, Svami).
     """
@@ -1005,22 +1076,22 @@ class GuardFort:
         enable_auth: bool = True,
         log_level: str = "INFO",
         log_format: str = "json",
-        cors_origins: Optional[List[str]] = None,
-        cors_methods: Optional[List[str]] = None,
-        cors_headers: Optional[List[str]] = None,
+        cors_origins: Optional[list[str]] = None,
+        cors_methods: Optional[list[str]] = None,
+        cors_headers: Optional[list[str]] = None,
         auth_header_name: str = "Authorization",
-        auth_schemes: Optional[List[str]] = None,
-        allowed_paths: Optional[List[str]] = None,
+        auth_schemes: Optional[list[str]] = None,
+        allowed_paths: Optional[list[str]] = None,
         security_headers: bool = True,
         enable_metrics: bool = True,
         metrics_retention_minutes: int = 60,
-        performance_thresholds: Dict[str, float] = None,
+        performance_thresholds: dict[str, float] = None,
         include_trace_logs: bool = True,
-        debug_mode: bool = False
+        debug_mode: bool = False,
     ):
         """
         Initialize GuardFort middleware with FastAPI application.
-        
+
         Args:
             app: FastAPI application instance
             service_name: Name of the service for logging
@@ -1057,7 +1128,7 @@ class GuardFort:
             "response_time_ms": 5000,  # 5 seconds
             "concurrent_requests": 100,
             "error_rate_percent": 5.0,
-            "memory_usage_mb": 512
+            "memory_usage_mb": 512,
         }
 
         # Initialize structured logging system
@@ -1065,7 +1136,7 @@ class GuardFort:
             service_name=service_name,
             log_level=log_level,
             log_format=log_format,
-            include_trace=include_trace_logs
+            include_trace=include_trace_logs,
         )
 
         # Keep reference to standard logger for backward compatibility
@@ -1074,8 +1145,7 @@ class GuardFort:
         # Initialize metrics collection system
         if self.enable_metrics:
             self.metrics = MetricsCollector(
-                retention_minutes=metrics_retention_minutes,
-                max_samples=1000
+                retention_minutes=metrics_retention_minutes, max_samples=1000
             )
         else:
             self.metrics = None
@@ -1086,13 +1156,12 @@ class GuardFort:
             structured_logger=self.structured_logger,
             metrics_collector=self.metrics,
             debug_mode=self.debug_mode,
-            include_stack_trace=include_trace_logs
+            include_stack_trace=include_trace_logs,
         )
 
         # Initialize service integration utilities
         self.service_integration = ServiceIntegration(
-            service_name=service_name,
-            structured_logger=self.structured_logger
+            service_name=service_name, structured_logger=self.structured_logger
         )
 
         # Configure CORS if needed
@@ -1134,11 +1203,11 @@ class GuardFort:
     async def _process_request(self, request: Request, call_next: Callable) -> Response:
         """
         Core middleware processing logic.
-        
+
         Args:
             request: FastAPI request object
             call_next: Next middleware or endpoint in the chain
-            
+
         Returns:
             Response object with GuardFort headers and processing
         """
@@ -1182,7 +1251,7 @@ class GuardFort:
                         401,
                         duration,
                         request.headers.get("User-Agent"),
-                        request.client.host if request.client else None
+                        request.client.host if request.client else None,
                     )
 
                 return self._create_auth_error_response(request_id, auth_reason)
@@ -1201,15 +1270,19 @@ class GuardFort:
                     "response_time",
                     duration_ms,
                     self.performance_thresholds["response_time_ms"],
-                    request_id
+                    request_id,
                 )
 
-            if self.metrics and self.metrics.concurrent_requests > self.performance_thresholds["concurrent_requests"]:
+            if (
+                self.metrics
+                and self.metrics.concurrent_requests
+                > self.performance_thresholds["concurrent_requests"]
+            ):
                 self.structured_logger.log_performance_alert(
                     "concurrent_requests",
                     self.metrics.concurrent_requests,
                     self.performance_thresholds["concurrent_requests"],
-                    request_id
+                    request_id,
                 )
 
             # Record request metrics
@@ -1220,7 +1293,7 @@ class GuardFort:
                     response.status_code,
                     duration,
                     request.headers.get("User-Agent"),
-                    request.client.host if request.client else None
+                    request.client.host if request.client else None,
                 )
 
             # Add GuardFort headers to response
@@ -1231,7 +1304,9 @@ class GuardFort:
                 self._add_security_headers(response)
 
             # Log successful request with enhanced data
-            self._log_request_enhanced(request, response, duration, request_id, auth_reason)
+            self._log_request_enhanced(
+                request, response, duration, request_id, auth_reason
+            )
 
             return response
 
@@ -1240,7 +1315,7 @@ class GuardFort:
             duration = time.time() - start_time
 
             # Record request metrics with appropriate status code
-            status_code = getattr(e, 'status_code', 500)
+            status_code = getattr(e, "status_code", 500)
             if self.metrics:
                 self.metrics.record_request_end(
                     request.method,
@@ -1248,7 +1323,7 @@ class GuardFort:
                     status_code,
                     duration,
                     request.headers.get("User-Agent"),
-                    request.client.host if request.client else None
+                    request.client.host if request.client else None,
                 )
 
             # Use advanced exception handler
@@ -1257,10 +1332,10 @@ class GuardFort:
     def _get_or_generate_request_id(self, request: Request) -> str:
         """
         Get request ID from headers or generate a new one.
-        
+
         Args:
             request: FastAPI request object
-            
+
         Returns:
             Request ID string (UUID format)
         """
@@ -1270,13 +1345,13 @@ class GuardFort:
 
         return request_id
 
-    def _validate_authentication(self, request: Request) -> Dict[str, Any]:
+    def _validate_authentication(self, request: Request) -> dict[str, Any]:
         """
         Validate authentication for the request.
-        
+
         Args:
             request: FastAPI request object
-            
+
         Returns:
             Dict with 'valid' boolean and 'reason' string
         """
@@ -1298,13 +1373,13 @@ class GuardFort:
         token_valid = self._validate_token(auth_header)
         return token_valid
 
-    def _validate_auth_scheme(self, auth_header: str) -> Dict[str, Any]:
+    def _validate_auth_scheme(self, auth_header: str) -> dict[str, Any]:
         """
         Validate the authentication scheme format.
-        
+
         Args:
             auth_header: Authorization header value
-            
+
         Returns:
             Dict with validation result
         """
@@ -1314,16 +1389,16 @@ class GuardFort:
 
         return {
             "valid": False,
-            "reason": f"invalid_auth_scheme_expected_{self.auth_schemes}"
+            "reason": f"invalid_auth_scheme_expected_{self.auth_schemes}",
         }
 
-    def _validate_token(self, auth_header: str) -> Dict[str, Any]:
+    def _validate_token(self, auth_header: str) -> dict[str, Any]:
         """
         Validate the authentication token.
-        
+
         Args:
             auth_header: Authorization header value
-            
+
         Returns:
             Dict with validation result
         """
@@ -1340,29 +1415,24 @@ class GuardFort:
         else:
             return {"valid": False, "reason": f"unsupported_scheme_{scheme}"}
 
-    def _validate_bearer_token(self, token: str) -> Dict[str, Any]:
+    def _validate_bearer_token(self, token: str) -> dict[str, Any]:
         """
         Validate Bearer token (JWT or similar).
-        
+
         Args:
             token: Bearer token value
-            
+
         Returns:
             Dict with validation result
         """
         # For demo/hackathon: Accept specific demo tokens or validate format
-        demo_tokens = [
-            "demo-token",
-            "konveyn2ai-token",
-            "hackathon-demo",
-            "test-token"
-        ]
+        demo_tokens = ["demo-token", "konveyn2ai-token", "hackathon-demo", "test-token"]
 
         if token in demo_tokens:
             return {"valid": True, "reason": "demo_token"}
 
         # Basic JWT format validation (3 parts separated by dots)
-        if re.match(r'^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$', token):
+        if re.match(r"^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$", token):
             # In production, would verify JWT signature and claims
             return {"valid": True, "reason": "jwt_format_valid"}
 
@@ -1372,28 +1442,24 @@ class GuardFort:
 
         return {"valid": False, "reason": "invalid_bearer_token"}
 
-    def _validate_api_key(self, api_key: str) -> Dict[str, Any]:
+    def _validate_api_key(self, api_key: str) -> dict[str, Any]:
         """
         Validate API key.
-        
+
         Args:
             api_key: API key value
-            
+
         Returns:
             Dict with validation result
         """
         # For demo/hackathon: Accept demo API keys
-        demo_api_keys = [
-            "konveyn2ai-api-key-demo",
-            "hackathon-api-key",
-            "demo-api-key"
-        ]
+        demo_api_keys = ["konveyn2ai-api-key-demo", "hackathon-api-key", "demo-api-key"]
 
         if api_key in demo_api_keys:
             return {"valid": True, "reason": "demo_api_key"}
 
         # Basic API key format validation (alphanumeric, minimum length)
-        if re.match(r'^[A-Za-z0-9_-]{16,}$', api_key):
+        if re.match(r"^[A-Za-z0-9_-]{16,}$", api_key):
             return {"valid": True, "reason": "api_key_format_valid"}
 
         return {"valid": False, "reason": "invalid_api_key"}
@@ -1401,7 +1467,7 @@ class GuardFort:
     def _add_response_headers(self, response: Response, request_id: str):
         """
         Add GuardFort headers to the response.
-        
+
         Args:
             response: FastAPI response object
             request_id: Request ID to add to headers
@@ -1413,7 +1479,7 @@ class GuardFort:
     def _add_security_headers(self, response: Response):
         """
         Add security headers to the response.
-        
+
         Args:
             response: FastAPI response object
         """
@@ -1448,20 +1514,16 @@ class GuardFort:
         )
 
         # Strict Transport Security (HTTPS only)
-        response.headers["Strict-Transport-Security"] = (
-            "max-age=31536000; includeSubDomains; preload"
-        )
+        response.headers[
+            "Strict-Transport-Security"
+        ] = "max-age=31536000; includeSubDomains; preload"
 
     def _log_request(
-        self,
-        request: Request,
-        response: Response,
-        duration: float,
-        request_id: str
+        self, request: Request, response: Response, duration: float, request_id: str
     ):
         """
         Log request details with structured format.
-        
+
         Args:
             request: FastAPI request object
             response: FastAPI response object
@@ -1476,7 +1538,7 @@ class GuardFort:
             "status_code": response.status_code,
             "duration_ms": round(duration * 1000, 2),
             "user_agent": request.headers.get("User-Agent", "unknown"),
-            "remote_addr": request.client.host if request.client else "unknown"
+            "remote_addr": request.client.host if request.client else "unknown",
         }
 
         # Log as JSON string for structured logging
@@ -1488,11 +1550,11 @@ class GuardFort:
         response: Response,
         duration: float,
         request_id: str,
-        auth_reason: str = None
+        auth_reason: str = None,
     ):
         """
         Enhanced request logging with additional context and structured data.
-        
+
         Args:
             request: FastAPI request object
             response: FastAPI response object
@@ -1505,7 +1567,9 @@ class GuardFort:
             "request_id": request_id,
             "method": request.method,
             "path": request.url.path,
-            "query_params": dict(request.query_params) if request.query_params else None,
+            "query_params": dict(request.query_params)
+            if request.query_params
+            else None,
             "status_code": response.status_code,
             "duration_ms": round(duration * 1000, 2),
             "user_agent": request.headers.get("User-Agent", "unknown"),
@@ -1513,7 +1577,7 @@ class GuardFort:
             "auth_reason": auth_reason,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "content_length": response.headers.get("content-length"),
-            "content_type": response.headers.get("content-type")
+            "content_type": response.headers.get("content-type"),
         }
 
         # Add performance classification
@@ -1539,15 +1603,11 @@ class GuardFort:
         self.structured_logger.log_request("INFO", log_data)
 
     def _log_exception(
-        self,
-        request: Request,
-        request_id: str,
-        duration: float,
-        exception: Exception
+        self, request: Request, request_id: str, duration: float, exception: Exception
     ):
         """
         Log exception details with context.
-        
+
         Args:
             request: FastAPI request object
             request_id: Request ID for tracing
@@ -1561,21 +1621,17 @@ class GuardFort:
             "duration_ms": round(duration * 1000, 2),
             "exception_type": type(exception).__name__,
             "exception_message": str(exception),
-            "status": "error"
+            "status": "error",
         }
 
         self.logger.error(json.dumps(log_data))
 
     def _log_exception_enhanced(
-        self,
-        request: Request,
-        request_id: str,
-        duration: float,
-        exception: Exception
+        self, request: Request, request_id: str, duration: float, exception: Exception
     ):
         """
         Enhanced exception logging with additional context and structured data.
-        
+
         Args:
             request: FastAPI request object
             request_id: Request ID for tracing
@@ -1587,41 +1643,40 @@ class GuardFort:
             "request_id": request_id,
             "method": request.method,
             "path": request.url.path,
-            "query_params": dict(request.query_params) if request.query_params else None,
+            "query_params": dict(request.query_params)
+            if request.query_params
+            else None,
             "duration_ms": round(duration * 1000, 2),
             "exception_type": type(exception).__name__,
             "exception_message": str(exception),
             "user_agent": request.headers.get("User-Agent", "unknown"),
             "remote_addr": request.client.host if request.client else "unknown",
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "status": "error"
+            "status": "error",
         }
 
         self.structured_logger.log_request("ERROR", log_data)
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """
         Get current metrics summary.
-        
+
         Returns:
             Dictionary containing comprehensive metrics data
         """
         if not self.metrics:
-            return {
-                "error": "Metrics collection is disabled",
-                "enabled": False
-            }
+            return {"error": "Metrics collection is disabled", "enabled": False}
 
         return {
             "enabled": True,
             "service": self.service_name,
-            **self.metrics.get_metrics_summary()
+            **self.metrics.get_metrics_summary(),
         }
 
     def add_metrics_endpoint(self, path: str = "/metrics"):
         """
         Add a metrics endpoint to the FastAPI application.
-        
+
         Args:
             path: URL path for the metrics endpoint
         """
@@ -1640,10 +1695,11 @@ class GuardFort:
     def add_health_endpoint(self, path: str = "/health"):
         """
         Add a health check endpoint with basic metrics.
-        
+
         Args:
             path: URL path for the health endpoint
         """
+
         @self.app.get(path)
         async def health_check():
             """Return service health status with basic metrics."""
@@ -1651,18 +1707,28 @@ class GuardFort:
                 "status": "healthy",
                 "service": self.service_name,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-                "version": "1.0.0"
+                "version": "1.0.0",
             }
 
             if self.metrics:
                 # Add basic performance indicators
                 metrics_summary = self.metrics.get_metrics_summary()
-                health_data.update({
-                    "requests_total": metrics_summary.get("requests", {}).get("total_count", 0),
-                    "error_rate_percent": metrics_summary.get("requests", {}).get("error_rate_percent", 0),
-                    "concurrent_requests": metrics_summary.get("performance", {}).get("concurrent_requests", 0),
-                    "avg_response_time_ms": metrics_summary.get("performance", {}).get("overall", {}).get("avg_response_time_ms", 0)
-                })
+                health_data.update(
+                    {
+                        "requests_total": metrics_summary.get("requests", {}).get(
+                            "total_count", 0
+                        ),
+                        "error_rate_percent": metrics_summary.get("requests", {}).get(
+                            "error_rate_percent", 0
+                        ),
+                        "concurrent_requests": metrics_summary.get(
+                            "performance", {}
+                        ).get("concurrent_requests", 0),
+                        "avg_response_time_ms": metrics_summary.get("performance", {})
+                        .get("overall", {})
+                        .get("avg_response_time_ms", 0),
+                    }
+                )
 
             return health_data
 
@@ -1670,13 +1736,12 @@ class GuardFort:
         if path not in self.allowed_paths:
             self.allowed_paths.append(path)
 
-    def register_external_service(self,
-                                service_name: str,
-                                base_url: str,
-                                health_endpoint: str = "/health"):
+    def register_external_service(
+        self, service_name: str, base_url: str, health_endpoint: str = "/health"
+    ):
         """
         Register an external service for integration and health monitoring.
-        
+
         Args:
             service_name: Name of the service to register
             base_url: Base URL of the service
@@ -1685,60 +1750,65 @@ class GuardFort:
         self.service_integration.register_service(
             service_name=service_name,
             base_url=base_url,
-            health_endpoint=health_endpoint
+            health_endpoint=health_endpoint,
         )
 
-        self.structured_logger.log_request("INFO", {
-            "event_type": "external_service_registered",
-            "service_name": service_name,
-            "base_url": base_url,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        })
+        self.structured_logger.log_request(
+            "INFO",
+            {
+                "event_type": "external_service_registered",
+                "service_name": service_name,
+                "base_url": base_url,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        )
 
-    async def check_service_health(self, service_name: str) -> Dict[str, Any]:
+    async def check_service_health(self, service_name: str) -> dict[str, Any]:
         """
         Check the health of a registered external service.
-        
+
         Args:
             service_name: Name of the service to check
-            
+
         Returns:
             Dictionary with health status information
         """
         return await self.service_integration.check_service_health(service_name)
 
-    def get_service_registry(self) -> Dict[str, Any]:
+    def get_service_registry(self) -> dict[str, Any]:
         """
         Get information about all registered services.
-        
+
         Returns:
             Dictionary with all service registration information
         """
         return self.service_integration.get_service_info()
 
-    def create_service_headers(self, request_id: str, source_service: str = None) -> Dict[str, str]:
+    def create_service_headers(
+        self, request_id: str, source_service: str = None
+    ) -> dict[str, str]:
         """
         Create headers for service-to-service communication.
-        
+
         Args:
             request_id: Current request ID for tracing
             source_service: Name of the calling service
-            
+
         Returns:
             Dictionary of headers for service requests
         """
         return self.service_integration.create_service_request_context(
-            request_id=request_id,
-            source_service=source_service
+            request_id=request_id, source_service=source_service
         )
 
     def add_service_status_endpoint(self, path: str = "/services"):
         """
         Add an endpoint that shows the status of all registered services.
-        
+
         Args:
             path: URL path for the services status endpoint
         """
+
         @self.app.get(path)
         async def get_services_status():
             """Return status information for all registered services."""
@@ -1751,16 +1821,18 @@ class GuardFort:
                 "summary": {
                     "total_services": len(services_info),
                     "healthy_services": 0,
-                    "unhealthy_services": 0
-                }
+                    "unhealthy_services": 0,
+                },
             }
 
             for service_name, config in services_info.items():
                 service_status = {
                     "base_url": config["base_url"],
                     "health_endpoint": config["health_endpoint"],
-                    "last_health_check": config["last_health_check"].isoformat() if config["last_health_check"] else None,
-                    "is_healthy": config["is_healthy"]
+                    "last_health_check": config["last_health_check"].isoformat()
+                    if config["last_health_check"]
+                    else None,
+                    "is_healthy": config["is_healthy"],
                 }
 
                 # Try to get current health status
@@ -1787,11 +1859,11 @@ class GuardFort:
     def _create_auth_error_response(self, request_id: str, reason: str) -> JSONResponse:
         """
         Create standardized authentication error response.
-        
+
         Args:
             request_id: Request ID for tracing
             reason: Authentication failure reason
-            
+
         Returns:
             JSONResponse with 401 status
         """
@@ -1800,22 +1872,21 @@ class GuardFort:
             content={
                 "error": "authentication_required",
                 "message": "Valid authentication is required to access this resource",
-                "request_id": request_id
+                "request_id": request_id,
             },
-            headers={
-                "X-Request-ID": request_id,
-                "X-Service": self.service_name
-            }
+            headers={"X-Request-ID": request_id, "X-Service": self.service_name},
         )
 
-    def _create_error_response(self, request_id: str, exception: Exception) -> JSONResponse:
+    def _create_error_response(
+        self, request_id: str, exception: Exception
+    ) -> JSONResponse:
         """
         Create sanitized error response for exceptions.
-        
+
         Args:
             request_id: Request ID for tracing
             exception: Exception that occurred
-            
+
         Returns:
             JSONResponse with 500 status and sanitized error
         """
@@ -1825,12 +1896,9 @@ class GuardFort:
             content={
                 "error": "internal_server_error",
                 "message": "An internal error occurred. Please contact support if the issue persists.",
-                "request_id": request_id
+                "request_id": request_id,
             },
-            headers={
-                "X-Request-ID": request_id,
-                "X-Service": self.service_name
-            }
+            headers={"X-Request-ID": request_id, "X-Service": self.service_name},
         )
 
 
@@ -1841,24 +1909,24 @@ def init_guard_fort(
     enable_auth: bool = True,
     log_level: str = "INFO",
     log_format: str = "json",
-    cors_origins: Optional[List[str]] = None,
-    cors_methods: Optional[List[str]] = None,
-    cors_headers: Optional[List[str]] = None,
-    auth_schemes: Optional[List[str]] = None,
-    allowed_paths: Optional[List[str]] = None,
+    cors_origins: Optional[list[str]] = None,
+    cors_methods: Optional[list[str]] = None,
+    cors_headers: Optional[list[str]] = None,
+    auth_schemes: Optional[list[str]] = None,
+    allowed_paths: Optional[list[str]] = None,
     security_headers: bool = True,
     enable_metrics: bool = True,
     metrics_retention_minutes: int = 60,
-    performance_thresholds: Dict[str, float] = None,
+    performance_thresholds: dict[str, float] = None,
     include_trace_logs: bool = True,
     add_metrics_endpoint: bool = True,
     add_health_endpoint: bool = True,
     add_service_status_endpoint: bool = True,
-    debug_mode: bool = False
+    debug_mode: bool = False,
 ) -> GuardFort:
     """
     Utility function to easily initialize GuardFort middleware.
-    
+
     Args:
         app: FastAPI application instance
         service_name: Name of the service
@@ -1879,18 +1947,18 @@ def init_guard_fort(
         add_health_endpoint: Whether to automatically add /health endpoint
         add_service_status_endpoint: Whether to automatically add /services endpoint
         debug_mode: Whether to enable debug mode for detailed error responses
-        
+
     Returns:
         GuardFort instance
-        
+
     Examples:
         # Basic usage with enhanced logging and metrics
         app = FastAPI()
         guard_fort = init_guard_fort(app, "amatya-role-prompter")
-        
+
         # With custom settings and structured logging
         guard_fort = init_guard_fort(
-            app, 
+            app,
             "janapada-memory",
             log_format="structured",
             cors_origins=["https://konveyn2ai.com"],
@@ -1902,11 +1970,11 @@ def init_guard_fort(
                 "error_rate_percent": 2.0
             }
         )
-        
+
         # Disable metrics for lightweight setup
         guard_fort = init_guard_fort(
             app,
-            "svami-orchestrator", 
+            "svami-orchestrator",
             enable_metrics=False,
             log_format="simple"
         )
@@ -1928,7 +1996,7 @@ def init_guard_fort(
         metrics_retention_minutes=metrics_retention_minutes,
         performance_thresholds=performance_thresholds,
         include_trace_logs=include_trace_logs,
-        debug_mode=debug_mode
+        debug_mode=debug_mode,
     )
 
     # Add endpoints if requested

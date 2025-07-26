@@ -12,7 +12,7 @@ import sys
 import pytest
 from pydantic import ValidationError
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from common.models import (
     AdviceRequest,
@@ -35,7 +35,7 @@ class TestJsonRpcError:
         error = JsonRpcError(
             code=JsonRpcErrorCode.INVALID_PARAMS,
             message="Invalid parameters",
-            data={"field": "query", "reason": "missing"}
+            data={"field": "query", "reason": "missing"},
         )
 
         assert error.code == -32602
@@ -45,8 +45,7 @@ class TestJsonRpcError:
     def test_error_without_data(self):
         """Test error creation without optional data field."""
         error = JsonRpcError(
-            code=JsonRpcErrorCode.METHOD_NOT_FOUND,
-            message="Method not found"
+            code=JsonRpcErrorCode.METHOD_NOT_FOUND, message="Method not found"
         )
 
         assert error.code == -32601
@@ -75,9 +74,7 @@ class TestJsonRpcRequest:
     def test_valid_request_creation(self):
         """Test creating valid JSON-RPC requests."""
         request = JsonRpcRequest(
-            id="req-123",
-            method="search",
-            params={"query": "test", "k": 5}
+            id="req-123", method="search", params={"query": "test", "k": 5}
         )
 
         assert request.jsonrpc == "2.0"
@@ -94,9 +91,7 @@ class TestJsonRpcRequest:
     def test_request_serialization(self):
         """Test JSON serialization of requests."""
         request = JsonRpcRequest(
-            id="req-789",
-            method="advise",
-            params={"role": "developer", "chunks": []}
+            id="req-789", method="advise", params={"role": "developer", "chunks": []}
         )
 
         json_str = request.to_json()
@@ -110,11 +105,7 @@ class TestJsonRpcRequest:
     def test_invalid_jsonrpc_version(self):
         """Test validation of JSON-RPC version."""
         with pytest.raises(ValidationError):
-            JsonRpcRequest(
-                jsonrpc="1.0",
-                id="req-123",
-                method="test"
-            )
+            JsonRpcRequest(jsonrpc="1.0", id="req-123", method="test")
 
     def test_invalid_method_names(self):
         """Test validation of method names."""
@@ -133,8 +124,7 @@ class TestJsonRpcResponse:
     def test_successful_response(self):
         """Test creating successful responses."""
         response = JsonRpcResponse.create_success(
-            request_id="req-123",
-            result={"data": "test result"}
+            request_id="req-123", result={"data": "test result"}
         )
 
         assert response.jsonrpc == "2.0"
@@ -145,8 +135,7 @@ class TestJsonRpcResponse:
     def test_error_response(self):
         """Test creating error responses."""
         error = JsonRpcError(
-            code=JsonRpcErrorCode.INTERNAL_ERROR,
-            message="Internal server error"
+            code=JsonRpcErrorCode.INTERNAL_ERROR, message="Internal server error"
         )
         response = JsonRpcResponse.create_error(request_id="req-456", error=error)
 
@@ -159,7 +148,7 @@ class TestJsonRpcResponse:
         """Test JSON serialization of responses."""
         response = JsonRpcResponse.create_success(
             request_id="req-789",
-            result={"snippets": [{"file": "test.py", "content": "code"}]}
+            result={"snippets": [{"file": "test.py", "content": "code"}]},
         )
 
         json_str = response.to_json()
@@ -175,11 +164,7 @@ class TestJsonRpcResponse:
         error = JsonRpcError(code=-32603, message="Error")
 
         with pytest.raises(ValueError):
-            JsonRpcResponse(
-                id="req-123",
-                result={"data": "test"},
-                error=error
-            )
+            JsonRpcResponse(id="req-123", result={"data": "test"}, error=error)
 
     def test_missing_result_and_error(self):
         """Test validation that requires either result or error."""
@@ -192,10 +177,7 @@ class TestSharedDataModels:
 
     def test_snippet_model(self):
         """Test Snippet model validation."""
-        snippet = Snippet(
-            file_path="src/test.py",
-            content="def test(): pass"
-        )
+        snippet = Snippet(file_path="src/test.py", content="def test(): pass")
 
         assert snippet.file_path == "src/test.py"
         assert snippet.content == "def test(): pass"
@@ -222,7 +204,7 @@ class TestSharedDataModels:
         """Test AdviceRequest model validation."""
         snippets = [
             Snippet(file_path="auth.py", content="def auth(): pass"),
-            Snippet(file_path="middleware.py", content="class Middleware: pass")
+            Snippet(file_path="middleware.py", content="class Middleware: pass"),
         ]
 
         request = AdviceRequest(role="backend_developer", chunks=snippets)
@@ -235,8 +217,7 @@ class TestSharedDataModels:
         """Test QueryRequest model validation."""
         # With explicit role
         request = QueryRequest(
-            question="How to implement auth?",
-            role="security_engineer"
+            question="How to implement auth?", role="security_engineer"
         )
         assert request.question == "How to implement auth?"
         assert request.role == "security_engineer"
@@ -250,7 +231,7 @@ class TestSharedDataModels:
         response = AnswerResponse(
             answer="Here's how to implement authentication...",
             sources=["auth.py", "middleware.py"],
-            request_id="req-123"
+            request_id="req-123",
         )
 
         assert "authentication" in response.answer
@@ -258,10 +239,7 @@ class TestSharedDataModels:
         assert response.request_id == "req-123"
 
         # With empty sources (default)
-        response = AnswerResponse(
-            answer="Simple answer",
-            request_id="req-456"
-        )
+        response = AnswerResponse(answer="Simple answer", request_id="req-456")
         assert response.sources == []
 
 
@@ -278,9 +256,9 @@ class TestModelSerialization:
                 "role": "backend_developer",
                 "chunks": [
                     {"file_path": "test.py", "content": "code"},
-                    {"file_path": "auth.py", "content": "auth code"}
-                ]
-            }
+                    {"file_path": "auth.py", "content": "auth code"},
+                ],
+            },
         )
 
         # Serialize to JSON
@@ -298,15 +276,7 @@ class TestModelSerialization:
     def test_model_config_extra_forbid(self):
         """Test that models reject extra fields."""
         with pytest.raises(ValidationError):
-            JsonRpcRequest(
-                id="req-123",
-                method="test",
-                extra_field="not allowed"
-            )
+            JsonRpcRequest(id="req-123", method="test", extra_field="not allowed")
 
         with pytest.raises(ValidationError):
-            Snippet(
-                file_path="test.py",
-                content="code",
-                extra_field="not allowed"
-            )
+            Snippet(file_path="test.py", content="code", extra_field="not allowed")

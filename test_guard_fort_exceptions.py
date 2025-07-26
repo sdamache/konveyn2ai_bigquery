@@ -17,7 +17,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 # Add the src directory to the path to import GuardFort
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from guard_fort.guard_fort import (
     AuthenticationException,
@@ -47,7 +47,7 @@ def test_custom_exceptions():
         log_format="json",
         add_metrics_endpoint=False,
         add_health_endpoint=False,
-        add_service_status_endpoint=False
+        add_service_status_endpoint=False,
     )
 
     # Add test endpoints that raise different exceptions
@@ -73,7 +73,9 @@ def test_custom_exceptions():
 
     @app.get("/test/external-service-error")
     async def test_external_service_error():
-        raise ExternalServiceException("API call failed", service_name="payment-api", upstream_status=502)
+        raise ExternalServiceException(
+            "API call failed", service_name="payment-api", upstream_status=502
+        )
 
     @app.get("/test/config-error")
     async def test_config_error():
@@ -113,15 +115,25 @@ def test_custom_exceptions():
         response = client.get(endpoint)
         data = response.json()
 
-        print(f"   {endpoint}: Status {response.status_code}, Error: {data.get('error')}")
+        print(
+            f"   {endpoint}: Status {response.status_code}, Error: {data.get('error')}"
+        )
 
-        assert response.status_code == expected_status, f"Expected {expected_status}, got {response.status_code}"
-        assert data.get("error") == expected_error, f"Expected {expected_error}, got {data.get('error')}"
+        assert (
+            response.status_code == expected_status
+        ), f"Expected {expected_status}, got {response.status_code}"
+        assert (
+            data.get("error") == expected_error
+        ), f"Expected {expected_error}, got {data.get('error')}"
         assert "request_id" in data, "Response should include request_id"
         assert "timestamp" in data, "Response should include timestamp"
 
         # Check for exception-specific details in debug mode
-        if expected_error in ["rate_limit_error", "external_service_error", "validation_error"]:
+        if expected_error in [
+            "rate_limit_error",
+            "external_service_error",
+            "validation_error",
+        ]:
             assert "details" in data, f"Expected details for {expected_error}"
 
     print("✅ Custom exceptions test passed!")
@@ -139,7 +151,7 @@ def test_service_integration():
         service_name="integration-test",
         enable_auth=False,
         add_metrics_endpoint=False,
-        add_health_endpoint=False
+        add_health_endpoint=False,
     )
 
     # Test service registration
@@ -147,13 +159,13 @@ def test_service_integration():
     guard_fort.register_external_service(
         service_name="user-service",
         base_url="http://localhost:8001",
-        health_endpoint="/health"
+        health_endpoint="/health",
     )
 
     guard_fort.register_external_service(
         service_name="payment-service",
         base_url="http://localhost:8002",
-        health_endpoint="/status"
+        health_endpoint="/status",
     )
 
     # Get service registry
@@ -199,7 +211,7 @@ def test_exception_logging_integration():
 
     app = FastAPI(title="Logging Test Service")
 
-    guard_fort = init_guard_fort(
+    init_guard_fort(
         app=app,
         service_name="logging-test",
         enable_auth=False,
@@ -208,12 +220,14 @@ def test_exception_logging_integration():
         debug_mode=True,
         add_metrics_endpoint=False,
         add_health_endpoint=False,
-        add_service_status_endpoint=False
+        add_service_status_endpoint=False,
     )
 
     @app.get("/test/logged-error")
     async def test_logged_error():
-        raise ValidationException("This error should be logged with full context", field="test_field")
+        raise ValidationException(
+            "This error should be logged with full context", field="test_field"
+        )
 
     @app.get("/test/generic-logged-error")
     async def test_generic_logged_error():
@@ -225,7 +239,9 @@ def test_exception_logging_integration():
     response = client.get("/test/logged-error")
     data = response.json()
 
-    print(f"   Custom exception: Status {response.status_code}, Error: {data.get('error')}")
+    print(
+        f"   Custom exception: Status {response.status_code}, Error: {data.get('error')}"
+    )
     assert response.status_code == 422
     assert data.get("error") == "validation_error"
     assert "details" in data  # Debug mode should include details
@@ -235,7 +251,9 @@ def test_exception_logging_integration():
     response = client.get("/test/generic-logged-error")
     data = response.json()
 
-    print(f"   Generic exception: Status {response.status_code}, Error: {data.get('error')}")
+    print(
+        f"   Generic exception: Status {response.status_code}, Error: {data.get('error')}"
+    )
     assert response.status_code == 502
     assert data.get("error") == "connection_error"
 
@@ -253,19 +271,18 @@ def test_service_health_monitoring():
         service_name="health-monitor-test",
         enable_auth=False,
         add_metrics_endpoint=False,
-        add_health_endpoint=False
+        add_health_endpoint=False,
     )
 
     # Register some test services
     guard_fort.register_external_service(
-        service_name="api-service",
-        base_url="http://localhost:9001"
+        service_name="api-service", base_url="http://localhost:9001"
     )
 
     guard_fort.register_external_service(
         service_name="db-service",
         base_url="http://localhost:9002",
-        health_endpoint="/ping"
+        health_endpoint="/ping",
     )
 
     @app.get("/test/check-health/{service_name}")
@@ -305,7 +322,9 @@ def test_service_health_monitoring():
 
     # Check that health information is included
     for service_name, service_info in data["registered_services"].items():
-        print(f"   Service {service_name}: Status {service_info.get('status', 'unknown')}")
+        print(
+            f"   Service {service_name}: Status {service_info.get('status', 'unknown')}"
+        )
         assert "base_url" in service_info
         assert "health_endpoint" in service_info
 
@@ -320,7 +339,7 @@ def test_debug_vs_production_mode():
     print("\n1. Testing debug mode (detailed errors)...")
     app_debug = FastAPI(title="Debug Mode Test")
 
-    guard_fort_debug = init_guard_fort(
+    init_guard_fort(
         app=app_debug,
         service_name="debug-test",
         enable_auth=False,
@@ -328,7 +347,7 @@ def test_debug_vs_production_mode():
         log_format="json",
         add_metrics_endpoint=False,
         add_health_endpoint=False,
-        add_service_status_endpoint=False
+        add_service_status_endpoint=False,
     )
 
     @app_debug.get("/test/debug-error")
@@ -346,7 +365,7 @@ def test_debug_vs_production_mode():
     print("\n2. Testing production mode (sanitized errors)...")
     app_prod = FastAPI(title="Production Mode Test")
 
-    guard_fort_prod = init_guard_fort(
+    init_guard_fort(
         app=app_prod,
         service_name="production-test",
         enable_auth=False,
@@ -354,7 +373,7 @@ def test_debug_vs_production_mode():
         log_format="json",
         add_metrics_endpoint=False,
         add_health_endpoint=False,
-        add_service_status_endpoint=False
+        add_service_status_endpoint=False,
     )
 
     @app_prod.get("/test/prod-error")
@@ -400,6 +419,7 @@ def main():
     except Exception as e:
         print(f"\n❌ Test failed with error: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 

@@ -8,11 +8,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from fastapi import Request
 
-from src.common.models import (
-    JsonRpcErrorCode,
-    JsonRpcRequest,
-    JsonRpcResponse,
-)
+from src.common.models import JsonRpcErrorCode, JsonRpcRequest, JsonRpcResponse
 from src.common.rpc_server import (
     JsonRpcMethodRegistry,
     JsonRpcServer,
@@ -66,7 +62,7 @@ class TestJsonRpcMethodRegistry:
     def test_method_schema_extraction(self):
         registry = JsonRpcMethodRegistry()
 
-        def handler(param1: str, param2: int = 10, param3 = None):
+        def handler(param1: str, param2: int = 10, param3=None):
             """Test handler docstring."""
             pass
 
@@ -119,7 +115,7 @@ class TestJsonRpcServer:
             "jsonrpc": "2.0",
             "id": "1",
             "method": "add",
-            "params": {"a": 5, "b": 3}
+            "params": {"a": 5, "b": 3},
         }
 
         mock_request.body.return_value = json.dumps(request_data).encode()
@@ -138,7 +134,7 @@ class TestJsonRpcServer:
             "jsonrpc": "2.0",
             "id": "1",
             "method": "nonexistent",
-            "params": {}
+            "params": {},
         }
 
         mock_request.body.return_value = json.dumps(request_data).encode()
@@ -159,7 +155,7 @@ class TestJsonRpcServer:
             "jsonrpc": "2.0",
             "id": "1",
             "method": "strict_method",
-            "params": {"wrong_param": "value"}
+            "params": {"wrong_param": "value"},
         }
 
         mock_request.body.return_value = json.dumps(request_data).encode()
@@ -185,8 +181,18 @@ class TestJsonRpcServer:
             return {"product": a * b}
 
         batch_data = [
-            {"jsonrpc": "2.0", "id": "1", "method": "multiply", "params": {"a": 2, "b": 3}},
-            {"jsonrpc": "2.0", "id": "2", "method": "multiply", "params": {"a": 4, "b": 5}}
+            {
+                "jsonrpc": "2.0",
+                "id": "1",
+                "method": "multiply",
+                "params": {"a": 2, "b": 3},
+            },
+            {
+                "jsonrpc": "2.0",
+                "id": "2",
+                "method": "multiply",
+                "params": {"a": 4, "b": 5},
+            },
         ]
 
         mock_request.body.return_value = json.dumps(batch_data).encode()
@@ -239,7 +245,7 @@ class TestJsonRpcServer:
             "jsonrpc": "2.0",
             "id": "1",
             "method": "error_method",
-            "params": {}
+            "params": {},
         }
 
         mock_request.body.return_value = json.dumps(request_data).encode()
@@ -254,16 +260,13 @@ class TestJsonRpcServer:
     async def test_context_injection(self, server, mock_request):
         @server.method("context_method")
         def context_handler(request_id: str, context: dict):
-            return {
-                "request_id": request_id,
-                "has_context": "http_request" in context
-            }
+            return {"request_id": request_id, "has_context": "http_request" in context}
 
         request_data = {
             "jsonrpc": "2.0",
             "id": "test-123",
             "method": "context_method",
-            "params": {}
+            "params": {},
         }
 
         mock_request.body.return_value = json.dumps(request_data).encode()
@@ -289,12 +292,7 @@ class TestJsonRpcServer:
         def test_handler():
             return {"status": "ok"}
 
-        request_data = {
-            "jsonrpc": "2.0",
-            "id": "1",
-            "method": "test",
-            "params": {}
-        }
+        request_data = {"jsonrpc": "2.0", "id": "1", "method": "test", "params": {}}
 
         mock_request.body.return_value = json.dumps(request_data).encode()
 
@@ -328,7 +326,9 @@ class TestUtilityFunctions:
         assert response.error is None
 
     def test_create_error_response(self):
-        response = create_error_response("123", -32000, "Test error", {"detail": "info"})
+        response = create_error_response(
+            "123", -32000, "Test error", {"detail": "info"}
+        )
 
         assert isinstance(response, JsonRpcResponse)
         assert response.id == "123"

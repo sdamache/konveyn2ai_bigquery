@@ -9,13 +9,9 @@ from src.common.rpc_client import JsonRpcClient
 
 @pytest.mark.asyncio
 async def test_json_rpc_client_call_success():
-    mock_response = {
-        "jsonrpc": "2.0",
-        "id": "1",
-        "result": {"message": "success"}
-    }
+    mock_response = {"jsonrpc": "2.0", "id": "1", "result": {"message": "success"}}
 
-    with patch('httpx.AsyncClient.post', new_callable=AsyncMock) as mock_post:
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_response_obj = Mock()
         mock_response_obj.status_code = 200
         mock_response_obj.json.return_value = mock_response
@@ -30,12 +26,15 @@ async def test_json_rpc_client_call_success():
         assert response.result == {"message": "success"}
         assert response.error is None
 
+
 @pytest.mark.asyncio
 async def test_json_rpc_client_call_http_error():
-    with patch('httpx.AsyncClient.post', new_callable=AsyncMock) as mock_post:
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_response = Mock()
         mock_response.status_code = 500
-        mock_post.side_effect = httpx.HTTPStatusError("Error", request=Mock(), response=mock_response)
+        mock_post.side_effect = httpx.HTTPStatusError(
+            "Error", request=Mock(), response=mock_response
+        )
 
         client = JsonRpcClient(url="http://test.com")
         response = await client.call(method="test_method", params={}, id="1")
@@ -46,9 +45,10 @@ async def test_json_rpc_client_call_http_error():
         assert isinstance(response.error, JsonRpcError)
         assert response.error.code == -32000
 
+
 @pytest.mark.asyncio
 async def test_json_rpc_client_call_request_error():
-    with patch('httpx.AsyncClient.post', new_callable=AsyncMock) as mock_post:
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         mock_post.side_effect = httpx.RequestError("Connection failed")
 
         client = JsonRpcClient(url="http://test.com")
@@ -60,9 +60,10 @@ async def test_json_rpc_client_call_request_error():
         assert isinstance(response.error, JsonRpcError)
         assert response.error.code == -32000
 
+
 @pytest.mark.asyncio
 async def test_json_rpc_client_auto_id_generation():
-    with patch('httpx.AsyncClient.post', new_callable=AsyncMock) as mock_post:
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         # We need to capture the generated ID from the request
         mock_response_obj = Mock()
         mock_response_obj.status_code = 200
@@ -71,11 +72,11 @@ async def test_json_rpc_client_auto_id_generation():
         def mock_json():
             # Extract ID from the request that was made
             call_args = mock_post.call_args
-            request_data = call_args.kwargs['json']
+            request_data = call_args.kwargs["json"]
             return {
                 "jsonrpc": "2.0",
-                "id": request_data['id'],  # Use the same ID from request
-                "result": {"status": "ok"}
+                "id": request_data["id"],  # Use the same ID from request
+                "result": {"status": "ok"},
             }
 
         mock_response_obj.json = mock_json
@@ -87,6 +88,7 @@ async def test_json_rpc_client_auto_id_generation():
         assert isinstance(response, JsonRpcResponse)
         assert response.result == {"status": "ok"}
         assert response.id is not None  # Should have auto-generated ID
+
 
 @pytest.mark.asyncio
 async def test_json_rpc_client_custom_timeout():

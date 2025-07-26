@@ -13,16 +13,18 @@ from google.cloud import aiplatform, artifactregistry_v1, run_v2
 # Load environment variables if .env.dev exists
 try:
     from dotenv import load_dotenv
-    if os.path.exists('.env.dev'):
-        load_dotenv('.env.dev')
+
+    if os.path.exists(".env.dev"):
+        load_dotenv(".env.dev")
         print("📝 Loaded environment variables from .env.dev file")
-    elif os.path.exists('.env'):
-        load_dotenv('.env')
+    elif os.path.exists(".env"):
+        load_dotenv(".env")
         print("📝 Loaded environment variables from .env file")
     else:
         print("📝 No .env.dev or .env file found, using system environment variables")
 except ImportError:
     print("⚠️  python-dotenv not installed, using system environment variables")
+
 
 def test_basic_credentials():
     """Test basic Google Cloud authentication"""
@@ -35,7 +37,7 @@ def test_basic_credentials():
         print(f"   Project: {project}")
 
         # Check if using service account or user credentials
-        if hasattr(credentials, 'service_account_email'):
+        if hasattr(credentials, "service_account_email"):
             print(f"   Service Account: {credentials.service_account_email}")
 
         return True, project
@@ -44,13 +46,14 @@ def test_basic_credentials():
         print(f"❌ Basic credential test failed: {e}")
         return False, None
 
+
 def test_vertex_ai_access():
     """Test Vertex AI permissions (Amatya, Janapada components)"""
     print("\n🤖 Testing Vertex AI Access...")
 
     try:
         # Initialize AI Platform
-        aiplatform.init(project='konveyn2ai', location='us-central1')
+        aiplatform.init(project="konveyn2ai", location="us-central1")
         print("✅ AI Platform initialized successfully")
 
         # Test vector index access
@@ -58,7 +61,7 @@ def test_vertex_ai_access():
         print(f"✅ Vector indexes accessible: {len(indexes)} found")
 
         for idx in indexes:
-            if 'konveyn2ai-code-index' in idx.display_name:
+            if "konveyn2ai-code-index" in idx.display_name:
                 print(f"   ✅ Main index found: {idx.display_name}")
                 break
 
@@ -68,6 +71,7 @@ def test_vertex_ai_access():
         print(f"❌ Vertex AI access failed: {e}")
         print("   This is required for Amatya and Janapada components")
         return False
+
 
 def test_cloud_run_access():
     """Test Cloud Run permissions (Svami component)"""
@@ -86,6 +90,7 @@ def test_cloud_run_access():
         print("   This is required for Svami Orchestrator component")
         return False
 
+
 def test_artifact_registry_access():
     """Test Artifact Registry permissions"""
     print("\n📦 Testing Artifact Registry Access...")
@@ -97,7 +102,7 @@ def test_artifact_registry_access():
         print(f"✅ Artifact Registry accessible: {len(repos)} repositories found")
 
         for repo in repos:
-            if 'konveyn2ai-repo' in repo.name:
+            if "konveyn2ai-repo" in repo.name:
                 print(f"   ✅ Main repository found: {repo.name.split('/')[-1]}")
                 break
 
@@ -108,20 +113,17 @@ def test_artifact_registry_access():
         print("   This is required for container deployments")
         return False
 
+
 def test_environment_variables():
     """Test required environment variables"""
     print("\n🌍 Testing Environment Variables...")
 
-    required_vars = [
-        'PROJECT_ID',
-        'REGION',
-        'VECTOR_INDEX_ID'
-    ]
+    required_vars = ["PROJECT_ID", "REGION", "VECTOR_INDEX_ID"]
 
     optional_vars = [
-        'GOOGLE_API_KEY',
-        'GOOGLE_GEMINI_API_KEY',
-        'GOOGLE_APPLICATION_CREDENTIALS'
+        "GOOGLE_API_KEY",
+        "GOOGLE_GEMINI_API_KEY",
+        "GOOGLE_APPLICATION_CREDENTIALS",
     ]
 
     missing_required = []
@@ -137,7 +139,7 @@ def test_environment_variables():
     for var in optional_vars:
         value = os.getenv(var)
         if value:
-            if 'KEY' in var:
+            if "KEY" in var:
                 print(f"✅ {var}: ***[REDACTED]***")
             else:
                 print(f"✅ {var}: {value}")
@@ -145,6 +147,7 @@ def test_environment_variables():
             print(f"⚠️  {var}: Not set (optional)")
 
     return len(missing_required) == 0
+
 
 def main():
     """Main test runner"""
@@ -203,6 +206,7 @@ def main():
         if not artifact_ok:
             print("   - Check Artifact Registry access")
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

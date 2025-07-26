@@ -14,7 +14,7 @@ import pytest
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from guard_fort import GuardFort, init_guard_fort
 
@@ -44,14 +44,16 @@ class TestGuardFortCore:
             app=self.app,
             service_name="test-service",
             enable_auth=True,
-            log_level="DEBUG"
+            log_level="DEBUG",
         )
 
         self.client = TestClient(self.app)
 
     def test_request_id_generation(self):
         """Test that request ID is generated when not provided."""
-        response = self.client.get("/test", headers={"Authorization": "Bearer demo-token"})
+        response = self.client.get(
+            "/test", headers={"Authorization": "Bearer demo-token"}
+        )
 
         assert response.status_code == 200
         assert "X-Request-ID" in response.headers
@@ -78,8 +80,8 @@ class TestGuardFortCore:
             "/test",
             headers={
                 "X-Request-ID": test_request_id,
-                "Authorization": "Bearer demo-token"
-            }
+                "Authorization": "Bearer demo-token",
+            },
         )
 
         assert response.status_code == 200
@@ -91,7 +93,9 @@ class TestGuardFortCore:
 
     def test_service_headers(self):
         """Test that GuardFort adds service identification headers."""
-        response = self.client.get("/test", headers={"Authorization": "Bearer demo-token"})
+        response = self.client.get(
+            "/test", headers={"Authorization": "Bearer demo-token"}
+        )
 
         assert response.status_code == 200
         assert response.headers["X-Service"] == "test-service"
@@ -110,22 +114,22 @@ class TestGuardFortCore:
         """Test the enhanced authentication mechanism."""
         # Test with valid demo Bearer token
         response = self.client.get(
-            "/test",
-            headers={"Authorization": "Bearer demo-token"}
+            "/test", headers={"Authorization": "Bearer demo-token"}
         )
         assert response.status_code == 200
 
         # Test with valid JWT format
         response = self.client.get(
             "/test",
-            headers={"Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ"}
+            headers={
+                "Authorization": "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ"
+            },
         )
         assert response.status_code == 200
 
         # Test with valid API key
         response = self.client.get(
-            "/test",
-            headers={"Authorization": "ApiKey demo-api-key"}
+            "/test", headers={"Authorization": "ApiKey demo-api-key"}
         )
         assert response.status_code == 200
 
@@ -138,21 +142,19 @@ class TestGuardFortCore:
 
         # Test with invalid auth scheme
         response = self.client.get(
-            "/test",
-            headers={"Authorization": "Invalid demo-token"}
+            "/test", headers={"Authorization": "Invalid demo-token"}
         )
         assert response.status_code == 401
 
         # Test with malformed auth header
-        response = self.client.get(
-            "/test",
-            headers={"Authorization": "Bearer"}
-        )
+        response = self.client.get("/test", headers={"Authorization": "Bearer"})
         assert response.status_code == 401
 
     def test_exception_handling(self):
         """Test that exceptions are caught and handled properly."""
-        response = self.client.get("/error", headers={"Authorization": "Bearer demo-token"})
+        response = self.client.get(
+            "/error", headers={"Authorization": "Bearer demo-token"}
+        )
 
         assert response.status_code == 500
         assert "X-Request-ID" in response.headers
@@ -166,10 +168,12 @@ class TestGuardFortCore:
         assert "ValueError" not in data["message"]
         assert "Test exception" not in data["message"]
 
-    @patch('logging.Logger.info')
+    @patch("logging.Logger.info")
     def test_request_logging(self, mock_log_info):
         """Test that requests are logged with proper structure."""
-        response = self.client.get("/test?param=value", headers={"Authorization": "Bearer demo-token"})
+        response = self.client.get(
+            "/test?param=value", headers={"Authorization": "Bearer demo-token"}
+        )
 
         assert response.status_code == 200
 
@@ -202,10 +206,12 @@ class TestGuardFortCore:
         assert request_log_call["duration_ms"] > 0
         assert "param=value" in request_log_call["query_params"]
 
-    @patch('logging.Logger.error')
+    @patch("logging.Logger.error")
     def test_exception_logging(self, mock_log_error):
         """Test that exceptions are logged with proper context."""
-        response = self.client.get("/error", headers={"Authorization": "Bearer demo-token"})
+        response = self.client.get(
+            "/error", headers={"Authorization": "Bearer demo-token"}
+        )
 
         assert response.status_code == 500
 
@@ -232,8 +238,10 @@ class TestGuardFortCore:
 
     def test_timing_functionality(self):
         """Test that request timing is captured and logged."""
-        with patch('logging.Logger.info') as mock_log:
-            response = self.client.get("/test", headers={"Authorization": "Bearer demo-token"})
+        with patch("logging.Logger.info") as mock_log:
+            response = self.client.get(
+                "/test", headers={"Authorization": "Bearer demo-token"}
+            )
 
             assert response.status_code == 200
 
@@ -255,7 +263,9 @@ class TestGuardFortCore:
 
     def test_security_headers(self):
         """Test that security headers are added to responses."""
-        response = self.client.get("/test", headers={"Authorization": "Bearer demo-token"})
+        response = self.client.get(
+            "/test", headers={"Authorization": "Bearer demo-token"}
+        )
 
         assert response.status_code == 200
 
@@ -306,7 +316,7 @@ class TestGuardFortUtilities:
             log_level="ERROR",
             cors_origins=["https://example.com"],
             auth_schemes=["Bearer"],
-            security_headers=False
+            security_headers=False,
         )
 
         assert isinstance(guard_fort, GuardFort)
@@ -327,19 +337,12 @@ class TestGuardFortUtilities:
         async def test_endpoint():
             return {"message": "test"}
 
-        guard_fort = init_guard_fort(
-            app=app,
-            service_name="no-auth-test",
-            enable_auth=False
-        )
+        init_guard_fort(app=app, service_name="no-auth-test", enable_auth=False)
 
         client = TestClient(app)
 
         # Test with invalid auth - should still pass since auth is disabled
-        response = client.get(
-            "/test",
-            headers={"Authorization": "Invalid format"}
-        )
+        response = client.get("/test", headers={"Authorization": "Invalid format"})
 
         assert response.status_code == 200
         assert response.headers["X-Service"] == "no-auth-test"
@@ -408,9 +411,7 @@ class TestGuardFortSecurity:
             return {"message": "public"}
 
         GuardFort(
-            app,
-            service_name="custom-paths",
-            allowed_paths=["/health", "/public"]
+            app, service_name="custom-paths", allowed_paths=["/health", "/public"]
         )
         client = TestClient(app)
 
@@ -464,11 +465,15 @@ class TestGuardFortSecurity:
 
         # Test demo API keys
         for api_key in ["konveyn2ai-api-key-demo", "hackathon-api-key", "demo-api-key"]:
-            response = client.get("/test", headers={"Authorization": f"ApiKey {api_key}"})
+            response = client.get(
+                "/test", headers={"Authorization": f"ApiKey {api_key}"}
+            )
             assert response.status_code == 200
 
         # Test valid format API key
-        response = client.get("/test", headers={"Authorization": "ApiKey abcdef1234567890"})
+        response = client.get(
+            "/test", headers={"Authorization": "ApiKey abcdef1234567890"}
+        )
         assert response.status_code == 200
 
         # Test invalid format API key

@@ -18,7 +18,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 # Add the src directory to the path to import GuardFort
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from guard_fort.guard_fort import init_guard_fort
 
@@ -40,8 +40,8 @@ def test_basic_logging_and_metrics():
         performance_thresholds={
             "response_time_ms": 100,  # Low threshold for testing alerts
             "concurrent_requests": 5,
-            "error_rate_percent": 10.0
-        }
+            "error_rate_percent": 10.0,
+        },
     )
 
     # Add test endpoints
@@ -84,8 +84,12 @@ def test_basic_logging_and_metrics():
     assert response.status_code == 200
 
     metrics_data = response.json()
-    print(f"   Total requests: {metrics_data.get('requests', {}).get('total_count', 0)}")
-    print(f"   Error rate: {metrics_data.get('requests', {}).get('error_rate_percent', 0)}%")
+    print(
+        f"   Total requests: {metrics_data.get('requests', {}).get('total_count', 0)}"
+    )
+    print(
+        f"   Error rate: {metrics_data.get('requests', {}).get('error_rate_percent', 0)}%"
+    )
 
     print("\n5. Testing health endpoint...")
     response = client.get("/health")
@@ -111,19 +115,19 @@ def test_different_log_formats():
 
         app = FastAPI(title=f"Test Service - {log_format}")
 
-        guard_fort = init_guard_fort(
+        init_guard_fort(
             app=app,
             service_name=f"test-{log_format}",
             log_format=log_format,
             enable_auth=False,
             enable_metrics=True,
             add_metrics_endpoint=False,  # Avoid conflicts
-            add_health_endpoint=False
+            add_health_endpoint=False,
         )
 
         @app.get("/test")
-        async def test_endpoint():
-            return {"message": f"Testing {log_format} format"}
+        def test_endpoint(fmt=log_format):
+            return {"message": f"Testing {fmt} format"}
 
         client = TestClient(app)
         response = client.get("/test")
@@ -140,13 +144,13 @@ def test_authentication_logging():
 
     app = FastAPI(title="Auth Test Service")
 
-    guard_fort = init_guard_fort(
+    init_guard_fort(
         app=app,
         service_name="auth-test",
         enable_auth=True,  # Enable auth for testing
         log_format="json",
         add_metrics_endpoint=False,
-        add_health_endpoint=False
+        add_health_endpoint=False,
     )
 
     @app.get("/protected")
@@ -182,13 +186,13 @@ def test_metrics_collection():
 
     app = FastAPI(title="Metrics Test Service")
 
-    guard_fort = init_guard_fort(
+    init_guard_fort(
         app=app,
         service_name="metrics-test",
         enable_auth=False,
         enable_metrics=True,
         metrics_retention_minutes=1,
-        add_health_endpoint=False
+        add_health_endpoint=False,
     )
 
     @app.get("/endpoint1")
@@ -275,6 +279,7 @@ def main():
     except Exception as e:
         print(f"\n❌ Test failed with error: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 

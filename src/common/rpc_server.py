@@ -9,7 +9,7 @@ import json
 import logging
 import traceback
 from inspect import Parameter, signature
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Optional
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
@@ -24,10 +24,12 @@ class JsonRpcMethodRegistry:
     """Registry for JSON-RPC method handlers."""
 
     def __init__(self) -> None:
-        self._methods: Dict[str, Callable[..., Any]] = {}
-        self._method_schemas: Dict[str, Dict[str, Any]] = {}
+        self._methods: dict[str, Callable[..., Any]] = {}
+        self._method_schemas: dict[str, dict[str, Any]] = {}
 
-    def register(self, method_name: str, handler: Callable[..., Any], description: str = "") -> None:
+    def register(
+        self, method_name: str, handler: Callable[..., Any], description: str = ""
+    ) -> None:
         """Register a method handler with optional description."""
         if method_name in self._methods:
             raise ValueError(f"Method '{method_name}' is already registered")
@@ -36,38 +38,46 @@ class JsonRpcMethodRegistry:
             raise ValueError("Method names starting with 'rpc.' are reserved")
 
         self._methods[method_name] = handler
-        self._method_schemas[method_name] = self._extract_method_schema(handler, description)
+        self._method_schemas[method_name] = self._extract_method_schema(
+            handler, description
+        )
         logger.info(f"Registered JSON-RPC method: {method_name}")
 
     def get_handler(self, method_name: str) -> Optional[Callable[..., Any]]:
         """Get a registered method handler."""
         return self._methods.get(method_name)
 
-    def get_methods(self) -> Dict[str, Dict[str, Any]]:
+    def get_methods(self) -> dict[str, dict[str, Any]]:
         """Get all registered methods with their schemas."""
         return self._method_schemas.copy()
 
-    def _extract_method_schema(self, handler: Callable[..., Any], description: str) -> Dict[str, Any]:
+    def _extract_method_schema(
+        self, handler: Callable[..., Any], description: str
+    ) -> dict[str, Any]:
         """Extract method schema from handler function signature."""
         sig = signature(handler)
         params = {}
 
         for param_name, param in sig.parameters.items():
             # Skip 'self' and context parameters
-            if param_name in ('self', 'request_id', 'context'):
+            if param_name in ("self", "request_id", "context"):
                 continue
 
             param_info = {
                 "name": param_name,
                 "required": param.default == Parameter.empty,
-                "type": str(param.annotation) if param.annotation != Parameter.empty else "Any"
+                "type": str(param.annotation)
+                if param.annotation != Parameter.empty
+                else "Any",
             }
             params[param_name] = param_info
 
         return {
-            "description": description or handler.__doc__ or f"Handler for {handler.__name__}",
+            "description": description
+            or handler.__doc__
+            or f"Handler for {handler.__name__}",
             "parameters": params,
-            "handler": handler.__name__
+            "handler": handler.__name__,
         }
 
 
@@ -78,13 +88,17 @@ class JsonRpcServer:
         self.title = title
         self.version = version
         self.registry = JsonRpcMethodRegistry()
-        self._middleware: List[Callable[..., Any]] = []
+        self._middleware: list[Callable[..., Any]] = []
 
-    def method(self, name: str, description: str = "") -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def method(
+        self, name: str, description: str = ""
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Decorator to register a JSON-RPC method."""
+
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             self.registry.register(name, func, description)
             return func
+
         return decorator
 
     def add_middleware(self, middleware: Callable[..., Any]) -> None:
@@ -98,7 +112,7 @@ class JsonRpcServer:
         try:
             # Parse request body
             body = await request.body()
-            request_data = json.loads(body.decode('utf-8'))
+            request_data = json.loads(body.decode("utf-8"))
 
             # Handle batch requests
             if isinstance(request_data, list):
@@ -106,7 +120,7 @@ class JsonRpcServer:
                     return self._create_error_response(
                         None,
                         JsonRpcErrorCode.INVALID_REQUEST,
-                        "Invalid Request: Empty batch"
+                        "Invalid Request: Empty batch",
                     )
 
                 responses = []
@@ -127,21 +141,19 @@ class JsonRpcServer:
 
         except json.JSONDecodeError:
             return self._create_error_response(
-                request_id,
-                JsonRpcErrorCode.PARSE_ERROR,
-                "Parse error: Invalid JSON"
+                request_id, JsonRpcErrorCode.PARSE_ERROR, "Parse error: Invalid JSON"
             )
         except Exception as e:
             logger.exception("Unexpected error handling JSON-RPC request")
             return self._create_error_response(
-                request_id,
-                JsonRpcErrorCode.INTERNAL_ERROR,
-                f"Internal error: {str(e)}"
+                request_id, JsonRpcErrorCode.INTERNAL_ERROR, f"Internal error: {str(e)}"
             )
 
-    async def _process_single_request(self, request_data: Dict[str, Any], http_request: Request) -> Optional[JsonRpcResponse]:
+    async def _process_single_request(
+        self, request_data: dict[str, Any], http_request: Request
+    ) -> Optional[JsonRpcResponse]:
         """Process a single JSON-RPC request."""
-        request_id = request_data.get('id')
+        request_id = request_data.get("id")
 
         try:
             # Validate request structure
@@ -165,8 +177,8 @@ class JsonRpcServer:
                     JsonRpcError(
                         code=JsonRpcErrorCode.METHOD_NOT_FOUND,
                         message=f"Method not found: {rpc_request.method}",
-                        data=None
-                    )
+                        data=None,
+                    ),
                 )
 
             # Prepare handler arguments
@@ -174,22 +186,26 @@ class JsonRpcServer:
 
             # Add context parameters if handler expects them
             handler_sig = signature(handler)
-            if 'request_id' in handler_sig.parameters:
-                handler_kwargs['request_id'] = rpc_request.id
-            if 'context' in handler_sig.parameters:
-                handler_kwargs['context'] = {
-                    'http_request': http_request,
-                    'rpc_request': rpc_request
+            if "request_id" in handler_sig.parameters:
+                handler_kwargs["request_id"] = rpc_request.id
+            if "context" in handler_sig.parameters:
+                handler_kwargs["context"] = {
+                    "http_request": http_request,
+                    "rpc_request": rpc_request,
                 }
 
             # Call handler
             try:
-                if hasattr(handler, '__self__'):
+                if hasattr(handler, "__self__"):
                     # Instance method
                     result = await handler(**handler_kwargs)
                 else:
                     # Function
-                    result = await handler(**handler_kwargs) if hasattr(handler, '__await__') else handler(**handler_kwargs)
+                    result = (
+                        await handler(**handler_kwargs)
+                        if hasattr(handler, "__await__")
+                        else handler(**handler_kwargs)
+                    )
 
                 # Handle notification requests (no id field)
                 if rpc_request.id is None:
@@ -206,8 +222,8 @@ class JsonRpcServer:
                     JsonRpcError(
                         code=JsonRpcErrorCode.INVALID_PARAMS,
                         message=f"Invalid params: {str(e)}",
-                        data={"error": str(e)}
-                    )
+                        data={"error": str(e)},
+                    ),
                 )
             except Exception as e:
                 # Handler execution error
@@ -219,8 +235,12 @@ class JsonRpcServer:
                     JsonRpcError(
                         code=JsonRpcErrorCode.INTERNAL_ERROR,
                         message=f"Handler error: {str(e)}",
-                        data={"traceback": traceback.format_exc() if logger.isEnabledFor(logging.DEBUG) else None}
-                    )
+                        data={
+                            "traceback": traceback.format_exc()
+                            if logger.isEnabledFor(logging.DEBUG)
+                            else None
+                        },
+                    ),
                 )
 
         except ValidationError as e:
@@ -230,8 +250,8 @@ class JsonRpcServer:
                 JsonRpcError(
                     code=JsonRpcErrorCode.INVALID_REQUEST,
                     message="Invalid Request: Validation failed",
-                    data={"validation_errors": e.errors()}
-                )
+                    data={"validation_errors": e.errors()},
+                ),
             )
         except Exception as e:
             # Unexpected error
@@ -241,19 +261,20 @@ class JsonRpcServer:
                 JsonRpcError(
                     code=JsonRpcErrorCode.INTERNAL_ERROR,
                     message=f"Internal error: {str(e)}",
-                    data=None
-                )
+                    data=None,
+                ),
             )
 
-    def _create_error_response(self, request_id: Optional[str], code: int, message: str) -> JSONResponse:
+    def _create_error_response(
+        self, request_id: Optional[str], code: int, message: str
+    ) -> JSONResponse:
         """Create an error response as JSONResponse."""
         error_response = JsonRpcResponse.create_error(
-            request_id or "unknown",
-            JsonRpcError(code=code, message=message, data=None)
+            request_id or "unknown", JsonRpcError(code=code, message=message, data=None)
         )
         return JSONResponse(content=error_response.model_dump())
 
-    def get_manifest(self) -> Dict[str, Any]:
+    def get_manifest(self) -> dict[str, Any]:
         """Get the agent manifest for /.well-known/agent.json endpoint."""
         return {
             "name": self.title,
@@ -264,19 +285,22 @@ class JsonRpcServer:
                 "single-requests",
                 "batch-requests",
                 "notifications",
-                "error-handling"
-            ]
+                "error-handling",
+            ],
         }
 
 
 # Utility functions for common response patterns
+
 
 def create_success_response(request_id: str, result: Any) -> JsonRpcResponse:
     """Create a successful JSON-RPC response."""
     return JsonRpcResponse.create_success(request_id, result)
 
 
-def create_error_response(request_id: str, code: int, message: str, data: Optional[Dict[str, Any]] = None) -> JsonRpcResponse:
+def create_error_response(
+    request_id: str, code: int, message: str, data: Optional[dict[str, Any]] = None
+) -> JsonRpcResponse:
     """Create an error JSON-RPC response."""
     error = JsonRpcError(code=code, message=message, data=data)
     return JsonRpcResponse.create_error(request_id, error)
@@ -284,12 +308,17 @@ def create_error_response(request_id: str, code: int, message: str, data: Option
 
 # Middleware utilities
 
-async def logging_middleware(rpc_request: JsonRpcRequest, http_request: Request) -> None:
+
+async def logging_middleware(
+    rpc_request: JsonRpcRequest, http_request: Request
+) -> None:
     """Middleware to log JSON-RPC requests."""
     logger.info(f"JSON-RPC call: {rpc_request.method} (id: {rpc_request.id})")
 
 
-async def request_id_propagation_middleware(rpc_request: JsonRpcRequest, http_request: Request) -> None:
+async def request_id_propagation_middleware(
+    rpc_request: JsonRpcRequest, http_request: Request
+) -> None:
     """Middleware to propagate request IDs in HTTP headers."""
     # Add request ID to response headers (handled by FastAPI middleware)
     pass
@@ -299,7 +328,10 @@ async def request_id_propagation_middleware(rpc_request: JsonRpcRequest, http_re
 
 _global_server = None
 
-def rpc_method(name: str, description: str = "") -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+
+def rpc_method(
+    name: str, description: str = ""
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Global decorator to register JSON-RPC methods."""
     global _global_server
     if _global_server is None:
