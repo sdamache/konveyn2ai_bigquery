@@ -24,8 +24,12 @@ from common.models import AdviceRequest, Snippet
 from guard_fort import GuardFort
 
 # Import service modules
-from .advisor import AdvisorService
-from .config import AmataConfig
+try:
+    from .advisor import AdvisorService
+    from .config import AmataConfig
+except ImportError:
+    from advisor import AdvisorService
+    from config import AmataConfig
 
 # Configure logging
 logging.basicConfig(
@@ -86,7 +90,12 @@ app.add_middleware(
 )
 
 # Initialize GuardFort security middleware
-guard_fort = GuardFort(app)
+guard_fort = GuardFort(
+    app,
+    service_name="amatya-role-prompter",
+    enable_auth=True,
+    allowed_paths=["/health", "/", "/docs", "/openapi.json", "/.well-known/agent.json"]
+)
 
 # Create JSON-RPC server
 rpc_server = JsonRpcServer(
@@ -100,29 +109,42 @@ rpc_server = JsonRpcServer(
 async def advise(role: str, chunks: list[dict], request_id: str = None) -> dict:
     """
     Generate role-specific advice based on provided code snippets.
-    
+
     Args:
         role: User role (e.g., 'backend_developer', 'security_engineer')
         chunks: List of code snippets with file_path and content
         request_id: Optional request ID for tracking
-    
+
     Returns:
         dict: Response containing generated advice
     """
     try:
         # Convert chunks to Snippet objects
         snippet_objects = [Snippet(**chunk) for chunk in chunks]
-        
+
         # Create advice request
         advice_request = AdviceRequest(role=role, chunks=snippet_objects)
-        
-        # Generate advice using advisor service
-        advice = await advisor_service.generate_advice(advice_request)
-        
+
+        # Check if advisor service is available
+        if advisor_service is None:
+            # Create a temporary advisor service for testing
+            from config import AmataConfig
+            from advisor import AdvisorService
+
+            temp_config = AmataConfig()
+            temp_advisor = AdvisorService(temp_config)
+            await temp_advisor.initialize()
+
+            advice = await temp_advisor.generate_advice(advice_request)
+            await temp_advisor.cleanup()
+        else:
+            # Use the global advisor service
+            advice = await advisor_service.generate_advice(advice_request)
+
         logger.info(f"Generated advice for role '{role}' with {len(chunks)} chunks")
-        
+
         return {"answer": advice}
-        
+
     except Exception as e:
         logger.error(f"Error generating advice: {e}")
         raise
@@ -141,22 +163,33 @@ async def health_check():
     """Health check endpoint for service monitoring."""
     try:
         # Check if advisor service is ready
-        if advisor_service and await advisor_service.is_healthy():
-            return {
-                "status": "healthy",
-                "service": "amatya-role-prompter",
-                "version": "1.0.0"
-            }
-        else:
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "status": "unhealthy",
+        if advisor_service:
+            is_healthy = await advisor_service.is_healthy()
+            if is_healthy:
+                return {
+                    "status": "healthy",
                     "service": "amatya-role-prompter",
                     "version": "1.0.0",
-                    "error": "Advisor service not ready"
+                    "mode": "vertex_ai" if advisor_service.llm_model else "mock"
                 }
-            )
+            else:
+                return JSONResponse(
+                    status_code=503,
+                    content={
+                        "status": "unhealthy",
+                        "service": "amatya-role-prompter",
+                        "version": "1.0.0",
+                        "error": "Advisor service not ready"
+                    }
+                )
+        else:
+            # Service not initialized yet (e.g., during startup or testing)
+            return {
+                "status": "starting",
+                "service": "amatya-role-prompter",
+                "version": "1.0.0",
+                "message": "Service is starting up"
+            }
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         return JSONResponse(
