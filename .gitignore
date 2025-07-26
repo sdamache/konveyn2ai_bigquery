@@ -115,3 +115,6 @@ google-credentials.json
 # IPython
 profile_default/
 ipython_config.py
+
+# Memory
+.memory/*
