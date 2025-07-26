@@ -7,12 +7,12 @@ This demo shows how to set up a JSON-RPC server with FastAPI and register method
 import os
 import sys
 
-from fastapi import FastAPI, Request
-
 # Add src directory to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from common.rpc_server import JsonRpcServer, logging_middleware
+from fastapi import FastAPI, Request  # noqa: E402
+
+from common.rpc_server import JsonRpcServer, logging_middleware  # noqa: E402
 
 # Create FastAPI app
 app = FastAPI(title="JSON-RPC Demo Server")

@@ -34,10 +34,10 @@ import sys
 # Add src directory to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 
-import uvicorn
-from fastapi import FastAPI, HTTPException, Request
+import uvicorn  # noqa: E402
+from fastapi import FastAPI, HTTPException, Request  # noqa: E402
 
-from guard_fort import init_guard_fort
+from guard_fort import init_guard_fort  # noqa: E402
 
 # Create FastAPI application
 app = FastAPI(

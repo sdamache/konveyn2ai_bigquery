@@ -17,10 +17,10 @@ import sys
 # Add the src directory to the path to import GuardFort
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
+from fastapi import FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
 
-from guard_fort.guard_fort import init_guard_fort
+from guard_fort.guard_fort import init_guard_fort  # noqa: E402
 
 
 def test_basic_logging_and_metrics():

@@ -13,11 +13,11 @@ from unittest.mock import patch
 # Add src directory to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 
-import pytest
-from fastapi import FastAPI, Request
-from fastapi.testclient import TestClient
+import pytest  # noqa: E402
+from fastapi import FastAPI, Request  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
 
-from guard_fort import GuardFort, init_guard_fort
+from guard_fort import GuardFort, init_guard_fort  # noqa: E402
 
 
 class TestGuardFortCore:
