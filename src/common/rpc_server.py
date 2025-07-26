@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 class JsonRpcMethodRegistry:
     """Registry for JSON-RPC method handlers."""
     
-    def __init__(self):
+    def __init__(self) -> None:
         self._methods: Dict[str, Callable[..., Any]] = {}
         self._method_schemas: Dict[str, Dict[str, Any]] = {}
     
@@ -82,7 +82,7 @@ class JsonRpcServer:
         self.registry = JsonRpcMethodRegistry()
         self._middleware: List[Callable[..., Any]] = []
     
-    def method(self, name: str, description: str = ""):
+    def method(self, name: str, description: str = "") -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Decorator to register a JSON-RPC method."""
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             self.registry.register(name, func, description)
@@ -242,7 +242,8 @@ class JsonRpcServer:
                 request_id or "unknown",
                 JsonRpcError(
                     code=JsonRpcErrorCode.INTERNAL_ERROR,
-                    message=f"Internal error: {str(e)}"
+                    message=f"Internal error: {str(e)}",
+                    data=None
                 )
             )
     
