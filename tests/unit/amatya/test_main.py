@@ -10,9 +10,14 @@ from fastapi.testclient import TestClient
 import sys
 import os
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../.."))
+# Add the project root and the specific component directory to Python path
+project_root = os.path.join(os.path.dirname(__file__), "../../..")
+sys.path.append(project_root)
+sys.path.append(os.path.join(project_root, "src"))
+sys.path.append(os.path.join(project_root, "src/amatya-role-prompter"))
+sys.path.append(os.path.join(project_root, "src/common"))
 
-from src.amatya_role_prompter.main import app
+from main import app
 
 
 class TestAmatyaRolePrompter:
@@ -387,7 +392,7 @@ class TestAmatyaConfiguration:
             "google.generativeai.GenerativeModel"
         ) as mock_model:
             # Import should trigger initialization
-            from src.amatya_role_prompter.main import app
+            from main import app
 
             # Verify Gemini was configured
             mock_configure.assert_called()

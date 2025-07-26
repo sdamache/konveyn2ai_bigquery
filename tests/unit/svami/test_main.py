@@ -11,10 +11,15 @@ import httpx
 import sys
 import os
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../.."))
+# Add the project root and the specific component directory to Python path
+project_root = os.path.join(os.path.dirname(__file__), "../../..")
+sys.path.append(project_root)
+sys.path.append(os.path.join(project_root, "src"))
+sys.path.append(os.path.join(project_root, "src/svami-orchestrator"))
+sys.path.append(os.path.join(project_root, "src/common"))
 
-from src.svami_orchestrator.main import app
-from common.models import QueryRequest
+from main import app
+from models import QueryRequest
 
 
 class TestSvamiOrchestrator:
@@ -286,7 +291,7 @@ class TestRequestIDGeneration:
 
     def test_request_id_format(self):
         """Test request ID format and uniqueness."""
-        from src.svami_orchestrator.main import generate_request_id
+        from main import generate_request_id
 
         # Generate multiple IDs
         ids = [generate_request_id() for _ in range(100)]

@@ -11,9 +11,14 @@ from fastapi.testclient import TestClient
 import sys
 import os
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../.."))
+# Add the project root and the specific component directory to Python path
+project_root = os.path.join(os.path.dirname(__file__), "../../..")
+sys.path.append(project_root)
+sys.path.append(os.path.join(project_root, "src"))
+sys.path.append(os.path.join(project_root, "src/janapada-memory"))
+sys.path.append(os.path.join(project_root, "src/common"))
 
-from src.janapada_memory.main import app
+from main import app
 
 
 class TestJanapadaMemory:
@@ -406,7 +411,7 @@ class TestJanapadaConfiguration:
 
         with patch("vertexai.init") as mock_init:
             # Import should trigger initialization
-            from src.janapada_memory.main import app
+            from main import app
 
             # Verify Vertex AI was initialized
             mock_init.assert_called()
