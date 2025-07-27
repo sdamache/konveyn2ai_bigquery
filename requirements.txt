@@ -1,4 +1,5 @@
 # KonveyN2AI Dependencies - PINNED VERSIONS FOR CONSISTENCY
+# FastAPI 0.116.1 resolves TestClient compatibility with httpx 0.28.1
 #
 # CRITICAL: All versions are pinned (==) to prevent CI/CD conflicts
 # Lessons learned from Task 1 protocol violations:
