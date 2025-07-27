@@ -16,8 +16,7 @@ google-genai==1.27.0
 
 # Web framework and API
 streamlit==1.30.0
-fastapi==0.108.0
-starlette==0.32.0.post1
+fastapi==0.116.1
 uvicorn[standard]==0.25.0
 
 # Data processing and numerical computing
@@ -45,4 +44,4 @@ bandit==1.7.6
 requests==2.31.0
 aiohttp==3.9.3
 tenacity==8.2.3
-httpx==0.26.0
+httpx==0.28.1
