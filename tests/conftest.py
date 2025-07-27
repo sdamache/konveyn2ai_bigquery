@@ -184,7 +184,7 @@ def gemini_migration_env():
         "GOOGLE_CLOUD_LOCATION": "us-central1",
         "GEMINI_API_KEY": "test_gemini_api_key_12345",
         "GEMINI_MODEL": "gemini-2.0-flash-001",
-        "VERTEX_AI_MODEL": "text-bison-001",
+        "VERTEX_AI_MODEL": "gemini-2.0-flash-001",
         "PYTEST_CURRENT_TEST": "test_gemini_migration",
     }
 
