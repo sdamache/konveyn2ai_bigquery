@@ -29,7 +29,7 @@ KonveyN2AI uses a comprehensive testing strategy with:
 - **pytest-asyncio**: Async test support
 - **pytest-cov**: Coverage reporting
 - **pytest-mock**: Mocking utilities
-- **pytest-httpx**: HTTP client testing
+- **httpx**: HTTP client for integration tests
 - **docker**: Container testing
 
 ## Test Structure
