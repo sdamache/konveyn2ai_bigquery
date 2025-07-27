@@ -550,16 +550,19 @@ class TestGeminiPerformance:
         import threading
 
         def make_request(request_id):
-            jsonrpc_request = {
-                "jsonrpc": "2.0",
-                "id": f"concurrent-{request_id}",
-                "method": "advise",
-                "params": sample_advice_request,
-            }
+            try:
+                jsonrpc_request = {
+                    "jsonrpc": "2.0",
+                    "id": f"concurrent-{request_id}",
+                    "method": "advise",
+                    "params": sample_advice_request,
+                }
 
-            # Use TestClient for synchronous requests
-            response = client.post("/", json=jsonrpc_request)
-            return response.json()
+                # Use TestClient for synchronous requests
+                response = client.post("/", json=jsonrpc_request)
+                return response.json()
+            except Exception as e:
+                return e
 
         # Test with smaller number for integration tests
         num_requests = 3
@@ -567,9 +570,13 @@ class TestGeminiPerformance:
         # Use ThreadPoolExecutor to simulate concurrent requests
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
             futures = [executor.submit(make_request, i) for i in range(num_requests)]
-            results = [
-                future.result() for future in concurrent.futures.as_completed(futures)
-            ]
+            results = []
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    result = future.result()
+                    results.append(result)
+                except Exception as e:
+                    results.append(e)
 
         # All requests should succeed
         successful_results = [r for r in results if not isinstance(r, Exception)]

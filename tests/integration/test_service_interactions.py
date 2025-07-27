@@ -132,8 +132,8 @@ class TestServiceCommunication:
 
         # Mock the actual service clients instead of HTTP calls
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch.object(main, "janapada_client", create=True) as mock_janapada,
+            patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
             # Mock Janapada response with proper JsonRpcResponse structure
             mock_janapada.call = AsyncMock(
@@ -211,8 +211,8 @@ class TestServiceFailureHandling:
         import main
 
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch.object(main, "janapada_client", create=True) as mock_janapada,
+            patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
             from common.models import JsonRpcResponse
             from fastapi.testclient import TestClient
@@ -274,8 +274,8 @@ class TestServiceFailureHandling:
         import main
 
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch.object(main, "janapada_client", create=True) as mock_janapada,
+            patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
             client = TestClient(app)
 
@@ -328,8 +328,8 @@ class TestServiceFailureHandling:
         import main
 
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch.object(main, "janapada_client", create=True) as mock_janapada,
+            patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
             client = TestClient(app)
 
@@ -383,8 +383,8 @@ class TestServiceHealthMonitoring:
         import main
 
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch.object(main, "janapada_client", create=True) as mock_janapada,
+            patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
             client = TestClient(app)
 
@@ -424,8 +424,8 @@ class TestServiceHealthMonitoring:
         import main
 
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch.object(main, "janapada_client", create=True) as mock_janapada,
+            patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
             client = TestClient(app)
 
@@ -478,8 +478,8 @@ class TestRequestTracking:
         import main
 
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch.object(main, "janapada_client", create=True) as mock_janapada,
+            patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
             client = TestClient(app)
 
@@ -550,8 +550,8 @@ class TestRequestTracking:
         import main
 
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch.object(main, "janapada_client", create=True) as mock_janapada,
+            patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
             client = TestClient(app)
 
@@ -613,8 +613,8 @@ class TestServiceLoadTesting:
         import main
 
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch.object(main, "janapada_client", create=True) as mock_janapada,
+            patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
             client = TestClient(app)
 
@@ -669,8 +669,8 @@ class TestServiceLoadTesting:
         import time
 
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch.object(main, "janapada_client", create=True) as mock_janapada,
+            patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
             from common.models import JsonRpcResponse
             from fastapi.testclient import TestClient
