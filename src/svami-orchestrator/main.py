@@ -375,10 +375,10 @@ async def answer_query(
 
         # Step 1: Call Janapada to search for relevant snippets
         print(f"[{request_id}] Step 1: Searching for relevant snippets via Janapada...")
-        
+
         snippets = []
         sources = []
-        
+
         try:
             search_response = await janapada_client.call(
                 method="search", params={"query": query.question, "k": 5}, id=request_id
@@ -394,7 +394,9 @@ async def answer_query(
                 # Process search results
                 if search_response.result and "snippets" in search_response.result:
                     snippet_data = search_response.result["snippets"]
-                    print(f"[{request_id}] Found {len(snippet_data)} snippets from Janapada")
+                    print(
+                        f"[{request_id}] Found {len(snippet_data)} snippets from Janapada"
+                    )
 
                     # Convert to Snippet objects and collect sources
                     for snippet_dict in snippet_data:
@@ -404,14 +406,18 @@ async def answer_query(
                             if snippet.file_path not in sources:
                                 sources.append(snippet.file_path)
                         except Exception as e:
-                            print(f"[{request_id}] Warning: Invalid snippet format: {e}")
+                            print(
+                                f"[{request_id}] Warning: Invalid snippet format: {e}"
+                            )
                             continue
                 else:
                     print(f"[{request_id}] No snippets returned from Janapada")
-                    
+
         except Exception as e:
             print(f"[{request_id}] Janapada service unavailable: {str(e)}")
-            print(f"[{request_id}] Continuing with graceful degradation (no code snippets)...")
+            print(
+                f"[{request_id}] Continuing with graceful degradation (no code snippets)..."
+            )
 
         # If no snippets found, provide a graceful response
         if not snippets:

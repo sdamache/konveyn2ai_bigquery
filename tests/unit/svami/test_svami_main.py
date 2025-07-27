@@ -361,7 +361,6 @@ class TestSvamiOrchestrator:
             patch("main.janapada_client") as mock_janapada,
             patch("main.amatya_client") as mock_amatya,
         ):
-
             from common.models import JsonRpcResponse
 
             # Mock successful service responses for valid auth cases
