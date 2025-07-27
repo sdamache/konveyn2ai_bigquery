@@ -143,7 +143,7 @@ async def advise(role: str, chunks: list[dict], request_id: str = None) -> dict:
 
         logger.info(f"Generated advice for role '{role}' with {len(chunks)} chunks")
 
-        return {"answer": advice}
+        return {"advice": advice}
 
     except Exception as e:
         logger.error(f"Error generating advice: {e}")

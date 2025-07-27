@@ -74,7 +74,6 @@ class TestSvamiOrchestrator:
         mock_client = AsyncMock()
         mock_client.call = AsyncMock()
         original_client = main.janapada_client
-        print(f"DEBUG: Setting janapada_client from {original_client} to {mock_client}")
         main.janapada_client = mock_client
         yield mock_client
         main.janapada_client = original_client
@@ -88,7 +87,6 @@ class TestSvamiOrchestrator:
         mock_client = AsyncMock()
         mock_client.call = AsyncMock()
         original_client = main.amatya_client
-        print(f"DEBUG: Setting amatya_client from {original_client} to {mock_client}")
         main.amatya_client = mock_client
         yield mock_client
         main.amatya_client = original_client
@@ -277,9 +275,6 @@ class TestSvamiOrchestrator:
 
         # Print debug info to understand what's happening
         import main
-
-        print(f"DEBUG: In test - janapada_client = {main.janapada_client}")
-        print(f"DEBUG: In test - amatya_client = {main.amatya_client}")
 
         # The detailed health endpoint should return 200 when services are initialized but degraded
         # If it returns 503, it means the global variables are still None despite fixtures

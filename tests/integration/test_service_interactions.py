@@ -45,10 +45,10 @@ class TestServiceCommunication:
             }
 
             # Create async client directly in test
-            async with httpx.AsyncClient(timeout=30.0) as async_client:
+            async with httpx.AsyncClient(timeout=10.0) as async_client:
                 # Create async client directly in test
 
-                async with httpx.AsyncClient(timeout=30.0) as async_client:
+                async with httpx.AsyncClient(timeout=10.0) as async_client:
                     response = await async_client.post(
                         f"{SERVICES['janapada']}/", json=jsonrpc_request
                     )
@@ -86,10 +86,10 @@ class TestServiceCommunication:
             }
 
             # Create async client directly in test
-            async with httpx.AsyncClient(timeout=30.0) as async_client:
+            async with httpx.AsyncClient(timeout=10.0) as async_client:
                 # Create async client directly in test
 
-                async with httpx.AsyncClient(timeout=30.0) as async_client:
+                async with httpx.AsyncClient(timeout=10.0) as async_client:
                     response = await async_client.post(
                         f"{SERVICES['amatya']}/", json=jsonrpc_request
                     )

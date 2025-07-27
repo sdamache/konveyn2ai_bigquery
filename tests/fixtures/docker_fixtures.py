@@ -36,19 +36,19 @@ def test_services_config():
             "name": "konveyn2ai_svami_1",
             "port": 8080,
             "health_endpoint": "/health",
-            "timeout": 30,
+            "timeout": 15,
         },
         "janapada": {
             "name": "konveyn2ai_janapada_1",
             "port": 8081,
             "health_endpoint": "/health",
-            "timeout": 30,
+            "timeout": 15,
         },
         "amatya": {
             "name": "konveyn2ai_amatya_1",
             "port": 8082,
             "health_endpoint": "/health",
-            "timeout": 30,
+            "timeout": 15,
         },
     }
 
@@ -88,7 +88,7 @@ def docker_services(docker_client, docker_compose_file, test_services_config):
     )
 
 
-def wait_for_service_health(port: int, endpoint: str, timeout: int = 30):
+def wait_for_service_health(port: int, endpoint: str, timeout: int = 15):
     """Wait for a service to become healthy."""
 
     url = f"http://localhost:{port}{endpoint}"
@@ -270,7 +270,7 @@ class DockerTestHelper:
         return result.exit_code, result.output.decode("utf-8")
 
     @staticmethod
-    def wait_for_container_log(container, expected_text: str, timeout: int = 30):
+    def wait_for_container_log(container, expected_text: str, timeout: int = 15):
         """Wait for specific text to appear in container logs."""
         start_time = time.time()
 
