@@ -62,7 +62,7 @@ def gemini_env_vars():
         "GOOGLE_CLOUD_LOCATION": "us-central1",
         "GEMINI_API_KEY": "test_gemini_api_key",
         "GEMINI_MODEL": "gemini-2.0-flash-001",
-        "VERTEX_AI_MODEL": "text-bison-001",
+        "VERTEX_AI_MODEL": "gemini-2.0-flash-001",
         "PYTEST_CURRENT_TEST": "test_gemini_migration",
     }
 
@@ -95,9 +95,12 @@ def mock_gemini_client():
 @pytest.fixture
 def mock_vertex_ai_fallback():
     """Mock Vertex AI for fallback testing."""
-    with patch("vertexai.init") as mock_init, patch(
-        "vertexai.language_models.TextGenerationModel.from_pretrained"
-    ) as mock_model:
+    with (
+        patch("vertexai.init") as mock_init,
+        patch(
+            "vertexai.language_models.TextGenerationModel.from_pretrained"
+        ) as mock_model,
+    ):
         # Mock successful Vertex AI response
         mock_response = MagicMock()
         mock_response.text = "Generated advice using Vertex AI fallback: Here's the analysis from Vertex AI..."
@@ -224,9 +227,12 @@ class TestGeminiMigrationIntegration:
         """Test mock fallback when both Gemini and Vertex AI fail."""
 
         # Mock both Gemini and Vertex AI failures
-        with patch("google.genai.Client") as mock_gemini, patch(
-            "vertexai.language_models.TextGenerationModel.from_pretrained"
-        ) as mock_vertex:
+        with (
+            patch("google.genai.Client") as mock_gemini,
+            patch(
+                "vertexai.language_models.TextGenerationModel.from_pretrained"
+            ) as mock_vertex,
+        ):
             # Gemini failure
             mock_gemini_client = MagicMock()
             mock_gemini_client.models.generate_content.side_effect = Exception(
@@ -343,11 +349,10 @@ class TestGeminiAPIIntegration:
             advisor = AdvisorService(config)
 
             # Mock the initialization to avoid real API calls
-            with patch.object(
-                advisor, "_initialize_gemini"
-            ) as mock_gemini_init, patch.object(
-                advisor, "_initialize_vertex_ai"
-            ) as mock_vertex_init:
+            with (
+                patch.object(advisor, "_initialize_gemini") as mock_gemini_init,
+                patch.object(advisor, "_initialize_vertex_ai") as mock_vertex_init,
+            ):
                 await advisor.initialize()
 
                 # Should call both initialization methods

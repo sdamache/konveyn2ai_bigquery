@@ -53,7 +53,7 @@ class AmataConfig:
         self.location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 
         # Vertex AI Configuration
-        self.model_name = os.getenv("VERTEX_AI_MODEL", "text-bison-001")
+        self.model_name = os.getenv("VERTEX_AI_MODEL", "gemini-2.0-flash-001")
         self.temperature = float(os.getenv("VERTEX_AI_TEMPERATURE", "0.2"))
         self.max_output_tokens = int(os.getenv("VERTEX_AI_MAX_TOKENS", "300"))
         self.top_k = int(os.getenv("VERTEX_AI_TOP_K", "40"))
