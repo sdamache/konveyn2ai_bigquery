@@ -704,7 +704,6 @@ class TestServiceLoadTesting:
                 main.amatya_client, "call", new_callable=AsyncMock
             ) as mock_amatya_call,
         ):
-
             client = TestClient(app)
 
             # Add realistic delays to simulate real service behavior
