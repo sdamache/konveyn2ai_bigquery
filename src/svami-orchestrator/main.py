@@ -234,7 +234,7 @@ async def detailed_health_check():
 
     Returns detailed health information for the orchestrator and its dependencies.
     """
-    start_time = asyncio.get_event_loop().time()
+    start_time = asyncio.get_running_loop().time()
 
     # Basic service status
     health_data = {
@@ -299,7 +299,7 @@ async def detailed_health_check():
         status_code = 200
 
     # Add performance metrics
-    total_time = (asyncio.get_event_loop().time() - start_time) * 1000
+    total_time = (asyncio.get_running_loop().time() - start_time) * 1000
     health_data["health_check_duration_ms"] = round(total_time, 2)
 
     return JSONResponse(status_code=status_code, content=health_data)

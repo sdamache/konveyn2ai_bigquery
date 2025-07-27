@@ -12,6 +12,7 @@ from typing import Optional, List
 import vertexai
 from vertexai.generative_models import GenerativeModel
 
+logger = logging.getLogger(__name__)
 # Gemini API imports
 try:
     from google import genai
@@ -19,7 +20,6 @@ try:
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
-    logger = logging.getLogger(__name__)
     logger.warning("Gemini API not available - install google-genai")
 
 # Import common modules
@@ -36,8 +36,6 @@ try:
 except ImportError:
     from config import AmataConfig
     from prompts import PromptConstructor
-
-logger = logging.getLogger(__name__)
 
 
 class AdvisorService:
@@ -262,7 +260,7 @@ class AdvisorService:
 
         try:
             # Use the new google-genai SDK
-            response = await asyncio.get_event_loop().run_in_executor(
+            response = await asyncio.get_running_loop().run_in_executor(
                 None,
                 lambda: self.gemini_client.models.generate_content(
                     model=self.config.gemini_model,
@@ -295,7 +293,7 @@ class AdvisorService:
         for attempt in range(max_retries):
             try:
                 # Use Vertex AI Gemini model generate_content method
-                response = await asyncio.get_event_loop().run_in_executor(
+                response = await asyncio.get_running_loop().run_in_executor(
                     None,
                     lambda: self.llm_model.generate_content(
                         prompt,
