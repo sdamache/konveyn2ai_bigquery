@@ -7,58 +7,70 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
 import httpx
 
-# Import the Svami main app
+# Import required modules for test setup
 import sys
 import os
-
-# Add the project root and the specific component directory to Python path
-project_root = os.path.join(os.path.dirname(__file__), "../../..")
-svami_path = os.path.join(project_root, "src/svami-orchestrator")
-src_path = os.path.join(project_root, "src")
-
-# Ensure paths are absolute and clean
-svami_path = os.path.abspath(svami_path)
-src_path = os.path.abspath(src_path)
-
-# Remove any existing paths to avoid conflicts
-paths_to_remove = [
-    p
-    for p in sys.path
-    if "amatya-role-prompter" in p
-    or "janapada-memory" in p
-    or "svami-orchestrator" in p
-    or p.endswith("/src")
-]
-for path in paths_to_remove:
-    sys.path.remove(path)
-
-# Insert at beginning to prioritize - src path allows 'common' package import
-sys.path.insert(0, svami_path)
-sys.path.insert(1, src_path)
-
-# Force fresh import to avoid module caching conflicts
 import importlib
-import sys
 
-if "main" in sys.modules:
-    importlib.reload(sys.modules["main"])
-from main import app
-from common.models import QueryRequest
+
+# Module-level fixture for Svami app isolation
+@pytest.fixture(scope="module")
+def svami_app():
+    """Module-level fixture to import Svami app with proper isolation."""
+    # Store original sys.path
+    original_path = sys.path.copy()
+
+    # Calculate paths
+    project_root = os.path.join(os.path.dirname(__file__), "../../..")
+    svami_path = os.path.abspath(os.path.join(project_root, "src/svami-orchestrator"))
+    src_path = os.path.abspath(os.path.join(project_root, "src"))
+
+    # Remove conflicting module entries to ensure clean import
+    modules_to_remove = [
+        key for key in sys.modules.keys() if key == "main" or key.startswith("main.")
+    ]
+    for module_key in modules_to_remove:
+        if module_key in sys.modules:
+            del sys.modules[module_key]
+
+    try:
+        # Temporarily modify sys.path for this module
+        sys.path.insert(0, svami_path)
+        sys.path.insert(1, src_path)
+
+        # Import the Svami main module
+        from main import app as svami_app_instance
+
+        yield svami_app_instance
+
+    finally:
+        # Restore original sys.path
+        sys.path[:] = original_path
+        # Clean up the module again to prevent contamination
+        modules_to_remove = [
+            key
+            for key in sys.modules.keys()
+            if key == "main" or key.startswith("main.")
+        ]
+        for module_key in modules_to_remove:
+            if module_key in sys.modules:
+                del sys.modules[module_key]
 
 
 class TestSvamiOrchestrator:
     """Test Svami Orchestrator service."""
 
     @pytest.fixture
-    def client(self):
+    def client(self, svami_app):
         """Test client for Svami service."""
-        return TestClient(app)
+        return TestClient(svami_app)
 
     @pytest.fixture
     def mock_janapada_client(self):
         """Mock Janapada JSON-RPC client."""
         # Import main module and set the global variable directly
         import main
+
         mock_client = AsyncMock()
         mock_client.call = AsyncMock()
         original_client = main.janapada_client
@@ -72,6 +84,7 @@ class TestSvamiOrchestrator:
         """Mock Amatya JSON-RPC client."""
         # Import main module and set the global variable directly
         import main
+
         mock_client = AsyncMock()
         mock_client.call = AsyncMock()
         original_client = main.amatya_client
@@ -113,17 +126,16 @@ class TestSvamiOrchestrator:
 
         # Import proper response models
         from common.models import JsonRpcResponse
-        
+
         # Mock Janapada search response
         mock_janapada_client.call.return_value = JsonRpcResponse(
-            id="test-id",
-            result={"snippets": sample_snippets}
+            id="test-id", result={"snippets": sample_snippets}
         )
 
         # Mock Amatya advice response
         mock_amatya_client.call.return_value = JsonRpcResponse(
             id="test-id",
-            result={"advice": "Here's how to implement authentication in FastAPI..."}
+            result={"advice": "Here's how to implement authentication in FastAPI..."},
         )
 
         # Make request
@@ -193,9 +205,12 @@ class TestSvamiOrchestrator:
 
         # Mock Amatya success (graceful degradation)
         from common.models import JsonRpcResponse
+
         mock_amatya_client.call.return_value = JsonRpcResponse(
             id="test-id",
-            result={"advice": "I don't have specific code snippets, but here's general advice..."}
+            result={
+                "advice": "I don't have specific code snippets, but here's general advice..."
+            },
         )
 
         response = client.post(
@@ -222,9 +237,9 @@ class TestSvamiOrchestrator:
 
         # Mock Janapada success
         from common.models import JsonRpcResponse
+
         mock_janapada_client.call.return_value = JsonRpcResponse(
-            id="test-id",
-            result={"snippets": sample_snippets}
+            id="test-id", result={"snippets": sample_snippets}
         )
 
         # Mock Amatya failure
@@ -259,9 +274,10 @@ class TestSvamiOrchestrator:
         # The basic health endpoint may not check dependencies
         # Let's test the detailed health endpoint instead
         response = client.get("/health/detailed")
-        
+
         # Print debug info to understand what's happening
         import main
+
         print(f"DEBUG: In test - janapada_client = {main.janapada_client}")
         print(f"DEBUG: In test - amatya_client = {main.amatya_client}")
 
@@ -276,7 +292,7 @@ class TestSvamiOrchestrator:
         else:
             assert response.status_code == 200
             data = response.json()
-            
+
             # The detailed endpoint should show degraded status when dependencies fail
             assert data["status"] in ["healthy", "degraded"]
 
@@ -288,13 +304,18 @@ class TestSvamiOrchestrator:
             patch("main.amatya_client") as mock_amatya,
         ):
             from common.models import JsonRpcResponse
+
             # Return sample snippets so Amatya gets called
-            mock_janapada.call = AsyncMock(return_value=JsonRpcResponse(
-                id="test-id", result={"snippets": sample_snippets}
-            ))
-            mock_amatya.call = AsyncMock(return_value=JsonRpcResponse(
-                id="test-id", result={"advice": "test advice"}
-            ))
+            mock_janapada.call = AsyncMock(
+                return_value=JsonRpcResponse(
+                    id="test-id", result={"snippets": sample_snippets}
+                )
+            )
+            mock_amatya.call = AsyncMock(
+                return_value=JsonRpcResponse(
+                    id="test-id", result={"advice": "test advice"}
+                )
+            )
 
             response = client.post(
                 "/answer",
@@ -321,8 +342,7 @@ class TestSvamiOrchestrator:
         # OPTIONS requests may require authentication in this implementation
         # Test with proper auth header
         response = client.options(
-            "/answer",
-            headers={"Authorization": "Bearer test-token"}
+            "/answer", headers={"Authorization": "Bearer test-token"}
         )
 
         # Should allow CORS (may return 200 or 405 depending on implementation)
@@ -337,17 +357,22 @@ class TestSvamiOrchestrator:
     def test_request_validation(self, client):
         """Test comprehensive request validation."""
 
-        with patch("main.janapada_client") as mock_janapada, \
-             patch("main.amatya_client") as mock_amatya:
-            
+        with (
+            patch("main.janapada_client") as mock_janapada,
+            patch("main.amatya_client") as mock_amatya,
+        ):
+
             from common.models import JsonRpcResponse
+
             # Mock successful service responses for valid auth cases
-            mock_janapada.call = AsyncMock(return_value=JsonRpcResponse(
-                id="test-id", result={"snippets": []}
-            ))
-            mock_amatya.call = AsyncMock(return_value=JsonRpcResponse(
-                id="test-id", result={"advice": "test advice"}
-            ))
+            mock_janapada.call = AsyncMock(
+                return_value=JsonRpcResponse(id="test-id", result={"snippets": []})
+            )
+            mock_amatya.call = AsyncMock(
+                return_value=JsonRpcResponse(
+                    id="test-id", result={"advice": "test advice"}
+                )
+            )
 
             test_cases = [
                 # Cases without auth header - should fail with 401 before validation
@@ -371,43 +396,58 @@ class TestSvamiOrchestrator:
 class TestRequestIDGeneration:
     """Test request ID generation and propagation."""
 
-    def test_request_id_format(self):
+    def test_request_id_format(self, svami_app):
         """Test request ID format and uniqueness."""
-        from main import generate_request_id
+        # Import within the function to use the proper module isolation
+        project_root = os.path.join(os.path.dirname(__file__), "../../..")
+        svami_path = os.path.abspath(
+            os.path.join(project_root, "src/svami-orchestrator")
+        )
 
-        # Generate multiple IDs
-        ids = [generate_request_id() for _ in range(100)]
+        # Temporarily add path and import
+        original_path = sys.path.copy()
+        sys.path.insert(0, svami_path)
+        try:
+            from main import generate_request_id
 
-        # All should be unique
-        assert len(set(ids)) == 100
+            # Generate multiple IDs
+            ids = [generate_request_id() for _ in range(100)]
 
-        # All should have expected format (UUID-like)
-        for request_id in ids:
-            assert len(request_id) > 10
-            assert isinstance(request_id, str)
+            # All should be unique
+            assert len(set(ids)) == 100
+
+            # All should have expected format (UUID-like)
+            for request_id in ids:
+                assert len(request_id) > 10
+                assert isinstance(request_id, str)
+        finally:
+            sys.path[:] = original_path
 
 
 class TestErrorHandling:
     """Test error handling and user-friendly messages."""
 
     @pytest.fixture
-    def client(self):
-        return TestClient(app)
+    def client(self, svami_app):
+        return TestClient(svami_app)
 
     def test_json_rpc_error_translation(self, client):
         """Test JSON-RPC error translation to user-friendly messages."""
 
-        with patch("main.janapada_client") as mock_janapada, \
-             patch("main.amatya_client") as mock_amatya:
+        with (
+            patch("main.janapada_client") as mock_janapada,
+            patch("main.amatya_client") as mock_amatya,
+        ):
             # Mock JSON-RPC error
             mock_janapada.call.side_effect = Exception(
                 "JSON-RPC error: Invalid parameters"
             )
             # Mock amatya client to be non-None but not used due to janapada error
             from common.models import JsonRpcResponse
-            mock_amatya.call = AsyncMock(return_value=JsonRpcResponse(
-                id="test-id", result={"advice": "test"}
-            ))
+
+            mock_amatya.call = AsyncMock(
+                return_value=JsonRpcResponse(id="test-id", result={"advice": "test"})
+            )
 
             response = client.post(
                 "/answer",
@@ -421,20 +461,26 @@ class TestErrorHandling:
             data = response.json()
             assert "answer" in data
             # Should contain fallback message about no snippets
-            assert "couldn't find" in data["answer"].lower() or "no relevant" in data["answer"].lower()
+            assert (
+                "couldn't find" in data["answer"].lower()
+                or "no relevant" in data["answer"].lower()
+            )
 
     def test_timeout_handling(self, client):
         """Test timeout handling for service calls."""
 
-        with patch("main.janapada_client") as mock_janapada, \
-             patch("main.amatya_client") as mock_amatya:
+        with (
+            patch("main.janapada_client") as mock_janapada,
+            patch("main.amatya_client") as mock_amatya,
+        ):
             # Mock timeout
             mock_janapada.call.side_effect = httpx.ReadTimeout("Request timeout")
             # Mock amatya client to be non-None
             from common.models import JsonRpcResponse
-            mock_amatya.call = AsyncMock(return_value=JsonRpcResponse(
-                id="test-id", result={"advice": "test"}
-            ))
+
+            mock_amatya.call = AsyncMock(
+                return_value=JsonRpcResponse(id="test-id", result={"advice": "test"})
+            )
 
             response = client.post(
                 "/answer",
@@ -447,4 +493,7 @@ class TestErrorHandling:
             data = response.json()
             assert "answer" in data
             # Should contain fallback message about no snippets
-            assert "couldn't find" in data["answer"].lower() or "no relevant" in data["answer"].lower()
+            assert (
+                "couldn't find" in data["answer"].lower()
+                or "no relevant" in data["answer"].lower()
+            )
