@@ -68,9 +68,11 @@ class JsonRpcMethodRegistry:
             param_info = {
                 "name": param_name,
                 "required": param.default == Parameter.empty,
-                "type": str(param.annotation)
-                if param.annotation != Parameter.empty
-                else "Any",
+                "type": (
+                    str(param.annotation)
+                    if param.annotation != Parameter.empty
+                    else "Any"
+                ),
             }
             params[param_name] = param_info
 
@@ -242,9 +244,11 @@ class JsonRpcServer:
                         code=JsonRpcErrorCode.INTERNAL_ERROR,
                         message=f"Handler error: {str(e)}",
                         data={
-                            "traceback": traceback.format_exc()
-                            if logger.isEnabledFor(logging.DEBUG)
-                            else None
+                            "traceback": (
+                                traceback.format_exc()
+                                if logger.isEnabledFor(logging.DEBUG)
+                                else None
+                            )
                         },
                     ),
                 )

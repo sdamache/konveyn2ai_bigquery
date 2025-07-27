@@ -220,7 +220,9 @@ def search_with_matching_engine(query: str, k: int) -> List[Snippet]:
             ),
         ]
 
-        logger.info(f"✅ Vector search completed: {len(vector_search_snippets)} results")
+        logger.info(
+            f"✅ Vector search completed: {len(vector_search_snippets)} results"
+        )
         return vector_search_snippets[:k]
 
     except Exception as e:
@@ -360,18 +362,18 @@ async def health_check():
         "components": {
             "vertex_ai_available": VERTEX_AI_AVAILABLE,
             "embedding_model": embedding_status,
-            "embedding_dimensions": 768
-            if embedding_model
-            else None,  # Updated for text-embedding-004
+            "embedding_dimensions": (
+                768 if embedding_model else None
+            ),  # Updated for text-embedding-004
             "embedding_model_name": "text-embedding-004" if embedding_model else None,
-            "matching_engine": "ready"
-            if matching_engine_index is not None
-            else "unavailable",
-            "matching_engine_index_id": os.environ.get(
-                "VECTOR_INDEX_ID", "805460437066842112"
-            )
-            if matching_engine_index is not None
-            else None,
+            "matching_engine": (
+                "ready" if matching_engine_index is not None else "unavailable"
+            ),
+            "matching_engine_index_id": (
+                os.environ.get("VECTOR_INDEX_ID", "805460437066842112")
+                if matching_engine_index is not None
+                else None
+            ),
             "faiss_fallback": "placeholder" if faiss_index is None else "ready",
         },
         "features": {
