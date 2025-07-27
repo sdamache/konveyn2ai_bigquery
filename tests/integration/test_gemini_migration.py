@@ -397,6 +397,11 @@ class TestGeminiAPIIntegration:
 class TestGeminiErrorHandling:
     """Test error handling in Gemini migration."""
 
+    @pytest.fixture
+    def client(self, amatya_app_with_gemini):
+        """Test client for Amatya service with Gemini."""
+        return TestClient(amatya_app_with_gemini)
+
     @pytest.mark.asyncio
     async def test_gemini_api_timeout(
         self, client, gemini_env_vars, sample_advice_request
@@ -536,16 +541,15 @@ class TestGeminiPerformance:
         assert "result" in data
         assert "advice" in data["result"]
 
-    @pytest.mark.asyncio
-    async def test_concurrent_requests_handling(
+    def test_concurrent_requests_handling(
         self, client, gemini_env_vars, mock_gemini_client, sample_advice_request
     ):
         """Test handling of concurrent requests with Gemini."""
 
-        import asyncio
-        import aiohttp
+        import concurrent.futures
+        import threading
 
-        async def make_request(session, request_id):
+        def make_request(request_id):
             jsonrpc_request = {
                 "jsonrpc": "2.0",
                 "id": f"concurrent-{request_id}",
@@ -553,19 +557,19 @@ class TestGeminiPerformance:
                 "params": sample_advice_request,
             }
 
-            # Use aiohttp for true async requests
-            async with session.post(
-                "http://testserver/", json=jsonrpc_request
-            ) as response:
-                return await response.json()
+            # Use TestClient for synchronous requests
+            response = client.post("/", json=jsonrpc_request)
+            return response.json()
 
         # Test with smaller number for integration tests
         num_requests = 3
 
-        async with aiohttp.ClientSession() as session:
-            tasks = [make_request(session, i) for i in range(num_requests)]
-
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+        # Use ThreadPoolExecutor to simulate concurrent requests
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            futures = [executor.submit(make_request, i) for i in range(num_requests)]
+            results = [
+                future.result() for future in concurrent.futures.as_completed(futures)
+            ]
 
         # All requests should succeed
         successful_results = [r for r in results if not isinstance(r, Exception)]
