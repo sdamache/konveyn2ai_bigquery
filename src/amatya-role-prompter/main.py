@@ -166,11 +166,26 @@ async def health_check():
         if advisor_service:
             is_healthy = await advisor_service.is_healthy()
             if is_healthy:
+                # Determine active AI service
+                ai_services = {
+                    "gemini_available": advisor_service.gemini_client is not None,
+                    "vertex_ai_available": advisor_service.llm_model is not None,
+                }
+
+                # Determine primary mode
+                if advisor_service.gemini_client is not None:
+                    mode = "gemini_primary"
+                elif advisor_service.llm_model is not None:
+                    mode = "vertex_ai_fallback"
+                else:
+                    mode = "mock"
+
                 return {
                     "status": "healthy",
                     "service": "amatya-role-prompter",
                     "version": "1.0.0",
-                    "mode": "vertex_ai" if advisor_service.llm_model else "mock",
+                    "mode": mode,
+                    "ai_services": ai_services,
                 }
             else:
                 return JSONResponse(

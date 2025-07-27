@@ -10,7 +10,17 @@ import asyncio
 import os
 from typing import Optional, List
 import vertexai
-from vertexai.language_models import TextGenerationModel
+from vertexai.generative_models import GenerativeModel
+
+# Gemini API imports
+try:
+    from google import genai
+
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+    logger = logging.getLogger(__name__)
+    logger.warning("Gemini API not available - install google-genai")
 
 # Import common modules
 import sys
@@ -31,28 +41,65 @@ logger = logging.getLogger(__name__)
 
 
 class AdvisorService:
-    """Service for generating role-specific advice using Vertex AI."""
+    """Service for generating role-specific advice using Gemini API with Vertex AI fallback."""
 
     def __init__(self, config: AmataConfig):
         """Initialize the advisor service."""
         self.config = config
-        self.llm_model: Optional[TextGenerationModel] = None
+        self.llm_model: Optional[GenerativeModel] = None
+        self.gemini_client: Optional[genai.Client] = None
         self.prompt_constructor = PromptConstructor()
         self._initialized = False
 
-        logger.info(f"AdvisorService initialized with model: {config.model_name}")
+        logger.info(
+            f"AdvisorService initialized - Vertex AI: {config.model_name}, Gemini: {config.use_gemini}"
+        )
 
     async def initialize(self):
-        """Initialize Vertex AI and load the model."""
+        """Initialize Gemini API and Vertex AI with hybrid approach."""
+        try:
+            # Initialize Gemini API first (primary)
+            await self._initialize_gemini()
+
+            # Initialize Vertex AI (fallback)
+            await self._initialize_vertex_ai()
+
+            self._initialized = True
+            logger.info("AdvisorService initialization complete")
+
+        except Exception as e:
+            logger.error(f"Failed to initialize AdvisorService: {e}")
+            # For demo purposes, continue with fallback mode
+            logger.warning("Continuing in fallback mode")
+            self._initialized = True
+
+    async def _initialize_gemini(self):
+        """Initialize Gemini API client."""
+        if not GEMINI_AVAILABLE:
+            logger.warning("Gemini API not available - skipping Gemini initialization")
+            return
+
+        if self.config.use_gemini:
+            try:
+                # Initialize Gemini client with keyword arguments only
+                self.gemini_client = genai.Client(api_key=self.config.gemini_api_key)
+                logger.info("✅ Gemini client initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize Gemini client: {e}")
+                self.gemini_client = None
+        else:
+            logger.info("Gemini API disabled - no API key provided")
+
+    async def _initialize_vertex_ai(self):
+        """Initialize Vertex AI as fallback."""
         try:
             # Check for Google Cloud credentials
             credentials_available = self._check_credentials()
 
             if not credentials_available:
                 logger.warning(
-                    "Google Cloud credentials not available - running in mock mode"
+                    "Google Cloud credentials not available - Vertex AI fallback disabled"
                 )
-                self._initialized = True
                 return
 
             # Initialize Vertex AI
@@ -62,19 +109,15 @@ class AdvisorService:
             # Load the text generation model with retry logic
             await self._load_model_with_retry()
 
-            self._initialized = True
-            logger.info("AdvisorService initialization complete")
-
         except Exception as e:
-            logger.error(f"Failed to initialize AdvisorService: {e}")
-            # For demo purposes, continue with fallback mode
-            logger.warning("Continuing in fallback mode without Vertex AI")
-            self._initialized = True
+            logger.error(f"Failed to initialize Vertex AI: {e}")
+            logger.warning("Vertex AI fallback not available")
 
     async def cleanup(self):
         """Cleanup resources."""
         self._initialized = False
         self.llm_model = None
+        self.gemini_client = None
         logger.info("AdvisorService cleanup complete")
 
     def _check_credentials(self) -> bool:
@@ -118,7 +161,7 @@ class AdvisorService:
             return False
 
     async def _load_model_with_retry(self, max_retries: int = 3):
-        """Load the text generation model with retry logic."""
+        """Load the Vertex AI Gemini model with retry logic."""
         # Skip expensive model loading in test environments
         if os.getenv("PYTEST_CURRENT_TEST") or "pytest" in sys.modules:
             logger.info("Test environment detected - skipping model loading")
@@ -126,28 +169,31 @@ class AdvisorService:
 
         for attempt in range(max_retries):
             try:
-                # Run the synchronous model loading in a thread pool
-                self.llm_model = await asyncio.get_event_loop().run_in_executor(
-                    None,
-                    lambda: TextGenerationModel.from_pretrained(self.config.model_name),
+                # Initialize Vertex AI Gemini model
+                self.llm_model = GenerativeModel(self.config.model_name)
+                logger.info(
+                    f"✅ Loaded Vertex AI Gemini model: {self.config.model_name}"
                 )
-                logger.info(f"Loaded model: {self.config.model_name}")
                 return
 
             except Exception as e:
-                logger.warning(f"Model loading attempt {attempt + 1} failed: {e}")
+                logger.warning(
+                    f"Vertex AI model loading attempt {attempt + 1} failed: {e}"
+                )
                 if attempt == max_retries - 1:
-                    logger.error("Failed to load model after all retries")
+                    logger.error("Failed to load Vertex AI model after all retries")
                     raise
                 await asyncio.sleep(2 * (attempt + 1))  # Exponential backoff
 
     async def is_healthy(self) -> bool:
         """Check if the service is healthy and ready."""
-        return self._initialized and self.llm_model is not None
+        return self._initialized and (
+            self.gemini_client is not None or self.llm_model is not None
+        )
 
     async def generate_advice(self, request: AdviceRequest) -> str:
         """
-        Generate role-specific advice based on the request.
+        Generate role-specific advice using hybrid Gemini-first, Vertex AI fallback approach.
 
         Args:
             request: AdviceRequest containing role and code chunks
@@ -168,46 +214,103 @@ class AdvisorService:
                 f"Generating advice for role '{request.role}' with {len(request.chunks)} chunks"
             )
 
-            # Check if we have a real model or are in mock mode
-            if self.llm_model is not None:
-                # Generate response using Vertex AI
-                response = await self._generate_with_retry(prompt)
+            # Try Gemini first (primary)
+            if self.gemini_client is not None:
+                try:
+                    response = await self._generate_with_gemini(prompt)
+                    if response:
+                        logger.info("✅ Successfully generated advice using Gemini API")
+                        return response.strip()
+                    else:
+                        logger.warning(
+                            "Empty response from Gemini, trying Vertex AI fallback"
+                        )
+                except Exception as e:
+                    logger.warning(f"Gemini API failed: {e}, trying Vertex AI fallback")
 
-                if response and response.text:
-                    logger.info("Successfully generated advice using Vertex AI")
-                    return response.text.strip()
-                else:
-                    logger.warning("Empty response from LLM, using fallback")
-                    return self._generate_fallback_response(
-                        request.role, request.chunks
-                    )
-            else:
-                # Mock mode - generate enhanced fallback response
-                logger.info("Generating advice in mock mode (no Vertex AI)")
-                return self._generate_enhanced_mock_response(
-                    request.role, request.chunks, prompt
-                )
+            # Fallback to Vertex AI
+            if self.llm_model is not None:
+                try:
+                    response = await self._generate_with_vertex_ai(prompt)
+                    if response and response.text:
+                        logger.info(
+                            "✅ Successfully generated advice using Vertex AI fallback"
+                        )
+                        return response.text.strip()
+                    else:
+                        logger.warning(
+                            "Empty response from Vertex AI, using mock fallback"
+                        )
+                except Exception as e:
+                    logger.warning(f"Vertex AI failed: {e}, using mock fallback")
+
+            # Final fallback - enhanced mock response
+            logger.info("Using enhanced mock response (no AI services available)")
+            return self._generate_enhanced_mock_response(
+                request.role, request.chunks, prompt
+            )
 
         except Exception as e:
             logger.error(f"Error generating advice: {e}")
             # Return fallback response on error
             return self._generate_fallback_response(request.role, request.chunks)
 
+    async def _generate_with_gemini(self, prompt: str) -> Optional[str]:
+        """Generate response using Gemini API."""
+        if not self.gemini_client:
+            return None
+
+        try:
+            # Use the new google-genai SDK
+            response = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: self.gemini_client.models.generate_content(
+                    model=self.config.gemini_model,
+                    contents=prompt,
+                    config=genai.types.GenerateContentConfig(
+                        temperature=self.config.temperature,
+                        max_output_tokens=self.config.max_output_tokens,
+                        top_k=self.config.top_k,
+                        top_p=self.config.top_p,
+                    ),
+                ),
+            )
+
+            if response and hasattr(response, "text") and response.text:
+                return response.text
+            else:
+                logger.warning("Empty or invalid response from Gemini API")
+                return None
+
+        except Exception as e:
+            logger.error(f"Gemini API generation failed: {e}")
+            return None
+
+    async def _generate_with_vertex_ai(self, prompt: str):
+        """Generate response using Vertex AI (fallback)."""
+        return await self._generate_with_retry(prompt)
+
     async def _generate_with_retry(self, prompt: str, max_retries: int = 3):
-        """Generate response with retry logic."""
+        """Generate response using Vertex AI Gemini model with retry logic."""
         for attempt in range(max_retries):
             try:
-                # Run the synchronous predict method in a thread pool
+                # Use Vertex AI Gemini model generate_content method
                 response = await asyncio.get_event_loop().run_in_executor(
                     None,
-                    lambda: self.llm_model.predict(
-                        prompt, **self.config.get_vertex_ai_config()
+                    lambda: self.llm_model.generate_content(
+                        prompt,
+                        generation_config={
+                            "temperature": self.config.temperature,
+                            "max_output_tokens": self.config.max_output_tokens,
+                            "top_k": self.config.top_k,
+                            "top_p": self.config.top_p,
+                        },
                     ),
                 )
                 return response
 
             except Exception as e:
-                logger.warning(f"Attempt {attempt + 1} failed: {e}")
+                logger.warning(f"Vertex AI attempt {attempt + 1} failed: {e}")
                 if attempt == max_retries - 1:
                     raise
                 await asyncio.sleep(1 * (attempt + 1))  # Exponential backoff

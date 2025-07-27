@@ -135,7 +135,7 @@ def mock_matching_engine(sample_snippets):
 
 @pytest.fixture
 def mock_gemini_ai():
-    """Mock Google Gemini AI."""
+    """Mock Google Gemini AI (legacy - for backward compatibility)."""
     with patch("google.generativeai.configure") as mock_configure, patch(
         "google.generativeai.GenerativeModel"
     ) as mock_model:
@@ -152,6 +152,44 @@ def mock_gemini_ai():
             "model": mock_model,
             "response": response_mock,
         }
+
+
+@pytest.fixture
+def mock_gemini_new_api():
+    """Mock new Google Gemini API (google-genai SDK)."""
+    with patch("google.genai.Client") as mock_client_class:
+        # Mock client instance
+        mock_client = MagicMock()
+
+        # Mock successful response
+        mock_response = MagicMock()
+        mock_response.text = "Generated advice using Gemini API: Based on the provided code snippets, here are my recommendations for a backend developer..."
+
+        # Mock the generate_content method
+        mock_client.models.generate_content.return_value = mock_response
+        mock_client_class.return_value = mock_client
+
+        yield {
+            "client_class": mock_client_class,
+            "client": mock_client,
+            "response": mock_response,
+        }
+
+
+@pytest.fixture
+def gemini_migration_env():
+    """Environment variables for Gemini migration testing."""
+    env_vars = {
+        "GOOGLE_CLOUD_PROJECT": "konveyn2ai",
+        "GOOGLE_CLOUD_LOCATION": "us-central1",
+        "GEMINI_API_KEY": "test_gemini_api_key_12345",
+        "GEMINI_MODEL": "gemini-2.0-flash-001",
+        "VERTEX_AI_MODEL": "text-bison-001",
+        "PYTEST_CURRENT_TEST": "test_gemini_migration",
+    }
+
+    with patch.dict(os.environ, env_vars):
+        yield env_vars
 
 
 @pytest.fixture

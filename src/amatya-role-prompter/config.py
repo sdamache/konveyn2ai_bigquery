@@ -9,6 +9,10 @@ import os
 import logging
 from typing import Optional
 from dataclasses import dataclass
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +31,11 @@ class AmataConfig:
     max_output_tokens: int
     top_k: int
     top_p: float
+
+    # Gemini API Configuration
+    gemini_api_key: str
+    gemini_model: str
+    use_gemini: bool
 
     # Service Configuration
     service_name: str
@@ -50,6 +59,18 @@ class AmataConfig:
         self.top_k = int(os.getenv("VERTEX_AI_TOP_K", "40"))
         self.top_p = float(os.getenv("VERTEX_AI_TOP_P", "0.8"))
 
+        # Gemini API Configuration
+        # Try GEMINI_API_KEY first, then fall back to GOOGLE_API_KEY for compatibility
+        self.gemini_api_key = os.getenv("GEMINI_API_KEY") or os.getenv(
+            "GOOGLE_API_KEY", ""
+        )
+        self.gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-001")
+        self.use_gemini = bool(
+            self.gemini_api_key
+            and self.gemini_api_key
+            not in ["", "your_gemini_api_key_here", "your_google_api_key_here"]
+        )
+
         # Service Configuration
         self.service_name = os.getenv("SERVICE_NAME", "amatya-role-prompter")
         self.port = int(os.getenv("PORT", "8001"))
@@ -64,7 +85,12 @@ class AmataConfig:
 
         logger.info(f"Initialized configuration for {self.service_name}")
         logger.info(f"Project: {self.project_id}, Location: {self.location}")
-        logger.info(f"Model: {self.model_name}, Environment: {self.environment}")
+        logger.info(
+            f"Vertex AI Model: {self.model_name}, Environment: {self.environment}"
+        )
+        logger.info(
+            f"Gemini API: {'Enabled' if self.use_gemini else 'Disabled'} (Model: {self.gemini_model})"
+        )
 
     def _validate_config(self):
         """Validate required configuration values."""
@@ -86,6 +112,15 @@ class AmataConfig:
 
     def get_vertex_ai_config(self) -> dict:
         """Get Vertex AI model configuration."""
+        return {
+            "temperature": self.temperature,
+            "max_output_tokens": self.max_output_tokens,
+            "top_k": self.top_k,
+            "top_p": self.top_p,
+        }
+
+    def get_gemini_config(self) -> dict:
+        """Get Gemini API model configuration."""
         return {
             "temperature": self.temperature,
             "max_output_tokens": self.max_output_tokens,
