@@ -299,7 +299,7 @@ class TestAmatyaRolePrompter:
             # Should handle empty chunks gracefully
             if "result" in data:
                 # Should provide general advice when no specific code is available
-                advice = data["result"]["answer"]
+                advice = data["result"]["advice"]
                 assert len(advice) > 0
             else:
                 # Or return appropriate error
@@ -430,10 +430,10 @@ class TestAmatyaRolePrompter:
 
             data = response.json()
             assert "result" in data
-            assert "answer" in data["result"]
+            assert "advice" in data["result"]
 
             # Verify role-specific content is generated
-            answer = data["result"]["answer"].lower()
+            answer = data["result"]["advice"].lower()
             # Check for role in various formats (with space, without space, with underscore)
             role_variations = [
                 role.lower(),
@@ -443,7 +443,7 @@ class TestAmatyaRolePrompter:
             assert any(variation in answer for variation in role_variations)
 
             # Verify response contains meaningful content
-            assert len(data["result"]["answer"]) > 100
+            assert len(data["result"]["advice"]) > 100
 
 
 class TestAmatyaConfiguration:
