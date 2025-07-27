@@ -271,24 +271,24 @@ class TestGeminiMigrationIntegration:
     def test_configuration_gemini_enabled(self, gemini_env_vars):
         """Test that configuration properly enables Gemini."""
 
-        sys.path.insert(0, amatya_path)
-        try:
-            from config import AmataConfig
+        # Clean import pattern using centralized utilities
+        from tests.utils.service_imports import get_service_main
 
-            config = AmataConfig()
+        # Get Amatya main module and access AmataConfig
+        amatya_main = get_service_main("amatya")
+        AmataConfig = amatya_main.AmataConfig
 
-            # Should detect Gemini API key and enable Gemini
-            assert config.use_gemini == True
-            assert config.gemini_api_key == "test_gemini_api_key"
-            assert config.gemini_model == "gemini-2.0-flash-001"
+        config = AmataConfig()
 
-            # Should have Gemini config method
-            gemini_config = config.get_gemini_config()
-            assert "temperature" in gemini_config
-            assert "max_output_tokens" in gemini_config
+        # Should detect Gemini API key and enable Gemini
+        assert config.use_gemini == True
+        assert config.gemini_api_key == "test_gemini_api_key"
+        assert config.gemini_model == "gemini-2.0-flash-001"
 
-        finally:
-            sys.path.pop(0)
+        # Should have Gemini config method
+        gemini_config = config.get_gemini_config()
+        assert "temperature" in gemini_config
+        assert "max_output_tokens" in gemini_config
 
     def test_configuration_gemini_disabled(self):
         """Test configuration when Gemini API key is not provided."""
@@ -299,18 +299,18 @@ class TestGeminiMigrationIntegration:
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
-            sys.path.insert(0, amatya_path)
-            try:
-                from config import AmataConfig
+            # Clean import pattern using centralized utilities
+            from tests.utils.service_imports import get_service_main
 
-                config = AmataConfig()
+            # Get Amatya main module and access AmataConfig
+            amatya_main = get_service_main("amatya")
+            AmataConfig = amatya_main.AmataConfig
 
-                # Should disable Gemini when no API key
-                assert config.use_gemini == False
-                assert config.gemini_api_key == ""
+            config = AmataConfig()
 
-            finally:
-                sys.path.pop(0)
+            # Should disable Gemini when no API key
+            assert config.use_gemini == False
+            assert config.gemini_api_key == ""
 
 
 class TestGeminiAPIIntegration:
@@ -319,84 +319,84 @@ class TestGeminiAPIIntegration:
     def test_gemini_client_initialization(self, gemini_env_vars):
         """Test Gemini client initialization with real configuration."""
 
-        sys.path.insert(0, amatya_path)
-        try:
-            from config import AmataConfig
-            from advisor import AdvisorService
+        # Clean import pattern using centralized utilities
+        from tests.utils.service_imports import get_service_main
 
-            config = AmataConfig()
-            advisor = AdvisorService(config)
+        # Get Amatya main module and access AmataConfig and AdvisorService
+        amatya_main = get_service_main("amatya")
+        AmataConfig = amatya_main.AmataConfig
+        AdvisorService = amatya_main.AdvisorService
 
-            # Should have Gemini client attribute
-            assert hasattr(advisor, "gemini_client")
+        config = AmataConfig()
+        advisor = AdvisorService(config)
 
-            # In test mode, client should be None initially
-            assert advisor.gemini_client is None
+        # Should have Gemini client attribute
+        assert hasattr(advisor, "gemini_client")
 
-        finally:
-            sys.path.pop(0)
+        # In test mode, client should be None initially
+        assert advisor.gemini_client is None
 
     @pytest.mark.asyncio
     async def test_advisor_service_initialization(self, gemini_env_vars):
         """Test AdvisorService initialization with hybrid approach."""
 
-        sys.path.insert(0, amatya_path)
-        try:
-            from config import AmataConfig
-            from advisor import AdvisorService
+        # Clean import pattern using centralized utilities
+        from tests.utils.service_imports import get_service_main
 
-            config = AmataConfig()
-            advisor = AdvisorService(config)
+        # Get Amatya main module and access required classes
+        amatya_main = get_service_main("amatya")
+        AmataConfig = amatya_main.AmataConfig
+        AdvisorService = amatya_main.AdvisorService
 
-            # Mock the initialization to avoid real API calls
-            with (
-                patch.object(advisor, "_initialize_gemini") as mock_gemini_init,
-                patch.object(advisor, "_initialize_vertex_ai") as mock_vertex_init,
-            ):
-                await advisor.initialize()
+        config = AmataConfig()
+        advisor = AdvisorService(config)
 
-                # Should call both initialization methods
-                mock_gemini_init.assert_called_once()
-                mock_vertex_init.assert_called_once()
+        # Mock the initialization to avoid real API calls
+        with (
+            patch.object(advisor, "_initialize_gemini") as mock_gemini_init,
+            patch.object(advisor, "_initialize_vertex_ai") as mock_vertex_init,
+        ):
+            await advisor.initialize()
 
-                # Should be marked as initialized
-                assert advisor._initialized == True
+            # Should call both initialization methods
+            mock_gemini_init.assert_called_once()
+            mock_vertex_init.assert_called_once()
 
-        finally:
-            sys.path.pop(0)
+            # Should be marked as initialized
+            assert advisor._initialized == True
 
     @pytest.mark.asyncio
     async def test_health_check_with_ai_services(self, gemini_env_vars):
         """Test health check reflects AI service availability."""
 
-        sys.path.insert(0, amatya_path)
-        try:
-            from config import AmataConfig
-            from advisor import AdvisorService
+        # Clean import pattern using centralized utilities
+        from tests.utils.service_imports import get_service_main
 
-            config = AmataConfig()
-            advisor = AdvisorService(config)
+        # Get Amatya main module and access required classes
+        amatya_main = get_service_main("amatya")
+        AmataConfig = amatya_main.AmataConfig
+        AdvisorService = amatya_main.AdvisorService
 
-            # Test with no services available
-            assert await advisor.is_healthy() == False
+        config = AmataConfig()
+        advisor = AdvisorService(config)
 
-            # Test with Gemini available
-            advisor.gemini_client = MagicMock()
-            advisor._initialized = True
-            assert await advisor.is_healthy() == True
+        # Test with no services available
+        assert await advisor.is_healthy() == False
 
-            # Test with Vertex AI available
-            advisor.gemini_client = None
-            advisor.llm_model = MagicMock()
-            assert await advisor.is_healthy() == True
+        # Test with Gemini available
+        advisor.gemini_client = MagicMock()
+        advisor._initialized = True
+        assert await advisor.is_healthy() == True
 
-            # Test with both available
-            advisor.gemini_client = MagicMock()
-            advisor.llm_model = MagicMock()
-            assert await advisor.is_healthy() == True
+        # Test with Vertex AI available
+        advisor.gemini_client = None
+        advisor.llm_model = MagicMock()
+        assert await advisor.is_healthy() == True
 
-        finally:
-            sys.path.pop(0)
+        # Test with both available
+        advisor.gemini_client = MagicMock()
+        advisor.llm_model = MagicMock()
+        assert await advisor.is_healthy() == True
 
 
 class TestGeminiErrorHandling:
