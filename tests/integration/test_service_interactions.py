@@ -672,25 +672,38 @@ class TestServiceLoadTesting:
         """Test performance benchmarks for service interactions."""
 
         import time
+        import sys
+        import os
 
+        # Add Svami path to sys.path for import
+        svami_path = os.path.join(
+            os.path.dirname(__file__), "../../src/svami-orchestrator"
+        )
+        svami_path = os.path.abspath(svami_path)
+        if svami_path not in sys.path:
+            sys.path.insert(0, svami_path)
+
+        from main import app
+        from common.models import JsonRpcResponse
+        from fastapi.testclient import TestClient
+
+        # Import main module to ensure it's loaded
+        import main
+        from common.rpc_client import JsonRpcClient
+
+        # Initialize the global clients manually since TestClient doesn't trigger lifespan
+        main.janapada_client = JsonRpcClient("http://localhost:8001")
+        main.amatya_client = JsonRpcClient("http://localhost:8002")
+
+        # Mock the JsonRpcClient.call method directly
         with (
-            patch.object(main, "janapada_client", create=True) as mock_janapada,
-            patch.object(main, "amatya_client", create=True) as mock_amatya,
+            patch.object(
+                main.janapada_client, "call", new_callable=AsyncMock
+            ) as mock_janapada_call,
+            patch.object(
+                main.amatya_client, "call", new_callable=AsyncMock
+            ) as mock_amatya_call,
         ):
-            from common.models import JsonRpcResponse
-            from fastapi.testclient import TestClient
-            import sys
-            import os
-
-            # Add Svami path to sys.path for import
-            svami_path = os.path.join(
-                os.path.dirname(__file__), "../../src/svami-orchestrator"
-            )
-            svami_path = os.path.abspath(svami_path)
-            if svami_path not in sys.path:
-                sys.path.insert(0, svami_path)
-
-            from main import app
 
             client = TestClient(app)
 
@@ -707,8 +720,8 @@ class TestServiceLoadTesting:
                     id=kwargs.get("id", "test"), result={"advice": "test"}
                 )
 
-            mock_janapada.call = AsyncMock(side_effect=mock_janapada_delay)
-            mock_amatya.call = AsyncMock(side_effect=mock_amatya_delay)
+            mock_janapada_call.side_effect = mock_janapada_delay
+            mock_amatya_call.side_effect = mock_amatya_delay
 
             start_time = time.time()
 
