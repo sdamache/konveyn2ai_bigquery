@@ -135,7 +135,9 @@ def test_janapada_failure():
     if response.status_code == 200:
         data = response.json()
         print(f"✅ Graceful error handling: {data['answer'][:100]}...")
-        assert "sorry" in data["answer"].lower(), "Should contain apology"
+        assert (
+            "couldn't find" in data["answer"].lower()
+        ), "Should contain graceful degradation message"
         assert (
             not mock_amatya.call.called
         ), "Amatya should not be called if Janapada fails"

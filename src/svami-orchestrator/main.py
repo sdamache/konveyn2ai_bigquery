@@ -375,37 +375,49 @@ async def answer_query(
 
         # Step 1: Call Janapada to search for relevant snippets
         print(f"[{request_id}] Step 1: Searching for relevant snippets via Janapada...")
-        search_response = await janapada_client.call(
-            method="search", params={"query": query.question, "k": 5}, id=request_id
-        )
 
-        # Handle search errors
-        if search_response.error:
-            print(
-                f"[{request_id}] Janapada search failed: {search_response.error.message}"
-            )
-            return handle_rpc_error(search_response.error, request_id)
-
-        # Process search results
         snippets = []
         sources = []
 
-        if search_response.result and "snippets" in search_response.result:
-            snippet_data = search_response.result["snippets"]
-            print(f"[{request_id}] Found {len(snippet_data)} snippets from Janapada")
+        try:
+            search_response = await janapada_client.call(
+                method="search", params={"query": query.question, "k": 5}, id=request_id
+            )
 
-            # Convert to Snippet objects and collect sources
-            for snippet_dict in snippet_data:
-                try:
-                    snippet = Snippet(**snippet_dict)
-                    snippets.append(snippet)
-                    if snippet.file_path not in sources:
-                        sources.append(snippet.file_path)
-                except Exception as e:
-                    print(f"[{request_id}] Warning: Invalid snippet format: {e}")
-                    continue
-        else:
-            print(f"[{request_id}] No snippets returned from Janapada")
+            # Handle search errors
+            if search_response.error:
+                print(
+                    f"[{request_id}] Janapada search failed: {search_response.error.message}"
+                )
+                print(f"[{request_id}] Continuing with graceful degradation...")
+            else:
+                # Process search results
+                if search_response.result and "snippets" in search_response.result:
+                    snippet_data = search_response.result["snippets"]
+                    print(
+                        f"[{request_id}] Found {len(snippet_data)} snippets from Janapada"
+                    )
+
+                    # Convert to Snippet objects and collect sources
+                    for snippet_dict in snippet_data:
+                        try:
+                            snippet = Snippet(**snippet_dict)
+                            snippets.append(snippet)
+                            if snippet.file_path not in sources:
+                                sources.append(snippet.file_path)
+                        except Exception as e:
+                            print(
+                                f"[{request_id}] Warning: Invalid snippet format: {e}"
+                            )
+                            continue
+                else:
+                    print(f"[{request_id}] No snippets returned from Janapada")
+
+        except Exception as e:
+            print(f"[{request_id}] Janapada service unavailable: {str(e)}")
+            print(
+                f"[{request_id}] Continuing with graceful degradation (no code snippets)..."
+            )
 
         # If no snippets found, provide a graceful response
         if not snippets:
