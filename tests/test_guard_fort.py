@@ -10,8 +10,7 @@ import sys
 import uuid
 from unittest.mock import patch
 
-# Add src directory to path for imports
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
+# Clean import pattern using centralized utilities - no sys.path needed with PYTHONPATH=src
 
 import pytest  # noqa: E402
 from fastapi import FastAPI, Request  # noqa: E402

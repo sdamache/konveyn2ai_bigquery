@@ -10,6 +10,7 @@ Industry best practice: centralized import management with clear, reusable patte
 import os
 import sys
 import importlib
+import importlib.util
 from typing import Any, Dict, Optional
 from pathlib import Path
 
@@ -29,7 +30,11 @@ class ServiceImporter:
 
     def get_service_module(self, service_name: str) -> Any:
         """
-        Import a service module with proper path handling.
+        Import a service module with proper isolation using importlib.
+
+        Uses industry-standard importlib.util.spec_from_file_location() to avoid
+        sys.modules conflicts when importing multiple main.py files from different
+        directories. Each service gets a unique module name for clean isolation.
 
         Args:
             service_name: One of 'svami', 'amatya', 'janapada'
@@ -57,25 +62,63 @@ class ServiceImporter:
             )
 
         service_path = self.src_path / service_paths[service_name]
+        main_py_path = service_path / "main.py"
 
         if not service_path.exists():
             raise FileNotFoundError(f"Service path not found: {service_path}")
 
-        # Add service path to Python path temporarily
-        service_path_str = str(service_path)
-        if service_path_str not in sys.path:
-            sys.path.insert(0, service_path_str)
+        if not main_py_path.exists():
+            raise FileNotFoundError(f"main.py not found: {main_py_path}")
 
         try:
-            # Import the main module
-            import main
+            # Use unique module name to prevent sys.modules conflicts
+            # This is the industry-standard approach for isolating same-named modules
+            unique_module_name = f"{service_name}_main_module"
 
-            # Reload to ensure fresh import
-            importlib.reload(main)
-            self._imported_modules[service_name] = main
-            return main
+            # Create module spec from file location
+            spec = importlib.util.spec_from_file_location(
+                unique_module_name, str(main_py_path)
+            )
+            if spec is None or spec.loader is None:
+                raise ImportError(f"Could not create module spec for {main_py_path}")
+
+            # Ensure both src path and service path are available during module execution
+            src_path_str = str(self.src_path)
+            service_path_str = str(service_path)
+            paths_added = []
+
+            # Add src path for common modules
+            if src_path_str not in sys.path:
+                sys.path.insert(0, src_path_str)
+                paths_added.append(src_path_str)
+
+            # Add service path for local service modules
+            if service_path_str not in sys.path:
+                sys.path.insert(0, service_path_str)
+                paths_added.append(service_path_str)
+
+            try:
+                # Create and execute module - this avoids sys.modules conflicts
+                main_module = importlib.util.module_from_spec(spec)
+
+                # IMPORTANT: Add to sys.modules before execution for patch target resolution
+                sys.modules[unique_module_name] = main_module
+
+                spec.loader.exec_module(main_module)
+
+                # Cache for reuse
+                self._imported_modules[service_name] = main_module
+                return main_module
+            finally:
+                # Clean up sys.path - remove in reverse order
+                for path_str in reversed(paths_added):
+                    if path_str in sys.path:
+                        sys.path.remove(path_str)
+
         except ImportError as e:
             raise ImportError(f"Failed to import {service_name} service: {e}")
+        except Exception as e:
+            raise RuntimeError(f"Error loading {service_name} service: {e}")
 
     def get_service_app(self, service_name: str) -> Any:
         """
@@ -100,28 +143,14 @@ class ServiceImporter:
         return main_module.app
 
     def cleanup(self):
-        """Clean up imported modules and restore sys.path."""
-        # Remove service paths from sys.path
-        for service_name in ["svami", "amatya", "janapada"]:
-            service_paths = {
-                "svami": "svami-orchestrator",
-                "amatya": "amatya-role-prompter",
-                "janapada": "janapada-memory",
-            }
-            service_path = str(self.src_path / service_paths[service_name])
-            if service_path in sys.path:
-                sys.path.remove(service_path)
+        """
+        Clean up imported service modules.
 
-        # Clear module cache for main modules
-        modules_to_remove = [
-            key
-            for key in sys.modules.keys()
-            if key == "main" or key.startswith("main.")
-        ]
-        for module_key in modules_to_remove:
-            if module_key in sys.modules:
-                del sys.modules[module_key]
-
+        With the new importlib approach, cleanup is much safer since we use
+        unique module names and don't modify sys.path.
+        """
+        # Simply clear our internal cache - no risky sys.modules manipulation needed
+        # The unique module names prevent conflicts so cleanup is optional
         self._imported_modules.clear()
 
 
@@ -178,6 +207,34 @@ def cleanup_service_imports():
         >>> cleanup_service_imports()  # In test teardown
     """
     _service_importer.cleanup()
+
+
+def get_service_patch_target(service_name: str, class_name: str) -> str:
+    """
+    Get the correct patch target path for a service class with unique module names.
+
+    Since we use unique module names like 'amatya_main_module', tests need the
+    correct patch target path for mocking.
+
+    Args:
+        service_name: One of 'svami', 'amatya', 'janapada'
+        class_name: Name of the class to patch (e.g., 'AdvisorService')
+
+    Returns:
+        The correct patch target string for unittest.mock.patch
+
+    Example:
+        >>> from tests.utils.service_imports import get_service_patch_target
+        >>> target = get_service_patch_target('amatya', 'AdvisorService')
+        >>> with patch(target) as mock_service:
+        ...     # Now patch will work correctly
+    """
+    # First ensure the module is loaded to get the correct sys.modules name
+    _service_importer.get_service_module(service_name)
+
+    # Return the unique module name that's actually in sys.modules
+    unique_module_name = f"{service_name}_main_module"
+    return f"{unique_module_name}.{class_name}"
 
 
 # For backward compatibility and specific use cases

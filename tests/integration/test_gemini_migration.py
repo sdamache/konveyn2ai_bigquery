@@ -15,43 +15,17 @@ import pytest
 import httpx
 from fastapi.testclient import TestClient
 
-# Add paths for imports
-project_root = os.path.join(os.path.dirname(__file__), "../..")
-amatya_path = os.path.abspath(os.path.join(project_root, "src/amatya-role-prompter"))
-src_path = os.path.abspath(os.path.join(project_root, "src"))
+# Paths no longer needed with centralized utilities
 
 
 @pytest.fixture(scope="module")
 def amatya_app_with_gemini():
     """Module-level fixture for Amatya app with Gemini migration."""
-    original_path = sys.path.copy()
+    # Clean import pattern using centralized utilities
+    from tests.utils.service_imports import get_service_app
 
-    # Clean up any existing modules
-    modules_to_remove = [
-        key
-        for key in sys.modules.keys()
-        if key in ["main", "config", "advisor"]
-        or key.startswith(("main.", "config.", "advisor."))
-    ]
-    for module_key in modules_to_remove:
-        if module_key in sys.modules:
-            del sys.modules[module_key]
-
-    try:
-        sys.path.insert(0, amatya_path)
-        sys.path.insert(1, src_path)
-
-        # Import with Gemini migration
-        from main import app as amatya_app_instance
-
-        yield amatya_app_instance
-
-    finally:
-        sys.path[:] = original_path
-        # Clean up modules
-        for module_key in modules_to_remove:
-            if module_key in sys.modules:
-                del sys.modules[module_key]
+    # Get Amatya app instance with Gemini configuration
+    return get_service_app("amatya")
 
 
 @pytest.fixture

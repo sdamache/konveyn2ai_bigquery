@@ -270,9 +270,14 @@ class TestSvamiOrchestrator:
     def test_request_id_injection(self, client, sample_snippets):
         """Test that request ID is properly injected into requests."""
 
+        from tests.utils.service_imports import get_service_patch_target
+
+        janapada_patch_target = get_service_patch_target("svami", "janapada_client")
+        amatya_patch_target = get_service_patch_target("svami", "amatya_client")
+
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch(janapada_patch_target) as mock_janapada,
+            patch(amatya_patch_target) as mock_amatya,
         ):
             from common.models import JsonRpcResponse
 
@@ -328,9 +333,14 @@ class TestSvamiOrchestrator:
     def test_request_validation(self, client):
         """Test comprehensive request validation."""
 
+        from tests.utils.service_imports import get_service_patch_target
+
+        janapada_patch_target = get_service_patch_target("svami", "janapada_client")
+        amatya_patch_target = get_service_patch_target("svami", "amatya_client")
+
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch(janapada_patch_target) as mock_janapada,
+            patch(amatya_patch_target) as mock_amatya,
         ):
             from common.models import JsonRpcResponse
 
@@ -397,9 +407,14 @@ class TestErrorHandling:
     def test_json_rpc_error_translation(self, client):
         """Test JSON-RPC error translation to user-friendly messages."""
 
+        from tests.utils.service_imports import get_service_patch_target
+
+        janapada_patch_target = get_service_patch_target("svami", "janapada_client")
+        amatya_patch_target = get_service_patch_target("svami", "amatya_client")
+
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch(janapada_patch_target) as mock_janapada,
+            patch(amatya_patch_target) as mock_amatya,
         ):
             # Mock JSON-RPC error
             mock_janapada.call.side_effect = Exception(
@@ -432,9 +447,14 @@ class TestErrorHandling:
     def test_timeout_handling(self, client):
         """Test timeout handling for service calls."""
 
+        from tests.utils.service_imports import get_service_patch_target
+
+        janapada_patch_target = get_service_patch_target("svami", "janapada_client")
+        amatya_patch_target = get_service_patch_target("svami", "amatya_client")
+
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch(janapada_patch_target) as mock_janapada,
+            patch(amatya_patch_target) as mock_amatya,
         ):
             # Mock timeout
             mock_janapada.call.side_effect = httpx.ReadTimeout("Request timeout")
