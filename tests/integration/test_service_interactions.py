@@ -129,25 +129,30 @@ class TestServiceCommunication:
 
         # Import main module to ensure it's loaded
         import main
+        from common.rpc_client import JsonRpcClient
 
-        # Mock the actual service clients instead of HTTP calls
+        # Initialize the global clients manually since TestClient doesn't trigger lifespan
+        main.janapada_client = JsonRpcClient("http://localhost:8001")
+        main.amatya_client = JsonRpcClient("http://localhost:8002")
+
+        # Mock the JsonRpcClient.call method directly
         with (
-            patch.object(main, "janapada_client", create=True) as mock_janapada,
-            patch.object(main, "amatya_client", create=True) as mock_amatya,
+            patch.object(
+                main.janapada_client, "call", new_callable=AsyncMock
+            ) as mock_janapada_call,
+            patch.object(
+                main.amatya_client, "call", new_callable=AsyncMock
+            ) as mock_amatya_call,
         ):
-            # Mock Janapada response with proper JsonRpcResponse structure
-            mock_janapada.call = AsyncMock(
-                return_value=JsonRpcResponse(
-                    id="test-id", result={"snippets": sample_snippets}
-                )
+            # Mock Janapada response
+            mock_janapada_call.return_value = JsonRpcResponse(
+                id="test-id", result={"snippets": sample_snippets}
             )
 
-            # Mock Amatya response with proper JsonRpcResponse structure
-            mock_amatya.call = AsyncMock(
-                return_value=JsonRpcResponse(
-                    id="test-id",
-                    result={"advice": "Generated advice based on code snippets"},
-                )
+            # Mock Amatya response
+            mock_amatya_call.return_value = JsonRpcResponse(
+                id="test-id",
+                result={"advice": "Generated advice based on code snippets"},
             )
 
             client = TestClient(app)
@@ -174,15 +179,15 @@ class TestServiceCommunication:
             assert len(data["sources"]) > 0
 
             # Verify both services were called
-            mock_janapada.call.assert_called_once()
-            mock_amatya.call.assert_called_once()
+            mock_janapada_call.assert_called_once()
+            mock_amatya_call.assert_called_once()
 
             # Verify call parameters
-            janapada_call = mock_janapada.call.call_args
+            janapada_call = mock_janapada_call.call_args
             assert janapada_call[1]["method"] == "search"
             assert "query" in janapada_call[1]["params"]
 
-            amatya_call = mock_amatya.call.call_args
+            amatya_call = mock_amatya_call.call_args
             assert amatya_call[1]["method"] == "advise"
             assert "role" in amatya_call[1]["params"]
             assert "chunks" in amatya_call[1]["params"]
