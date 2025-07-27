@@ -17,6 +17,7 @@ google-genai==1.27.0
 # Web framework and API
 streamlit==1.30.0
 fastapi==0.108.0
+starlette==0.32.0.post1
 uvicorn[standard]==0.25.0
 
 # Data processing and numerical computing
