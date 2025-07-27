@@ -127,10 +127,13 @@ class TestServiceCommunication:
         from main import app
         from common.models import JsonRpcResponse
 
+        # Import main module to ensure it's loaded
+        import main
+
         # Mock the actual service clients instead of HTTP calls
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch.object(main, "janapada_client") as mock_janapada,
+            patch.object(main, "amatya_client") as mock_amatya,
         ):
             # Mock Janapada response with proper JsonRpcResponse structure
             mock_janapada.call = AsyncMock(
@@ -193,23 +196,26 @@ class TestServiceFailureHandling:
     async def test_janapada_service_unavailable(self, mock_gemini_ai):
         """Test behavior when Janapada service is unavailable."""
 
+        # Import main module first
+        import sys
+        import os
+
+        # Add Svami path to sys.path for import
+        svami_path = os.path.join(
+            os.path.dirname(__file__), "../../src/svami-orchestrator"
+        )
+        svami_path = os.path.abspath(svami_path)
+        if svami_path not in sys.path:
+            sys.path.insert(0, svami_path)
+
+        import main
+
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch.object(main, "janapada_client") as mock_janapada,
+            patch.object(main, "amatya_client") as mock_amatya,
         ):
             from common.models import JsonRpcResponse
             from fastapi.testclient import TestClient
-            import sys
-            import os
-
-            # Add Svami path to sys.path for import
-            svami_path = os.path.join(
-                os.path.dirname(__file__), "../../src/svami-orchestrator"
-            )
-            svami_path = os.path.abspath(svami_path)
-            if svami_path not in sys.path:
-                sys.path.insert(0, svami_path)
-
             from main import app
 
             client = TestClient(app)
@@ -251,25 +257,26 @@ class TestServiceFailureHandling:
     ):
         """Test behavior when Amatya service is unavailable."""
 
+        from common.models import JsonRpcResponse
+        from fastapi.testclient import TestClient
+        import sys
+        import os
+
+        # Add Svami path to sys.path for import
+        svami_path = os.path.join(
+            os.path.dirname(__file__), "../../src/svami-orchestrator"
+        )
+        svami_path = os.path.abspath(svami_path)
+        if svami_path not in sys.path:
+            sys.path.insert(0, svami_path)
+
+        from main import app
+        import main
+
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch.object(main, "janapada_client") as mock_janapada,
+            patch.object(main, "amatya_client") as mock_amatya,
         ):
-            from common.models import JsonRpcResponse
-            from fastapi.testclient import TestClient
-            import sys
-            import os
-
-            # Add Svami path to sys.path for import
-            svami_path = os.path.join(
-                os.path.dirname(__file__), "../../src/svami-orchestrator"
-            )
-            svami_path = os.path.abspath(svami_path)
-            if svami_path not in sys.path:
-                sys.path.insert(0, svami_path)
-
-            from main import app
-
             client = TestClient(app)
 
             # Mock Janapada success
@@ -303,26 +310,27 @@ class TestServiceFailureHandling:
     async def test_partial_service_failures(self):
         """Test handling of partial service failures and timeouts."""
 
+        from common.models import JsonRpcResponse
+        from fastapi.testclient import TestClient
+        import sys
+        import os
+        import time
+
+        # Add Svami path to sys.path for import
+        svami_path = os.path.join(
+            os.path.dirname(__file__), "../../src/svami-orchestrator"
+        )
+        svami_path = os.path.abspath(svami_path)
+        if svami_path not in sys.path:
+            sys.path.insert(0, svami_path)
+
+        from main import app
+        import main
+
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch.object(main, "janapada_client") as mock_janapada,
+            patch.object(main, "amatya_client") as mock_amatya,
         ):
-            from common.models import JsonRpcResponse
-            from fastapi.testclient import TestClient
-            import sys
-            import os
-            import time
-
-            # Add Svami path to sys.path for import
-            svami_path = os.path.join(
-                os.path.dirname(__file__), "../../src/svami-orchestrator"
-            )
-            svami_path = os.path.abspath(svami_path)
-            if svami_path not in sys.path:
-                sys.path.insert(0, svami_path)
-
-            from main import app
-
             client = TestClient(app)
 
             # Mock Janapada - slow response
@@ -359,24 +367,25 @@ class TestServiceHealthMonitoring:
         """Test health check when all services are healthy."""
 
         # Mock the health check dependencies by mocking the Svami service directly
+        from fastapi.testclient import TestClient
+        import sys
+        import os
+
+        # Add Svami path to sys.path for import
+        svami_path = os.path.join(
+            os.path.dirname(__file__), "../../src/svami-orchestrator"
+        )
+        svami_path = os.path.abspath(svami_path)
+        if svami_path not in sys.path:
+            sys.path.insert(0, svami_path)
+
+        from main import app
+        import main
+
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch.object(main, "janapada_client") as mock_janapada,
+            patch.object(main, "amatya_client") as mock_amatya,
         ):
-            from fastapi.testclient import TestClient
-            import sys
-            import os
-
-            # Add Svami path to sys.path for import
-            svami_path = os.path.join(
-                os.path.dirname(__file__), "../../src/svami-orchestrator"
-            )
-            svami_path = os.path.abspath(svami_path)
-            if svami_path not in sys.path:
-                sys.path.insert(0, svami_path)
-
-            from main import app
-
             client = TestClient(app)
 
             # Mock that both services are available by ensuring they don't raise exceptions
@@ -399,24 +408,25 @@ class TestServiceHealthMonitoring:
 
         # This test needs to mock the actual health checking logic in Svami
         # For now, just verify the health endpoint responds properly
+        from fastapi.testclient import TestClient
+        import sys
+        import os
+
+        # Add Svami path to sys.path for import
+        svami_path = os.path.join(
+            os.path.dirname(__file__), "../../src/svami-orchestrator"
+        )
+        svami_path = os.path.abspath(svami_path)
+        if svami_path not in sys.path:
+            sys.path.insert(0, svami_path)
+
+        from main import app
+        import main
+
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch.object(main, "janapada_client") as mock_janapada,
+            patch.object(main, "amatya_client") as mock_amatya,
         ):
-            from fastapi.testclient import TestClient
-            import sys
-            import os
-
-            # Add Svami path to sys.path for import
-            svami_path = os.path.join(
-                os.path.dirname(__file__), "../../src/svami-orchestrator"
-            )
-            svami_path = os.path.abspath(svami_path)
-            if svami_path not in sys.path:
-                sys.path.insert(0, svami_path)
-
-            from main import app
-
             client = TestClient(app)
 
             # Mock Janapada as healthy
@@ -451,25 +461,26 @@ class TestRequestTracking:
 
         captured_request_ids = []
 
+        from common.models import JsonRpcResponse
+        from fastapi.testclient import TestClient
+        import sys
+        import os
+
+        # Add Svami path to sys.path for import
+        svami_path = os.path.join(
+            os.path.dirname(__file__), "../../src/svami-orchestrator"
+        )
+        svami_path = os.path.abspath(svami_path)
+        if svami_path not in sys.path:
+            sys.path.insert(0, svami_path)
+
+        from main import app
+        import main
+
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch.object(main, "janapada_client") as mock_janapada,
+            patch.object(main, "amatya_client") as mock_amatya,
         ):
-            from common.models import JsonRpcResponse
-            from fastapi.testclient import TestClient
-            import sys
-            import os
-
-            # Add Svami path to sys.path for import
-            svami_path = os.path.join(
-                os.path.dirname(__file__), "../../src/svami-orchestrator"
-            )
-            svami_path = os.path.abspath(svami_path)
-            if svami_path not in sys.path:
-                sys.path.insert(0, svami_path)
-
-            from main import app
-
             client = TestClient(app)
 
             def capture_janapada_request_id(*args, **kwargs):
@@ -522,25 +533,26 @@ class TestRequestTracking:
 
         request_ids = set()
 
+        from common.models import JsonRpcResponse
+        from fastapi.testclient import TestClient
+        import sys
+        import os
+
+        # Add Svami path to sys.path for import
+        svami_path = os.path.join(
+            os.path.dirname(__file__), "../../src/svami-orchestrator"
+        )
+        svami_path = os.path.abspath(svami_path)
+        if svami_path not in sys.path:
+            sys.path.insert(0, svami_path)
+
+        from main import app
+        import main
+
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch.object(main, "janapada_client") as mock_janapada,
+            patch.object(main, "amatya_client") as mock_amatya,
         ):
-            from common.models import JsonRpcResponse
-            from fastapi.testclient import TestClient
-            import sys
-            import os
-
-            # Add Svami path to sys.path for import
-            svami_path = os.path.join(
-                os.path.dirname(__file__), "../../src/svami-orchestrator"
-            )
-            svami_path = os.path.abspath(svami_path)
-            if svami_path not in sys.path:
-                sys.path.insert(0, svami_path)
-
-            from main import app
-
             client = TestClient(app)
 
             mock_janapada.call = AsyncMock(
@@ -584,25 +596,26 @@ class TestServiceLoadTesting:
     ):
         """Test handling of concurrent requests across services."""
 
+        from common.models import JsonRpcResponse
+        from fastapi.testclient import TestClient
+        import sys
+        import os
+
+        # Add Svami path to sys.path for import
+        svami_path = os.path.join(
+            os.path.dirname(__file__), "../../src/svami-orchestrator"
+        )
+        svami_path = os.path.abspath(svami_path)
+        if svami_path not in sys.path:
+            sys.path.insert(0, svami_path)
+
+        from main import app
+        import main
+
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch.object(main, "janapada_client") as mock_janapada,
+            patch.object(main, "amatya_client") as mock_amatya,
         ):
-            from common.models import JsonRpcResponse
-            from fastapi.testclient import TestClient
-            import sys
-            import os
-
-            # Add Svami path to sys.path for import
-            svami_path = os.path.join(
-                os.path.dirname(__file__), "../../src/svami-orchestrator"
-            )
-            svami_path = os.path.abspath(svami_path)
-            if svami_path not in sys.path:
-                sys.path.insert(0, svami_path)
-
-            from main import app
-
             client = TestClient(app)
 
             call_count = 0
