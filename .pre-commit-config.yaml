@@ -18,6 +18,13 @@ repos:
       - id: black
         language_version: python3
 
+  # Ruff linting with pinned version
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.15
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+
   # Local tools using versions from requirements.txt
   - repo: local
     hooks:

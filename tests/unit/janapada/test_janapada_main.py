@@ -2,15 +2,14 @@
 Unit tests for Janapada Memory service.
 """
 
-import pytest
 import json
-from unittest.mock import patch, MagicMock, AsyncMock
-from fastapi.testclient import TestClient
+import os
 
 # Import required modules for test setup
-import sys
-import os
-import importlib
+from unittest.mock import MagicMock, patch
+
+import pytest
+from fastapi.testclient import TestClient
 
 
 # Module-level fixture for Janapada app using centralized utilities
@@ -328,7 +327,6 @@ class TestJanapadaMemory:
         """Test handling of concurrent search requests."""
 
         import threading
-        import time
 
         results = []
         errors = []
@@ -421,7 +419,9 @@ class TestJanapadaConfiguration:
 
         # The vertexai.init is called during module initialization, so we need to check if it was patched in the setup
         # Since the main module is already imported, we test the basic functionality instead
-        from main import app
+        from tests.utils.service_imports import get_service_app
+
+        app = get_service_app("janapada")
 
         # Verify app was successfully created even with mocked Google Cloud services
         assert app is not None
