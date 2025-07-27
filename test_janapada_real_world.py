@@ -4,15 +4,15 @@ Comprehensive Real-World Testing for Janapada Memory Service
 Tests actual Google Cloud service integration for subtasks 6.1 and 6.2
 """
 
-import os
-import sys
 import json
-import asyncio
 import logging
-import requests
+import os
 import subprocess
-from typing import Dict, Any, List, Optional
+import sys
 from datetime import datetime
+from typing import Any
+
+import requests
 
 # Configure logging
 logging.basicConfig(
@@ -44,7 +44,7 @@ class JanapadaRealWorldTester:
             )
 
             # Load project info from credentials file (without displaying sensitive data)
-            with open(self.credentials_file, "r") as f:
+            with open(self.credentials_file) as f:
                 creds = json.load(f)
                 project_id = creds.get("project_id", "konveyn2ai")
 
@@ -58,7 +58,7 @@ class JanapadaRealWorldTester:
             logger.error(f"❌ Failed to setup credentials: {e}")
             return False
 
-    def test_google_cloud_auth(self) -> Dict[str, Any]:
+    def test_google_cloud_auth(self) -> dict[str, Any]:
         """Test Google Cloud authentication"""
         logger.info("🔐 Testing Google Cloud authentication...")
 
@@ -89,7 +89,7 @@ class JanapadaRealWorldTester:
             logger.error(f"❌ Google Cloud authentication failed: {e}")
             return {"status": "failed", "error": str(e)}
 
-    def test_vertex_ai_embeddings(self) -> Dict[str, Any]:
+    def test_vertex_ai_embeddings(self) -> dict[str, Any]:
         """Test Vertex AI TextEmbeddingModel directly"""
         logger.info("🤖 Testing Vertex AI TextEmbeddingModel...")
 
@@ -168,7 +168,7 @@ class JanapadaRealWorldTester:
             logger.error(f"❌ Failed to start service: {e}")
             return False
 
-    def test_health_endpoint(self) -> Dict[str, Any]:
+    def test_health_endpoint(self) -> dict[str, Any]:
         """Test the health check endpoint"""
         logger.info("🏥 Testing health check endpoint...")
 
@@ -194,7 +194,7 @@ class JanapadaRealWorldTester:
             logger.error(f"❌ Health check failed: {e}")
             return {"status": "failed", "error": str(e)}
 
-    def test_debug_embedding_endpoint(self) -> Dict[str, Any]:
+    def test_debug_embedding_endpoint(self) -> dict[str, Any]:
         """Test the debug embedding endpoint"""
         logger.info("🔍 Testing debug embedding endpoint...")
 
@@ -227,7 +227,7 @@ class JanapadaRealWorldTester:
             logger.error(f"❌ Debug embedding test failed: {e}")
             return {"status": "failed", "error": str(e)}
 
-    def test_json_rpc_search(self) -> Dict[str, Any]:
+    def test_json_rpc_search(self) -> dict[str, Any]:
         """Test the JSON-RPC search endpoint"""
         logger.info("🔍 Testing JSON-RPC search endpoint...")
 
@@ -284,7 +284,7 @@ class JanapadaRealWorldTester:
             self.service_process.wait()
             logger.info("✅ Service process terminated")
 
-    def run_comprehensive_tests(self) -> Dict[str, Any]:
+    def run_comprehensive_tests(self) -> dict[str, Any]:
         """Run all comprehensive tests"""
         logger.info("🚀 Starting comprehensive real-world testing...")
 
@@ -369,7 +369,7 @@ def main():
     with open("test_results_janapada_real_world.json", "w") as f:
         json.dump(results, f, indent=2)
 
-    print(f"📄 Detailed results saved to: test_results_janapada_real_world.json")
+    print("📄 Detailed results saved to: test_results_janapada_real_world.json")
 
     return 0 if passed_tests == total_tests else 1
 

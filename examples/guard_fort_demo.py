@@ -23,7 +23,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 
 import uvicorn  # noqa: E402
 from fastapi import FastAPI, Request  # noqa: E402
-
 from guard_fort import init_guard_fort  # noqa: E402
 
 # Create FastAPI application

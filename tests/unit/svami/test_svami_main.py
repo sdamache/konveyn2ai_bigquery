@@ -2,15 +2,12 @@
 Unit tests for Svami Orchestrator main module.
 """
 
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-from fastapi.testclient import TestClient
-import httpx
-
 # Import required modules for test setup
-import sys
-import os
-import importlib
+from unittest.mock import AsyncMock, patch
+
+import httpx
+import pytest
+from fastapi.testclient import TestClient
 
 
 # Module-level fixture for Svami app using centralized utilities
@@ -250,7 +247,7 @@ class TestSvamiOrchestrator:
         # Clean import pattern using centralized utilities
         from tests.utils.service_imports import get_service_main
 
-        main = get_service_main("svami")
+        get_service_main("svami")
 
         # The detailed health endpoint should return 200 when services are initialized but degraded
         # If it returns 503, it means the global variables are still None despite fixtures

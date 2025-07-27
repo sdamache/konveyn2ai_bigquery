@@ -7,8 +7,9 @@ with proper service initialization and mocking support.
 Industry best practice: factory pattern for test client creation.
 """
 
-from typing import Any, Dict, Optional, Union
-from unittest.mock import MagicMock, AsyncMock, patch
+from typing import Any
+from unittest.mock import AsyncMock
+
 from fastapi.testclient import TestClient
 
 from .service_imports import get_service_app, get_service_main, import_common_models
@@ -50,7 +51,7 @@ class ServiceTestClient:
         self.main_module.janapada_client = JsonRpcClient("http://localhost:8001")
         self.main_module.amatya_client = JsonRpcClient("http://localhost:8002")
 
-    def create_mocked_clients(self) -> Dict[str, Any]:
+    def create_mocked_clients(self) -> dict[str, Any]:
         """
         Create mocked service clients for Svami orchestrator testing.
 
@@ -147,7 +148,7 @@ def create_simple_client(service_name: str) -> TestClient:
     return TestClient(app)
 
 
-def create_mocked_svami_client() -> Dict[str, Any]:
+def create_mocked_svami_client() -> dict[str, Any]:
     """
     Convenience function to create a fully mocked Svami client.
 
@@ -171,7 +172,7 @@ def create_mocked_svami_client() -> Dict[str, Any]:
 
 
 # Service configuration helpers
-def get_service_config(service_name: str) -> Dict[str, Any]:
+def get_service_config(service_name: str) -> dict[str, Any]:
     """
     Get service-specific configuration for testing.
 
@@ -209,7 +210,7 @@ def get_service_config(service_name: str) -> Dict[str, Any]:
 
 
 # Common test data factories
-def create_sample_query_request() -> Dict[str, Any]:
+def create_sample_query_request() -> dict[str, Any]:
     """Create a sample query request for testing."""
     return {
         "question": "How do I implement authentication?",
@@ -217,7 +218,7 @@ def create_sample_query_request() -> Dict[str, Any]:
     }
 
 
-def create_sample_search_request() -> Dict[str, Any]:
+def create_sample_search_request() -> dict[str, Any]:
     """Create a sample search request for testing."""
     return {
         "jsonrpc": "2.0",
@@ -227,7 +228,7 @@ def create_sample_search_request() -> Dict[str, Any]:
     }
 
 
-def create_sample_advice_request() -> Dict[str, Any]:
+def create_sample_advice_request() -> dict[str, Any]:
     """Create a sample advice request for testing."""
     return {
         "jsonrpc": "2.0",

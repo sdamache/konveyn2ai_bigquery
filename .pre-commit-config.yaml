@@ -34,6 +34,6 @@ repos:
         entry: bandit
         language: system
         types: [python]
-        args: [--recursive, --format, txt]
+        args: [--recursive]
         files: ^src/.*\.py$
         exclude: ^src/.*/test_.*\.py$

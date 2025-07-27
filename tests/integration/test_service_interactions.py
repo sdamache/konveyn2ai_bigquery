@@ -2,10 +2,10 @@
 Integration tests for service interactions between Svami, Janapada, and Amatya.
 """
 
-import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import httpx
-import asyncio
-from unittest.mock import patch, MagicMock, AsyncMock
+import pytest
 
 # Test configuration
 SERVICES = {
@@ -49,7 +49,7 @@ class TestServiceCommunication:
                 # Create async client directly in test
 
                 async with httpx.AsyncClient(timeout=10.0) as async_client:
-                    response = await async_client.post(
+                    await async_client.post(
                         f"{SERVICES['janapada']}/", json=jsonrpc_request
                     )
 
@@ -90,7 +90,7 @@ class TestServiceCommunication:
                 # Create async client directly in test
 
                 async with httpx.AsyncClient(timeout=10.0) as async_client:
-                    response = await async_client.post(
+                    await async_client.post(
                         f"{SERVICES['amatya']}/", json=jsonrpc_request
                     )
 
@@ -179,8 +179,8 @@ class TestServiceFailureHandling:
         """Test behavior when Janapada service is unavailable."""
 
         # Clean import pattern using centralized utilities
-        from tests.utils.test_clients import create_test_client
         from tests.utils.service_imports import import_common_models
+        from tests.utils.test_clients import create_test_client
 
         # Create test client with service
         service_client = create_test_client("svami")
@@ -194,7 +194,6 @@ class TestServiceFailureHandling:
             patch.object(main, "janapada_client", create=True) as mock_janapada,
             patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
-
             # Mock Janapada failure
             mock_janapada.call.side_effect = Exception("Service unavailable")
 
@@ -233,8 +232,8 @@ class TestServiceFailureHandling:
         """Test behavior when Amatya service is unavailable."""
 
         # Clean import pattern using centralized utilities
-        from tests.utils.test_clients import create_test_client
         from tests.utils.service_imports import import_common_models
+        from tests.utils.test_clients import create_test_client
 
         # Create test client with service
         service_client = create_test_client("svami")
@@ -248,7 +247,6 @@ class TestServiceFailureHandling:
             patch.object(main, "janapada_client", create=True) as mock_janapada,
             patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
-
             # Mock Janapada success
             mock_janapada.call = AsyncMock(
                 return_value=JsonRpcResponse(
@@ -282,9 +280,10 @@ class TestServiceFailureHandling:
 
         import time
 
+        from tests.utils.service_imports import import_common_models
+
         # Clean import pattern using centralized utilities
         from tests.utils.test_clients import create_test_client
-        from tests.utils.service_imports import import_common_models
 
         # Create test client with service
         service_client = create_test_client("svami")
@@ -298,7 +297,6 @@ class TestServiceFailureHandling:
             patch.object(main, "janapada_client", create=True) as mock_janapada,
             patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
-
             # Mock Janapada - slow response
             def slow_janapada_call(*args, **kwargs):
                 time.sleep(0.1)  # Simulate slow response
@@ -345,7 +343,6 @@ class TestServiceHealthMonitoring:
             patch.object(main, "janapada_client", create=True) as mock_janapada,
             patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
-
             # Mock that both services are available by ensuring they don't raise exceptions
             mock_janapada.call = AsyncMock(return_value={"status": "healthy"})
             mock_amatya.call = AsyncMock(return_value={"status": "healthy"})
@@ -377,7 +374,6 @@ class TestServiceHealthMonitoring:
             patch.object(main, "janapada_client", create=True) as mock_janapada,
             patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
-
             # Mock Janapada as healthy
             mock_janapada.call = AsyncMock(return_value={"status": "healthy"})
 
@@ -411,8 +407,8 @@ class TestRequestTracking:
         captured_request_ids = []
 
         # Clean import pattern using centralized utilities
-        from tests.utils.test_clients import create_test_client
         from tests.utils.service_imports import import_common_models
+        from tests.utils.test_clients import create_test_client
 
         # Create test client with service
         service_client = create_test_client("svami")
@@ -477,8 +473,8 @@ class TestRequestTracking:
         request_ids = set()
 
         # Clean import pattern using centralized utilities
-        from tests.utils.test_clients import create_test_client
         from tests.utils.service_imports import import_common_models
+        from tests.utils.test_clients import create_test_client
 
         # Create test client with service
         service_client = create_test_client("svami")
@@ -492,7 +488,6 @@ class TestRequestTracking:
             patch.object(main, "janapada_client", create=True) as mock_janapada,
             patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
-
             mock_janapada.call = AsyncMock(
                 return_value=JsonRpcResponse(id="test-id", result={"snippets": []})
             )
@@ -535,8 +530,8 @@ class TestServiceLoadTesting:
         """Test handling of concurrent requests across services."""
 
         # Clean import pattern using centralized utilities
-        from tests.utils.test_clients import create_test_client
         from tests.utils.service_imports import import_common_models
+        from tests.utils.test_clients import create_test_client
 
         # Create test client with service
         service_client = create_test_client("svami")
@@ -550,7 +545,6 @@ class TestServiceLoadTesting:
             patch.object(main, "janapada_client", create=True) as mock_janapada,
             patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
-
             call_count = 0
 
             def mock_amatya_response(*args, **kwargs):
@@ -601,9 +595,10 @@ class TestServiceLoadTesting:
 
         import time
 
+        from tests.utils.service_imports import import_common_models
+
         # Clean import pattern using centralized utilities
         from tests.utils.test_clients import create_test_client
-        from tests.utils.service_imports import import_common_models
 
         # Create test client with service
         service_client = create_test_client("svami")
@@ -621,7 +616,6 @@ class TestServiceLoadTesting:
                 main.amatya_client, "call", new_callable=AsyncMock
             ) as mock_amatya_call,
         ):
-
             # Add realistic delays to simulate real service behavior
             def mock_janapada_delay(*args, **kwargs):
                 time.sleep(0.01)  # Reduced delay for test performance

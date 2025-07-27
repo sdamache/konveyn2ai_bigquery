@@ -12,13 +12,13 @@ import inspect
 import json
 import logging
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional, Type, get_type_hints
+from typing import Any, Callable, Optional, get_type_hints
 from urllib.parse import urljoin
 
 import httpx
 from pydantic import BaseModel, Field
 
-from .models import JsonRpcRequest, JsonRpcResponse
+from .models import JsonRpcResponse
 from .rpc_client import JsonRpcClient
 
 logger = logging.getLogger(__name__)
@@ -39,12 +39,12 @@ class MethodSchema(BaseModel):
 
     name: str = Field(..., description="Method name")
     description: str = Field(..., description="Method description")
-    parameters: List[ParameterSchema] = Field(
+    parameters: list[ParameterSchema] = Field(
         default_factory=list, description="Method parameters"
     )
     return_type: str = Field(..., description="Return type")
     handler: str = Field(..., description="Handler function name")
-    examples: Optional[List[Dict[str, Any]]] = Field(None, description="Usage examples")
+    examples: Optional[list[dict[str, Any]]] = Field(None, description="Usage examples")
 
 
 class AgentCapability(BaseModel):
@@ -62,16 +62,16 @@ class AgentManifest(BaseModel):
     version: str = Field(..., description="Agent version")
     protocol: str = Field(default="json-rpc-2.0", description="Communication protocol")
     description: Optional[str] = Field(None, description="Agent description")
-    methods: Dict[str, MethodSchema] = Field(
+    methods: dict[str, MethodSchema] = Field(
         default_factory=dict, description="Available methods"
     )
-    capabilities: List[AgentCapability] = Field(
+    capabilities: list[AgentCapability] = Field(
         default_factory=list, description="Agent capabilities"
     )
-    endpoints: Dict[str, str] = Field(
+    endpoints: dict[str, str] = Field(
         default_factory=dict, description="Service endpoints"
     )
-    metadata: Dict[str, Any] = Field(
+    metadata: dict[str, Any] = Field(
         default_factory=dict, description="Additional metadata"
     )
     generated_at: str = Field(
@@ -87,11 +87,11 @@ class AgentManifestGenerator:
         self.name = name
         self.version = version
         self.description = description
-        self.methods: Dict[str, Callable[..., Any]] = {}
-        self.method_descriptions: Dict[str, str] = {}
-        self.capabilities: List[AgentCapability] = []
-        self.endpoints: Dict[str, str] = {}
-        self.metadata: Dict[str, Any] = {}
+        self.methods: dict[str, Callable[..., Any]] = {}
+        self.method_descriptions: dict[str, str] = {}
+        self.capabilities: list[AgentCapability] = []
+        self.endpoints: dict[str, str] = {}
+        self.metadata: dict[str, Any] = {}
 
         # Add default capabilities
         self._add_default_capabilities()
@@ -149,7 +149,7 @@ class AgentManifestGenerator:
 
     def _extract_parameter_schema(
         self, func: Callable[..., Any]
-    ) -> List[ParameterSchema]:
+    ) -> list[ParameterSchema]:
         """Extract parameter schema from function signature and type hints."""
         sig = inspect.signature(func)
         type_hints = get_type_hints(func)
@@ -186,7 +186,7 @@ class AgentManifestGenerator:
 
         return parameters
 
-    def _parse_docstring_params(self, func: Callable[..., Any]) -> Dict[str, str]:
+    def _parse_docstring_params(self, func: Callable[..., Any]) -> dict[str, str]:
         """Parse parameter descriptions from docstring."""
         if not func.__doc__:
             return {}
@@ -259,7 +259,7 @@ class AgentManifestGenerator:
             metadata=self.metadata,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert manifest to dictionary."""
         manifest = self.generate_manifest()
         return manifest.model_dump()
@@ -274,7 +274,7 @@ class AgentDiscovery:
 
     def __init__(self, timeout: int = 30):
         self.timeout = timeout
-        self._manifest_cache: Dict[str, AgentManifest] = {}
+        self._manifest_cache: dict[str, AgentManifest] = {}
 
     async def discover_agent(self, base_url: str) -> Optional[AgentManifest]:
         """Discover an agent by fetching its manifest."""
@@ -302,7 +302,7 @@ class AgentDiscovery:
         self,
         base_url: str,
         method: str,
-        params: Dict[str, Any],
+        params: dict[str, Any],
         request_id: Optional[str] = None,
     ) -> JsonRpcResponse:
         """Call a method on a remote agent."""
@@ -321,7 +321,7 @@ class AgentDiscovery:
         """Get cached manifest for an agent."""
         return self._manifest_cache.get(base_url)
 
-    def list_agent_methods(self, base_url: str) -> List[str]:
+    def list_agent_methods(self, base_url: str) -> list[str]:
         """List available methods for a cached agent."""
         manifest = self.get_cached_manifest(base_url)
         return list(manifest.methods.keys()) if manifest else []

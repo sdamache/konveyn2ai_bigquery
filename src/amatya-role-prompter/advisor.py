@@ -5,14 +5,22 @@ This module implements the main business logic for generating role-specific
 advice using Google Cloud Vertex AI text models.
 """
 
-import logging
 import asyncio
+import logging
 import os
-from typing import Optional, List
+import sys
+from typing import Optional
+
 import vertexai
 from vertexai.generative_models import GenerativeModel
 
+# Add path for common modules
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
+
+from common.models import AdviceRequest, Snippet
+
 logger = logging.getLogger(__name__)
+
 # Gemini API imports
 try:
     from google import genai
@@ -22,20 +30,14 @@ except ImportError:
     GEMINI_AVAILABLE = False
     logger.warning("Gemini API not available - install google-genai")
 
-# Import common modules
-import sys
-
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
-
-from common.models import AdviceRequest, Snippet
-
 # Handle both relative and absolute imports
 try:
     from .config import AmataConfig
     from .prompts import PromptConstructor
 except ImportError:
-    from config import AmataConfig
     from prompts import PromptConstructor
+
+    from config import AmataConfig
 
 
 class AdvisorService:
@@ -313,7 +315,7 @@ class AdvisorService:
                     raise
                 await asyncio.sleep(1 * (attempt + 1))  # Exponential backoff
 
-    def _generate_fallback_response(self, role: str, chunks: List[Snippet]) -> str:
+    def _generate_fallback_response(self, role: str, chunks: list[Snippet]) -> str:
         """
         Generate a fallback response when LLM fails.
 
@@ -358,7 +360,7 @@ Please try your query again later for more detailed, AI-generated guidance.
         return fallback_advice
 
     def _generate_enhanced_mock_response(
-        self, role: str, chunks: List[Snippet], prompt: str
+        self, role: str, chunks: list[Snippet], prompt: str
     ) -> str:
         """
         Generate an enhanced mock response for demo purposes.

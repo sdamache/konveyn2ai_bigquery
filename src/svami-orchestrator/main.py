@@ -13,26 +13,24 @@ Key Features:
 - Health monitoring and error handling
 """
 
-import os
 import asyncio
+import os
+import sys
 import uuid
-from typing import Optional
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from typing import Optional
 
-from fastapi import FastAPI, Request, Depends, HTTPException
-from fastapi.responses import JSONResponse
 import uvicorn
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 
-# Import common models and utilities
-import sys
-
+# Add path for common modules
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from common.models import QueryRequest, AnswerResponse, Snippet, JsonRpcError
+from common.models import AnswerResponse, JsonRpcError, QueryRequest, Snippet
 from common.rpc_client import JsonRpcClient
 from guard_fort import init_guard_fort
-
 
 # Global variables for JSON-RPC clients
 janapada_client: Optional[JsonRpcClient] = None
@@ -55,7 +53,7 @@ async def lifespan(app: FastAPI):
     # Register external services for health monitoring
     await register_external_services()
 
-    print(f"Svami Orchestrator initialized with:")
+    print("Svami Orchestrator initialized with:")
     print(f"  Janapada URL: {janapada_url}")
     print(f"  Amatya URL: {amatya_url}")
     print("  Guard-Fort middleware enabled")
@@ -481,7 +479,7 @@ async def answer_query(
         raise HTTPException(
             status_code=500,
             detail=f"Internal server error while processing query: {str(e)}",
-        )
+        ) from e
 
 
 async def main():

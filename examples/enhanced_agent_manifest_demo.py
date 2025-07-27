@@ -11,16 +11,15 @@ This demo shows:
 import asyncio
 import os
 import sys
-from typing import Dict, List, Optional
+from typing import Optional
 
 # Add src directory to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from fastapi import FastAPI, Request  # noqa: E402
 import uvicorn  # noqa: E402
-
-from common.rpc_server import JsonRpcServer, logging_middleware  # noqa: E402
 from common.agent_manifest import AgentDiscovery  # noqa: E402
+from common.rpc_server import JsonRpcServer, logging_middleware  # noqa: E402
+from fastapi import FastAPI, Request  # noqa: E402
 
 # Create FastAPI app
 app = FastAPI(title="Enhanced Agent Manifest Demo")
@@ -58,7 +57,7 @@ rpc_server.set_metadata("repository", "https://github.com/neeharve/KonveyN2AI")
 
 # Register enhanced JSON-RPC methods with detailed type hints and docstrings
 @rpc_server.method("add", "Add two or more numbers together")
-def add(a: float, b: float, c: Optional[float] = None) -> Dict[str, float]:
+def add(a: float, b: float, c: Optional[float] = None) -> dict[str, float]:
     """
     Add two or more numbers together.
 
@@ -82,7 +81,7 @@ def add(a: float, b: float, c: Optional[float] = None) -> Dict[str, float]:
 
 
 @rpc_server.method("multiply", "Multiply a list of numbers")
-def multiply(numbers: List[float]) -> Dict[str, float]:
+def multiply(numbers: list[float]) -> dict[str, float]:
     """
     Multiply a list of numbers together.
 
@@ -104,8 +103,8 @@ def multiply(numbers: List[float]) -> Dict[str, float]:
 
 @rpc_server.method("statistics", "Calculate basic statistics for a dataset")
 def calculate_statistics(
-    data: List[float], include_variance: bool = False
-) -> Dict[str, float]:
+    data: list[float], include_variance: bool = False
+) -> dict[str, float]:
     """
     Calculate basic statistics for a dataset.
 
@@ -149,7 +148,7 @@ def calculate_statistics(
 @rpc_server.method("greet_user", "Greet a user with customizable message")
 def greet_user(
     name: str, title: Optional[str] = None, language: str = "en"
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """
     Greet a user with a customizable message.
 
@@ -175,7 +174,7 @@ def greet_user(
 
 
 @rpc_server.method("agent_info", "Get information about this agent")
-def get_agent_info() -> Dict[str, any]:
+def get_agent_info() -> dict[str, any]:
     """
     Get comprehensive information about this agent.
 

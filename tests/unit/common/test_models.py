@@ -3,10 +3,10 @@ Unit tests for common models and data structures.
 """
 
 import pytest
-from pydantic import ValidationError
 
 # Clean import pattern using centralized utilities - no sys.path needed with PYTHONPATH=src
-from common.models import QueryRequest, Snippet, SearchRequest, AdviceRequest
+from common.models import AdviceRequest, QueryRequest, SearchRequest, Snippet
+from pydantic import ValidationError
 
 
 class TestQueryRequest:

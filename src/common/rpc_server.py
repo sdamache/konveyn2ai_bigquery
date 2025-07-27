@@ -16,8 +16,8 @@ from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
-from .models import JsonRpcError, JsonRpcErrorCode, JsonRpcRequest, JsonRpcResponse
 from .agent_manifest import AgentManifestGenerator
+from .models import JsonRpcError, JsonRpcErrorCode, JsonRpcRequest, JsonRpcResponse
 
 logger = logging.getLogger(__name__)
 

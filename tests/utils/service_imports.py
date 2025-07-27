@@ -7,12 +7,11 @@ and eliminates the need for complex sys.path manipulation in individual tests.
 Industry best practice: centralized import management with clear, reusable patterns.
 """
 
-import os
-import sys
 import importlib
 import importlib.util
-from typing import Any, Dict, Optional
+import sys
 from pathlib import Path
+from typing import Any
 
 
 class ServiceImporter:
@@ -25,7 +24,7 @@ class ServiceImporter:
     def __init__(self):
         self.project_root = Path(__file__).parent.parent.parent
         self.src_path = self.project_root / "src"
-        self._imported_modules: Dict[str, Any] = {}
+        self._imported_modules: dict[str, Any] = {}
         self._original_path = None
 
     def get_service_module(self, service_name: str) -> Any:
@@ -246,9 +245,9 @@ def import_common_models():
 
     try:
         from common.models import (
+            AdviceRequest,
             JsonRpcResponse,
             QueryRequest,
-            AdviceRequest,
             SearchRequest,
         )
         from common.rpc_client import JsonRpcClient

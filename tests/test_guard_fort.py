@@ -5,17 +5,13 @@ Tests request ID generation, propagation, timing, and basic middleware behavior.
 """
 
 import json
-import os
-import sys
 import uuid
 from unittest.mock import patch
 
 # Clean import pattern using centralized utilities - no sys.path needed with PYTHONPATH=src
-
 import pytest  # noqa: E402
 from fastapi import FastAPI, Request  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
-
 from guard_fort import GuardFort, init_guard_fort  # noqa: E402
 
 

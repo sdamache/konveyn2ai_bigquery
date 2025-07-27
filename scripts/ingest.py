@@ -13,16 +13,14 @@ Usage:
     python scripts/ingest.py --repo-path /path/to/repo --index-id INDEX_ID --index-endpoint-id ENDPOINT_ID
 """
 
+import argparse
+import json
+import logging
 import os
 import sys
-import glob
-import argparse
-import logging
-from typing import List, Dict, Any, Optional
-from pathlib import Path
-import json
 import time
-from functools import lru_cache
+from pathlib import Path
+from typing import Any
 
 # Add project root to path for imports
 project_root = Path(__file__).parent.parent
@@ -31,8 +29,8 @@ sys.path.insert(0, str(project_root))
 # Import Google Cloud dependencies
 try:
     import vertexai
-    from vertexai.language_models import TextEmbeddingModel
     from google.cloud import aiplatform
+    from vertexai.language_models import TextEmbeddingModel
 
     VERTEX_AI_AVAILABLE = True
 except ImportError:
@@ -137,7 +135,7 @@ class RepositoryIngestionPipeline:
             f"Target index: {self.index_id}, endpoint: {self.index_endpoint_id}"
         )
 
-    def collect_files(self) -> List[Path]:
+    def collect_files(self) -> list[Path]:
         """
         Collect and filter repository files based on extensions and exclusion patterns.
 
@@ -238,7 +236,7 @@ class RepositoryIngestionPipeline:
             return True
         return False
 
-    def process_files(self, file_paths: List[Path]) -> List[Dict[str, Any]]:
+    def process_files(self, file_paths: list[Path]) -> list[dict[str, Any]]:
         """
         Process files into chunks with metadata.
 
@@ -277,7 +275,7 @@ class RepositoryIngestionPipeline:
 
         return all_chunks
 
-    def _process_single_file(self, file_path: Path) -> List[Dict[str, Any]]:
+    def _process_single_file(self, file_path: Path) -> list[dict[str, Any]]:
         """
         Process a single file into chunks.
 
@@ -289,7 +287,7 @@ class RepositoryIngestionPipeline:
         """
         # Read file content
         try:
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            with open(file_path, encoding="utf-8", errors="ignore") as f:
                 content = f.read()
         except Exception as e:
             logger.warning(f"Could not read file {file_path}: {e}")
@@ -310,7 +308,7 @@ class RepositoryIngestionPipeline:
 
         return chunks
 
-    def _split_into_chunks(self, content: str, file_path: str) -> List[Dict[str, Any]]:
+    def _split_into_chunks(self, content: str, file_path: str) -> list[dict[str, Any]]:
         """
         Split file content into logical chunks.
 
@@ -356,7 +354,7 @@ class RepositoryIngestionPipeline:
 
         return chunks
 
-    def _get_separators_for_file(self, file_path: str) -> List[str]:
+    def _get_separators_for_file(self, file_path: str) -> list[str]:
         """
         Get language-specific separators for logical chunking.
 
@@ -399,7 +397,7 @@ class RepositoryIngestionPipeline:
         else:
             return ["\n\n", "\n// ", "\n# ", "\n/*"]
 
-    def _split_by_separators(self, content: str, separators: List[str]) -> List[str]:
+    def _split_by_separators(self, content: str, separators: list[str]) -> list[str]:
         """
         Split content by separators while preserving separators.
 
@@ -433,7 +431,7 @@ class RepositoryIngestionPipeline:
 
     def _split_large_segment(
         self, segment: str, target_size: int, overlap_size: int
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Split a large segment into overlapping chunks.
 
@@ -474,7 +472,7 @@ class RepositoryIngestionPipeline:
 
     def _create_chunk(
         self, content: str, file_path: str, chunk_index: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Create a chunk dictionary with metadata.
 
@@ -528,7 +526,7 @@ class RepositoryIngestionPipeline:
             logger.error(f"Failed to initialize Vertex AI: {e}")
             return False
 
-    def generate_embeddings(self, chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def generate_embeddings(self, chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """
         Generate embeddings for chunks using Vertex AI.
 
@@ -596,8 +594,8 @@ class RepositoryIngestionPipeline:
         return chunks_with_embeddings
 
     def _generate_embeddings_with_retry(
-        self, texts: List[str], max_retries: int = 3
-    ) -> List[List[float]]:
+        self, texts: list[str], max_retries: int = 3
+    ) -> list[list[float]]:
         """
         Generate embeddings with retry logic.
 
@@ -626,7 +624,7 @@ class RepositoryIngestionPipeline:
         return []
 
     def upload_to_matching_engine(
-        self, chunks_with_embeddings: List[Dict[str, Any]]
+        self, chunks_with_embeddings: list[dict[str, Any]]
     ) -> bool:
         """
         Upload chunks with embeddings to Matching Engine.
@@ -666,7 +664,7 @@ class RepositoryIngestionPipeline:
                     continue
 
                 # Create metadata
-                metadata = {
+                {
                     "file_path": chunk["file_path"],
                     "chunk_index": chunk["chunk_index"],
                     "char_count": chunk["char_count"],
@@ -708,7 +706,7 @@ class RepositoryIngestionPipeline:
             logger.error(f"Failed to upload to Matching Engine: {e}")
             return False
 
-    def _upload_datapoint_batch(self, index_endpoint, datapoints: List) -> None:
+    def _upload_datapoint_batch(self, index_endpoint, datapoints: list) -> None:
         """
         Upload a batch of datapoints to Matching Engine.
 

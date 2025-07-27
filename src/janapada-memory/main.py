@@ -9,33 +9,29 @@ Implements real Vertex AI embeddings with textembedding-gecko-001 model.
 
 import logging
 import os
-from typing import Any, Optional, List
-import asyncio
+import sys
 from functools import lru_cache
+from typing import Any, Optional
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+
+# Add path for common modules
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from common.models import Snippet
+from common.rpc_server import JsonRpcServer
 
 # Google Cloud Vertex AI imports
 try:
     import vertexai
-    from vertexai.language_models import TextEmbeddingModel
     from google.cloud import aiplatform
+    from vertexai.language_models import TextEmbeddingModel
 
     VERTEX_AI_AVAILABLE = True
 except ImportError:
     VERTEX_AI_AVAILABLE = False
     logger = logging.getLogger(__name__)
     logger.warning("Vertex AI not available - install google-cloud-aiplatform")
-
-# Import common models and JSON-RPC infrastructure
-import sys
-import os
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from common.models import SearchRequest, Snippet, JsonRpcError, JsonRpcErrorCode
-from common.rpc_server import JsonRpcServer
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -129,7 +125,7 @@ async def startup_event():
 
 # Embedding generation with caching
 @lru_cache(maxsize=1000)
-def generate_embedding_cached(text: str) -> Optional[List[float]]:
+def generate_embedding_cached(text: str) -> Optional[list[float]]:
     """
     Generate embedding for text with LRU caching for performance.
 
@@ -169,7 +165,7 @@ def generate_embedding_cached(text: str) -> Optional[List[float]]:
         return None
 
 
-def search_with_matching_engine(query: str, k: int) -> List[Snippet]:
+def search_with_matching_engine(query: str, k: int) -> list[Snippet]:
     """
     Search for relevant code snippets using Vertex AI Matching Engine.
 
@@ -212,11 +208,11 @@ def search_with_matching_engine(query: str, k: int) -> List[Snippet]:
             ),
             Snippet(
                 file_path="src/auth/token_validator.py",
-                content=f"# Vector search result (similarity: 0.85)\ndef verify_jwt_token(token: str) -> bool:\n    try:\n        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])\n        return payload.get('user_id') is not None\n    except jwt.InvalidTokenError:\n        return False",
+                content="# Vector search result (similarity: 0.85)\ndef verify_jwt_token(token: str) -> bool:\n    try:\n        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])\n        return payload.get('user_id') is not None\n    except jwt.InvalidTokenError:\n        return False",
             ),
             Snippet(
                 file_path="src/middleware/auth_handler.py",
-                content=f"# Vector search result (similarity: 0.82)\nclass AuthenticationMiddleware:\n    def __init__(self, secret_key: str):\n        self.secret_key = secret_key\n    \n    def authenticate(self, token: str) -> Optional[dict]:\n        return jwt.decode(token, self.secret_key)",
+                content="# Vector search result (similarity: 0.82)\nclass AuthenticationMiddleware:\n    def __init__(self, secret_key: str):\n        self.secret_key = secret_key\n    \n    def authenticate(self, token: str) -> Optional[dict]:\n        return jwt.decode(token, self.secret_key)",
             ),
         ]
 
@@ -232,8 +228,8 @@ def search_with_matching_engine(query: str, k: int) -> List[Snippet]:
 
 
 def get_enhanced_mock_snippets(
-    query: str, query_embedding: List[float], k: int
-) -> List[Snippet]:
+    query: str, query_embedding: list[float], k: int
+) -> list[Snippet]:
     """Enhanced mock snippets that show embedding was generated successfully."""
     enhanced_snippets = [
         Snippet(
@@ -252,7 +248,7 @@ def get_enhanced_mock_snippets(
     return enhanced_snippets[:k]
 
 
-def search_with_embeddings(query: str, k: int) -> List[Snippet]:
+def search_with_embeddings(query: str, k: int) -> list[Snippet]:
     """
     Search for relevant code snippets using embedding-based similarity.
 
@@ -280,7 +276,7 @@ def search_with_embeddings(query: str, k: int) -> List[Snippet]:
     return get_enhanced_mock_snippets(query, query_embedding, k)
 
 
-def get_mock_snippets(query: str, k: int) -> List[Snippet]:
+def get_mock_snippets(query: str, k: int) -> list[Snippet]:
     """Fallback mock snippets when embedding generation fails."""
     mock_snippets = [
         Snippet(
@@ -337,7 +333,7 @@ def search_snippets(
 
     except Exception as e:
         logger.error(f"❌ Search failed: {str(e)}")
-        raise RuntimeError(f"Search operation failed: {str(e)}")
+        raise RuntimeError(f"Search operation failed: {str(e)}") from e
 
 
 # JSON-RPC endpoint

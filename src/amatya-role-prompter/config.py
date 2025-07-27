@@ -5,10 +5,10 @@ Handles environment variables, Google Cloud settings, and service configuration
 following KonveyN2AI standards.
 """
 
-import os
 import logging
-from typing import Optional
+import os
 from dataclasses import dataclass
+
 from dotenv import load_dotenv
 
 # Load environment variables from .env file

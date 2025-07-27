@@ -6,7 +6,7 @@ incorporating code snippets and context for optimal LLM responses.
 """
 
 import logging
-from typing import List, Dict
+
 from common.models import Snippet
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ class PromptConstructor:
         self.role_templates = self._load_role_templates()
         logger.info("PromptConstructor initialized")
 
-    def construct_prompt(self, role: str, chunks: List[Snippet]) -> str:
+    def construct_prompt(self, role: str, chunks: list[Snippet]) -> str:
         """
         Construct a role-specific prompt for advice generation.
 
@@ -45,7 +45,7 @@ class PromptConstructor:
         logger.info(f"Constructed prompt for role '{role}' with {len(chunks)} chunks")
         return prompt
 
-    def _build_context(self, chunks: List[Snippet]) -> str:
+    def _build_context(self, chunks: list[Snippet]) -> str:
         """
         Build context string from code snippets.
 
@@ -82,7 +82,7 @@ class PromptConstructor:
         # Return specific template if available, otherwise use default
         return self.role_templates.get(normalized_role, self.role_templates["default"])
 
-    def _load_role_templates(self) -> Dict[str, str]:
+    def _load_role_templates(self) -> dict[str, str]:
         """Load role-specific prompt templates."""
         return {
             "default": """You are an experienced onboarding assistant helping a new {role} understand and contribute to this project.
@@ -244,11 +244,11 @@ As an experienced technical writer, provide a comprehensive onboarding guide foc
 Include specific file references and focus on documentation-specific concerns like clarity, accuracy, and maintainability.""",
         }
 
-    def get_available_roles(self) -> List[str]:
+    def get_available_roles(self) -> list[str]:
         """Get list of available role templates."""
         return list(self.role_templates.keys())
 
-    def get_context_aware_prompt(self, role: str, chunks: List[Snippet]) -> str:
+    def get_context_aware_prompt(self, role: str, chunks: list[Snippet]) -> str:
         """
         Get a context-aware prompt that adapts based on the code content.
 
@@ -280,7 +280,7 @@ Include specific file references and focus on documentation-specific concerns li
 
         return base_prompt
 
-    def _analyze_project_context(self, chunks: List[Snippet]) -> Dict[str, bool]:
+    def _analyze_project_context(self, chunks: list[Snippet]) -> dict[str, bool]:
         """
         Analyze code chunks to understand project characteristics.
 

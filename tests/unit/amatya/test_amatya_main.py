@@ -5,7 +5,6 @@ Unit tests for Amatya Role Prompter service.
 import os
 
 # Import required modules for test setup
-import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

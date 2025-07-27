@@ -2,13 +2,13 @@
 Docker-related test fixtures for integration testing with containers.
 """
 
-import pytest
-import docker
-import time
-import requests
-from typing import Dict, List
-import subprocess
 import os
+import subprocess
+import time
+
+import docker
+import pytest
+import requests
 
 
 @pytest.fixture(scope="session")
@@ -73,7 +73,7 @@ def docker_services(docker_client, docker_compose_file, test_services_config):
     )
 
     # Wait for services to be healthy
-    for service_name, config in test_services_config.items():
+    for _service_name, config in test_services_config.items():
         wait_for_service_health(
             port=config["port"],
             endpoint=config["health_endpoint"],
@@ -118,7 +118,7 @@ def isolated_containers(docker_client):
     containers = {}
 
     def create_container(
-        image_name: str, service_name: str, port: int, env_vars: Dict[str, str] = None
+        image_name: str, service_name: str, port: int, env_vars: dict[str, str] = None
     ):
         """Create and start a container for testing."""
 
@@ -193,7 +193,7 @@ def service_containers(docker_client, docker_network, mock_external_dependencies
     containers = []
 
     def start_service(
-        service_name: str, image_tag: str, port: int, extra_env: Dict[str, str] = None
+        service_name: str, image_tag: str, port: int, extra_env: dict[str, str] = None
     ):
         """Start a service container with proper configuration."""
 
@@ -264,7 +264,7 @@ class DockerTestHelper:
         return container.logs(tail=tail).decode("utf-8")
 
     @staticmethod
-    def exec_command_in_container(container, command: List[str]):
+    def exec_command_in_container(container, command: list[str]):
         """Execute a command inside a container."""
         result = container.exec_run(command)
         return result.exit_code, result.output.decode("utf-8")
@@ -319,7 +319,7 @@ def docker_compose_project():
             self.compose_file = compose_file
             self.project_dir = os.path.dirname(compose_file)
 
-        def up(self, services: List[str] = None):
+        def up(self, services: list[str] = None):
             """Start services."""
             cmd = ["docker-compose", "-f", self.compose_file, "up", "-d"]
             if services:

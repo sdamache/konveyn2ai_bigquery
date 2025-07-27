@@ -5,12 +5,11 @@ Shared pytest fixtures and configuration for KonveyN2AI tests.
 import asyncio
 import json
 import os
-from typing import AsyncGenerator, Dict, Any
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 import httpx
-from fastapi.testclient import TestClient
+import pytest
 
 # Test configuration
 TEST_CONFIG = {
@@ -269,7 +268,7 @@ def degraded_response():
 class MockResponse:
     """Mock HTTP response for testing."""
 
-    def __init__(self, json_data: Dict[str, Any], status_code: int = 200):
+    def __init__(self, json_data: dict[str, Any], status_code: int = 200):
         self.json_data = json_data
         self.status_code = status_code
 

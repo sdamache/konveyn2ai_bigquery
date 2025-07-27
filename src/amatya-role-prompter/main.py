@@ -8,20 +8,19 @@ for communication with other KonveyN2AI components.
 
 import logging
 import os
+import sys
 from contextlib import asynccontextmanager
 
+import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-import uvicorn
 
-# Import common modules
-import sys
-
+# Add path for common modules
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from common.rpc_server import JsonRpcServer
 from common.models import AdviceRequest, Snippet
+from common.rpc_server import JsonRpcServer
 from guard_fort import GuardFort
 
 # Import service modules
@@ -30,6 +29,7 @@ try:
     from .config import AmataConfig
 except ImportError:
     from advisor import AdvisorService
+
     from config import AmataConfig
 
 # Configure logging
@@ -128,8 +128,9 @@ async def advise(role: str, chunks: list[dict], request_id: str = None) -> dict:
         # Check if advisor service is available
         if advisor_service is None:
             # Create a temporary advisor service for testing
-            from config import AmataConfig
             from advisor import AdvisorService
+
+            from config import AmataConfig
 
             temp_config = AmataConfig()
             temp_advisor = AdvisorService(temp_config)

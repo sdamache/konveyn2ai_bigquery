@@ -5,14 +5,10 @@ Tests the real implementation of Gemini-first, Vertex AI fallback architecture
 without mocking the core AI service logic.
 """
 
-import asyncio
 import os
-import sys
-from unittest.mock import patch, MagicMock, AsyncMock
-from typing import Dict, Any
+from unittest.mock import MagicMock, patch
 
 import pytest
-import httpx
 from fastapi.testclient import TestClient
 
 # Paths no longer needed with centralized utilities
@@ -255,7 +251,7 @@ class TestGeminiMigrationIntegration:
         config = AmataConfig()
 
         # Should detect Gemini API key and enable Gemini
-        assert config.use_gemini == True
+        assert config.use_gemini is True
         assert config.gemini_api_key == "test_gemini_api_key"
         assert config.gemini_model == "gemini-2.0-flash-001"
 
@@ -283,7 +279,7 @@ class TestGeminiMigrationIntegration:
             config = AmataConfig()
 
             # Should disable Gemini when no API key
-            assert config.use_gemini == False
+            assert config.use_gemini is False
             assert config.gemini_api_key == ""
 
 
@@ -337,7 +333,7 @@ class TestGeminiAPIIntegration:
             mock_vertex_init.assert_called_once()
 
             # Should be marked as initialized
-            assert advisor._initialized == True
+            assert advisor._initialized is True
 
     @pytest.mark.asyncio
     async def test_health_check_with_ai_services(self, gemini_env_vars):
@@ -355,22 +351,22 @@ class TestGeminiAPIIntegration:
         advisor = AdvisorService(config)
 
         # Test with no services available
-        assert await advisor.is_healthy() == False
+        assert await advisor.is_healthy() is False
 
         # Test with Gemini available
         advisor.gemini_client = MagicMock()
         advisor._initialized = True
-        assert await advisor.is_healthy() == True
+        assert await advisor.is_healthy() is True
 
         # Test with Vertex AI available
         advisor.gemini_client = None
         advisor.llm_model = MagicMock()
-        assert await advisor.is_healthy() == True
+        assert await advisor.is_healthy() is True
 
         # Test with both available
         advisor.gemini_client = MagicMock()
         advisor.llm_model = MagicMock()
-        assert await advisor.is_healthy() == True
+        assert await advisor.is_healthy() is True
 
 
 class TestGeminiErrorHandling:
@@ -526,7 +522,6 @@ class TestGeminiPerformance:
         """Test handling of concurrent requests with Gemini."""
 
         import concurrent.futures
-        import threading
 
         def make_request(request_id):
             try:
