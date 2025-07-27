@@ -11,19 +11,23 @@ repos:
       - id: check-merge-conflict
       - id: debug-statements  # Critical: prevents debug statements in production
 
+  # Black code formatting with pinned version for consistency
+  - repo: https://github.com/psf/black
+    rev: 25.1.0
+    hooks:
+      - id: black
+        language_version: python3
+
+  # Ruff linting with pinned version
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.15
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+
   # Local tools using versions from requirements.txt
   - repo: local
     hooks:
-      # Black code formatting
-      - id: black
-        name: black
-        entry: black
-        language: system
-        types: [python]
-        args: [--line-length=88]
-
-
-
       # Security scanning with Bandit
       - id: bandit
         name: bandit

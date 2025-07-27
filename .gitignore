@@ -119,8 +119,7 @@ CLAUDE.md
 # MCP configuration (development tooling)
 .mcp.json
 
-# GitHub development instructions (not project code)
-.github/
+
 
 # Rules files (contain duplicate info)
 .rules

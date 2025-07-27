@@ -13,48 +13,15 @@ import os
 import importlib
 
 
-# Module-level fixture for Svami app isolation
+# Module-level fixture for Svami app using centralized utilities
 @pytest.fixture(scope="module")
 def svami_app():
     """Module-level fixture to import Svami app with proper isolation."""
-    # Store original sys.path
-    original_path = sys.path.copy()
+    # Clean import pattern using centralized utilities
+    from tests.utils.service_imports import get_service_app
 
-    # Calculate paths
-    project_root = os.path.join(os.path.dirname(__file__), "../../..")
-    svami_path = os.path.abspath(os.path.join(project_root, "src/svami-orchestrator"))
-    src_path = os.path.abspath(os.path.join(project_root, "src"))
-
-    # Remove conflicting module entries to ensure clean import
-    modules_to_remove = [
-        key for key in sys.modules.keys() if key == "main" or key.startswith("main.")
-    ]
-    for module_key in modules_to_remove:
-        if module_key in sys.modules:
-            del sys.modules[module_key]
-
-    try:
-        # Temporarily modify sys.path for this module
-        sys.path.insert(0, svami_path)
-        sys.path.insert(1, src_path)
-
-        # Import the Svami main module
-        from main import app as svami_app_instance
-
-        yield svami_app_instance
-
-    finally:
-        # Restore original sys.path
-        sys.path[:] = original_path
-        # Clean up the module again to prevent contamination
-        modules_to_remove = [
-            key
-            for key in sys.modules.keys()
-            if key == "main" or key.startswith("main.")
-        ]
-        for module_key in modules_to_remove:
-            if module_key in sys.modules:
-                del sys.modules[module_key]
+    # Get Svami app instance
+    return get_service_app("svami")
 
 
 class TestSvamiOrchestrator:
@@ -68,8 +35,11 @@ class TestSvamiOrchestrator:
     @pytest.fixture
     def mock_janapada_client(self):
         """Mock Janapada JSON-RPC client."""
-        # Import main module and set the global variable directly
-        import main
+        # Clean import pattern using centralized utilities
+        from tests.utils.service_imports import get_service_main
+
+        # Get Svami main module
+        main = get_service_main("svami")
 
         mock_client = AsyncMock()
         mock_client.call = AsyncMock()
@@ -81,8 +51,11 @@ class TestSvamiOrchestrator:
     @pytest.fixture
     def mock_amatya_client(self):
         """Mock Amatya JSON-RPC client."""
-        # Import main module and set the global variable directly
-        import main
+        # Clean import pattern using centralized utilities
+        from tests.utils.service_imports import get_service_main
+
+        # Get Svami main module
+        main = get_service_main("svami")
 
         mock_client = AsyncMock()
         mock_client.call = AsyncMock()
@@ -274,7 +247,10 @@ class TestSvamiOrchestrator:
         response = client.get("/health/detailed")
 
         # Print debug info to understand what's happening
-        import main
+        # Clean import pattern using centralized utilities
+        from tests.utils.service_imports import get_service_main
+
+        main = get_service_main("svami")
 
         # The detailed health endpoint should return 200 when services are initialized but degraded
         # If it returns 503, it means the global variables are still None despite fixtures
@@ -294,9 +270,14 @@ class TestSvamiOrchestrator:
     def test_request_id_injection(self, client, sample_snippets):
         """Test that request ID is properly injected into requests."""
 
+        from tests.utils.service_imports import get_service_patch_target
+
+        janapada_patch_target = get_service_patch_target("svami", "janapada_client")
+        amatya_patch_target = get_service_patch_target("svami", "amatya_client")
+
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch(janapada_patch_target) as mock_janapada,
+            patch(amatya_patch_target) as mock_amatya,
         ):
             from common.models import JsonRpcResponse
 
@@ -352,9 +333,14 @@ class TestSvamiOrchestrator:
     def test_request_validation(self, client):
         """Test comprehensive request validation."""
 
+        from tests.utils.service_imports import get_service_patch_target
+
+        janapada_patch_target = get_service_patch_target("svami", "janapada_client")
+        amatya_patch_target = get_service_patch_target("svami", "amatya_client")
+
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch(janapada_patch_target) as mock_janapada,
+            patch(amatya_patch_target) as mock_amatya,
         ):
             from common.models import JsonRpcResponse
 
@@ -392,30 +378,23 @@ class TestRequestIDGeneration:
 
     def test_request_id_format(self, svami_app):
         """Test request ID format and uniqueness."""
-        # Import within the function to use the proper module isolation
-        project_root = os.path.join(os.path.dirname(__file__), "../../..")
-        svami_path = os.path.abspath(
-            os.path.join(project_root, "src/svami-orchestrator")
-        )
+        # Clean import pattern using centralized utilities
+        from tests.utils.service_imports import get_service_main
 
-        # Temporarily add path and import
-        original_path = sys.path.copy()
-        sys.path.insert(0, svami_path)
-        try:
-            from main import generate_request_id
+        # Get Svami main module and access generate_request_id
+        main = get_service_main("svami")
+        generate_request_id = main.generate_request_id
 
-            # Generate multiple IDs
-            ids = [generate_request_id() for _ in range(100)]
+        # Generate multiple IDs
+        ids = [generate_request_id() for _ in range(100)]
 
-            # All should be unique
-            assert len(set(ids)) == 100
+        # All should be unique
+        assert len(set(ids)) == 100
 
-            # All should have expected format (UUID-like)
-            for request_id in ids:
-                assert len(request_id) > 10
-                assert isinstance(request_id, str)
-        finally:
-            sys.path[:] = original_path
+        # All should have expected format (UUID-like)
+        for request_id in ids:
+            assert len(request_id) > 10
+            assert isinstance(request_id, str)
 
 
 class TestErrorHandling:
@@ -428,9 +407,14 @@ class TestErrorHandling:
     def test_json_rpc_error_translation(self, client):
         """Test JSON-RPC error translation to user-friendly messages."""
 
+        from tests.utils.service_imports import get_service_patch_target
+
+        janapada_patch_target = get_service_patch_target("svami", "janapada_client")
+        amatya_patch_target = get_service_patch_target("svami", "amatya_client")
+
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch(janapada_patch_target) as mock_janapada,
+            patch(amatya_patch_target) as mock_amatya,
         ):
             # Mock JSON-RPC error
             mock_janapada.call.side_effect = Exception(
@@ -463,9 +447,14 @@ class TestErrorHandling:
     def test_timeout_handling(self, client):
         """Test timeout handling for service calls."""
 
+        from tests.utils.service_imports import get_service_patch_target
+
+        janapada_patch_target = get_service_patch_target("svami", "janapada_client")
+        amatya_patch_target = get_service_patch_target("svami", "amatya_client")
+
         with (
-            patch("main.janapada_client") as mock_janapada,
-            patch("main.amatya_client") as mock_amatya,
+            patch(janapada_patch_target) as mock_janapada,
+            patch(amatya_patch_target) as mock_amatya,
         ):
             # Mock timeout
             mock_janapada.call.side_effect = httpx.ReadTimeout("Request timeout")

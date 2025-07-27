@@ -111,39 +111,18 @@ class TestServiceCommunication:
     ):
         """Test complete end-to-end workflow through all services."""
 
-        # Import and setup first
-        from fastapi.testclient import TestClient
-        import sys
-        import os
+        # Clean import pattern using centralized utilities
+        from tests.utils.test_clients import create_mocked_svami_client
 
-        # Add Svami path to sys.path for import
-        svami_path = os.path.join(
-            os.path.dirname(__file__), "../../src/svami-orchestrator"
-        )
-        svami_path = os.path.abspath(svami_path)
-        if svami_path not in sys.path:
-            sys.path.insert(0, svami_path)
+        # Create fully configured test client with mocks
+        setup = create_mocked_svami_client()
+        client = setup["client"]
+        mock_janapada_call = setup["janapada_call"]
+        mock_amatya_call = setup["amatya_call"]
+        JsonRpcResponse = setup["JsonRpcResponse"]
 
-        from main import app
-        from common.models import JsonRpcResponse
-
-        # Import main module to ensure it's loaded
-        import main
-        from common.rpc_client import JsonRpcClient
-
-        # Initialize the global clients manually since TestClient doesn't trigger lifespan
-        main.janapada_client = JsonRpcClient("http://localhost:8001")
-        main.amatya_client = JsonRpcClient("http://localhost:8002")
-
-        # Mock the JsonRpcClient.call method directly
-        with (
-            patch.object(
-                main.janapada_client, "call", new_callable=AsyncMock
-            ) as mock_janapada_call,
-            patch.object(
-                main.amatya_client, "call", new_callable=AsyncMock
-            ) as mock_amatya_call,
-        ):
+        # Mock context (keep existing mock behavior)
+        with mock_janapada_call, mock_amatya_call:
             # Mock Janapada response
             mock_janapada_call.return_value = JsonRpcResponse(
                 id="test-id", result={"snippets": sample_snippets}
@@ -154,8 +133,6 @@ class TestServiceCommunication:
                 id="test-id",
                 result={"advice": "Generated advice based on code snippets"},
             )
-
-            client = TestClient(app)
 
             # Send query to Svami orchestrator
             query_request = {
@@ -201,29 +178,22 @@ class TestServiceFailureHandling:
     async def test_janapada_service_unavailable(self, mock_gemini_ai):
         """Test behavior when Janapada service is unavailable."""
 
-        # Import main module first
-        import sys
-        import os
+        # Clean import pattern using centralized utilities
+        from tests.utils.test_clients import create_test_client
+        from tests.utils.service_imports import import_common_models
 
-        # Add Svami path to sys.path for import
-        svami_path = os.path.join(
-            os.path.dirname(__file__), "../../src/svami-orchestrator"
-        )
-        svami_path = os.path.abspath(svami_path)
-        if svami_path not in sys.path:
-            sys.path.insert(0, svami_path)
+        # Create test client with service
+        service_client = create_test_client("svami")
+        client = service_client.get_client()
+        main = service_client.get_main_module()
+        models = import_common_models()
+        JsonRpcResponse = models["JsonRpcResponse"]
 
-        import main
-
+        # Create mocks for testing failure scenarios
         with (
             patch.object(main, "janapada_client", create=True) as mock_janapada,
             patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
-            from common.models import JsonRpcResponse
-            from fastapi.testclient import TestClient
-            from main import app
-
-            client = TestClient(app)
 
             # Mock Janapada failure
             mock_janapada.call.side_effect = Exception("Service unavailable")
@@ -262,27 +232,22 @@ class TestServiceFailureHandling:
     ):
         """Test behavior when Amatya service is unavailable."""
 
-        from common.models import JsonRpcResponse
-        from fastapi.testclient import TestClient
-        import sys
-        import os
+        # Clean import pattern using centralized utilities
+        from tests.utils.test_clients import create_test_client
+        from tests.utils.service_imports import import_common_models
 
-        # Add Svami path to sys.path for import
-        svami_path = os.path.join(
-            os.path.dirname(__file__), "../../src/svami-orchestrator"
-        )
-        svami_path = os.path.abspath(svami_path)
-        if svami_path not in sys.path:
-            sys.path.insert(0, svami_path)
+        # Create test client with service
+        service_client = create_test_client("svami")
+        client = service_client.get_client()
+        main = service_client.get_main_module()
+        models = import_common_models()
+        JsonRpcResponse = models["JsonRpcResponse"]
 
-        from main import app
-        import main
-
+        # Create mocks for testing failure scenarios
         with (
             patch.object(main, "janapada_client", create=True) as mock_janapada,
             patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
-            client = TestClient(app)
 
             # Mock Janapada success
             mock_janapada.call = AsyncMock(
@@ -315,28 +280,24 @@ class TestServiceFailureHandling:
     async def test_partial_service_failures(self):
         """Test handling of partial service failures and timeouts."""
 
-        from common.models import JsonRpcResponse
-        from fastapi.testclient import TestClient
-        import sys
-        import os
         import time
 
-        # Add Svami path to sys.path for import
-        svami_path = os.path.join(
-            os.path.dirname(__file__), "../../src/svami-orchestrator"
-        )
-        svami_path = os.path.abspath(svami_path)
-        if svami_path not in sys.path:
-            sys.path.insert(0, svami_path)
+        # Clean import pattern using centralized utilities
+        from tests.utils.test_clients import create_test_client
+        from tests.utils.service_imports import import_common_models
 
-        from main import app
-        import main
+        # Create test client with service
+        service_client = create_test_client("svami")
+        client = service_client.get_client()
+        main = service_client.get_main_module()
+        models = import_common_models()
+        JsonRpcResponse = models["JsonRpcResponse"]
 
+        # Create mocks for testing failure scenarios
         with (
             patch.object(main, "janapada_client", create=True) as mock_janapada,
             patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
-            client = TestClient(app)
 
             # Mock Janapada - slow response
             def slow_janapada_call(*args, **kwargs):
@@ -371,27 +332,19 @@ class TestServiceHealthMonitoring:
     async def test_all_services_healthy(self):
         """Test health check when all services are healthy."""
 
-        # Mock the health check dependencies by mocking the Svami service directly
-        from fastapi.testclient import TestClient
-        import sys
-        import os
+        # Clean import pattern using centralized utilities
+        from tests.utils.test_clients import create_test_client
 
-        # Add Svami path to sys.path for import
-        svami_path = os.path.join(
-            os.path.dirname(__file__), "../../src/svami-orchestrator"
-        )
-        svami_path = os.path.abspath(svami_path)
-        if svami_path not in sys.path:
-            sys.path.insert(0, svami_path)
+        # Create test client with service
+        service_client = create_test_client("svami")
+        client = service_client.get_client()
+        main = service_client.get_main_module()
 
-        from main import app
-        import main
-
+        # Create mocks for testing scenarios
         with (
             patch.object(main, "janapada_client", create=True) as mock_janapada,
             patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
-            client = TestClient(app)
 
             # Mock that both services are available by ensuring they don't raise exceptions
             mock_janapada.call = AsyncMock(return_value={"status": "healthy"})
@@ -411,28 +364,19 @@ class TestServiceHealthMonitoring:
     async def test_dependency_health_reporting(self):
         """Test health reporting of dependency services."""
 
-        # This test needs to mock the actual health checking logic in Svami
-        # For now, just verify the health endpoint responds properly
-        from fastapi.testclient import TestClient
-        import sys
-        import os
+        # Clean import pattern using centralized utilities
+        from tests.utils.test_clients import create_test_client
 
-        # Add Svami path to sys.path for import
-        svami_path = os.path.join(
-            os.path.dirname(__file__), "../../src/svami-orchestrator"
-        )
-        svami_path = os.path.abspath(svami_path)
-        if svami_path not in sys.path:
-            sys.path.insert(0, svami_path)
+        # Create test client with service
+        service_client = create_test_client("svami")
+        client = service_client.get_client()
+        main = service_client.get_main_module()
 
-        from main import app
-        import main
-
+        # Create mocks for testing scenarios
         with (
             patch.object(main, "janapada_client", create=True) as mock_janapada,
             patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
-            client = TestClient(app)
 
             # Mock Janapada as healthy
             mock_janapada.call = AsyncMock(return_value={"status": "healthy"})
@@ -466,27 +410,21 @@ class TestRequestTracking:
 
         captured_request_ids = []
 
-        from common.models import JsonRpcResponse
-        from fastapi.testclient import TestClient
-        import sys
-        import os
+        # Clean import pattern using centralized utilities
+        from tests.utils.test_clients import create_test_client
+        from tests.utils.service_imports import import_common_models
 
-        # Add Svami path to sys.path for import
-        svami_path = os.path.join(
-            os.path.dirname(__file__), "../../src/svami-orchestrator"
-        )
-        svami_path = os.path.abspath(svami_path)
-        if svami_path not in sys.path:
-            sys.path.insert(0, svami_path)
-
-        from main import app
-        import main
+        # Create test client with service
+        service_client = create_test_client("svami")
+        client = service_client.get_client()
+        main = service_client.get_main_module()
+        models = import_common_models()
+        JsonRpcResponse = models["JsonRpcResponse"]
 
         with (
             patch.object(main, "janapada_client", create=True) as mock_janapada,
             patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
-            client = TestClient(app)
 
             def capture_janapada_request_id(*args, **kwargs):
                 captured_request_ids.append(kwargs["id"])
@@ -538,27 +476,22 @@ class TestRequestTracking:
 
         request_ids = set()
 
-        from common.models import JsonRpcResponse
-        from fastapi.testclient import TestClient
-        import sys
-        import os
+        # Clean import pattern using centralized utilities
+        from tests.utils.test_clients import create_test_client
+        from tests.utils.service_imports import import_common_models
 
-        # Add Svami path to sys.path for import
-        svami_path = os.path.join(
-            os.path.dirname(__file__), "../../src/svami-orchestrator"
-        )
-        svami_path = os.path.abspath(svami_path)
-        if svami_path not in sys.path:
-            sys.path.insert(0, svami_path)
+        # Create test client with service
+        service_client = create_test_client("svami")
+        client = service_client.get_client()
+        main = service_client.get_main_module()
+        models = import_common_models()
+        JsonRpcResponse = models["JsonRpcResponse"]
 
-        from main import app
-        import main
-
+        # Create mocks for testing scenarios
         with (
             patch.object(main, "janapada_client", create=True) as mock_janapada,
             patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
-            client = TestClient(app)
 
             mock_janapada.call = AsyncMock(
                 return_value=JsonRpcResponse(id="test-id", result={"snippets": []})
@@ -601,27 +534,22 @@ class TestServiceLoadTesting:
     ):
         """Test handling of concurrent requests across services."""
 
-        from common.models import JsonRpcResponse
-        from fastapi.testclient import TestClient
-        import sys
-        import os
+        # Clean import pattern using centralized utilities
+        from tests.utils.test_clients import create_test_client
+        from tests.utils.service_imports import import_common_models
 
-        # Add Svami path to sys.path for import
-        svami_path = os.path.join(
-            os.path.dirname(__file__), "../../src/svami-orchestrator"
-        )
-        svami_path = os.path.abspath(svami_path)
-        if svami_path not in sys.path:
-            sys.path.insert(0, svami_path)
+        # Create test client with service
+        service_client = create_test_client("svami")
+        client = service_client.get_client()
+        main = service_client.get_main_module()
+        models = import_common_models()
+        JsonRpcResponse = models["JsonRpcResponse"]
 
-        from main import app
-        import main
-
+        # Create mocks for testing scenarios
         with (
             patch.object(main, "janapada_client", create=True) as mock_janapada,
             patch.object(main, "amatya_client", create=True) as mock_amatya,
         ):
-            client = TestClient(app)
 
             call_count = 0
 
@@ -672,28 +600,17 @@ class TestServiceLoadTesting:
         """Test performance benchmarks for service interactions."""
 
         import time
-        import sys
-        import os
 
-        # Add Svami path to sys.path for import
-        svami_path = os.path.join(
-            os.path.dirname(__file__), "../../src/svami-orchestrator"
-        )
-        svami_path = os.path.abspath(svami_path)
-        if svami_path not in sys.path:
-            sys.path.insert(0, svami_path)
+        # Clean import pattern using centralized utilities
+        from tests.utils.test_clients import create_test_client
+        from tests.utils.service_imports import import_common_models
 
-        from main import app
-        from common.models import JsonRpcResponse
-        from fastapi.testclient import TestClient
-
-        # Import main module to ensure it's loaded
-        import main
-        from common.rpc_client import JsonRpcClient
-
-        # Initialize the global clients manually since TestClient doesn't trigger lifespan
-        main.janapada_client = JsonRpcClient("http://localhost:8001")
-        main.amatya_client = JsonRpcClient("http://localhost:8002")
+        # Create test client with service
+        service_client = create_test_client("svami")
+        client = service_client.get_client()
+        main = service_client.get_main_module()
+        models = import_common_models()
+        JsonRpcResponse = models["JsonRpcResponse"]
 
         # Mock the JsonRpcClient.call method directly
         with (
@@ -704,7 +621,6 @@ class TestServiceLoadTesting:
                 main.amatya_client, "call", new_callable=AsyncMock
             ) as mock_amatya_call,
         ):
-            client = TestClient(app)
 
             # Add realistic delays to simulate real service behavior
             def mock_janapada_delay(*args, **kwargs):

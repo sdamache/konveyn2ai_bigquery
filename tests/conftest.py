@@ -95,9 +95,12 @@ def mock_google_credentials():
 @pytest.fixture
 def mock_vertex_ai():
     """Mock Vertex AI services."""
-    with patch("vertexai.init") as mock_init, patch(
-        "vertexai.language_models.TextEmbeddingModel.from_pretrained"
-    ) as mock_model:
+    with (
+        patch("vertexai.init") as mock_init,
+        patch(
+            "vertexai.language_models.TextEmbeddingModel.from_pretrained"
+        ) as mock_model,
+    ):
         # Mock embedding model
         embedding_mock = MagicMock()
         embedding_mock.values = [0.1, 0.2, 0.3] * 1024  # 3072 dimensions
@@ -136,9 +139,10 @@ def mock_matching_engine(sample_snippets):
 @pytest.fixture
 def mock_gemini_ai():
     """Mock Google Gemini AI (legacy - for backward compatibility)."""
-    with patch("google.generativeai.configure") as mock_configure, patch(
-        "google.generativeai.GenerativeModel"
-    ) as mock_model:
+    with (
+        patch("google.generativeai.configure") as mock_configure,
+        patch("google.generativeai.GenerativeModel") as mock_model,
+    ):
         # Mock model response
         response_mock = MagicMock()
         response_mock.text = "Based on the code snippets provided, here's how to implement authentication in FastAPI:\n\n1. Create JWT tokens using the create_jwt_token function\n2. Use middleware to authenticate requests\n3. Define User models for user data"

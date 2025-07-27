@@ -2,59 +2,25 @@
 Unit tests for Janapada Memory service.
 """
 
-import pytest
 import json
-from unittest.mock import patch, MagicMock, AsyncMock
-from fastapi.testclient import TestClient
+import os
 
 # Import required modules for test setup
-import sys
-import os
-import importlib
+from unittest.mock import MagicMock, patch
+
+import pytest
+from fastapi.testclient import TestClient
 
 
-# Module-level fixture for Janapada app isolation
+# Module-level fixture for Janapada app using centralized utilities
 @pytest.fixture(scope="module")
 def janapada_app():
     """Module-level fixture to import Janapada app with proper isolation."""
-    # Store original sys.path
-    original_path = sys.path.copy()
+    # Clean import pattern using centralized utilities
+    from tests.utils.service_imports import get_service_app
 
-    # Calculate paths
-    project_root = os.path.join(os.path.dirname(__file__), "../../..")
-    janapada_path = os.path.abspath(os.path.join(project_root, "src/janapada-memory"))
-    src_path = os.path.abspath(os.path.join(project_root, "src"))
-
-    # Remove conflicting module entries to ensure clean import
-    modules_to_remove = [
-        key for key in sys.modules.keys() if key == "main" or key.startswith("main.")
-    ]
-    for module_key in modules_to_remove:
-        if module_key in sys.modules:
-            del sys.modules[module_key]
-
-    try:
-        # Temporarily modify sys.path for this module
-        sys.path.insert(0, janapada_path)
-        sys.path.insert(1, src_path)
-
-        # Import the Janapada main module
-        from main import app as janapada_app_instance
-
-        yield janapada_app_instance
-
-    finally:
-        # Restore original sys.path
-        sys.path[:] = original_path
-        # Clean up the module again to prevent contamination
-        modules_to_remove = [
-            key
-            for key in sys.modules.keys()
-            if key == "main" or key.startswith("main.")
-        ]
-        for module_key in modules_to_remove:
-            if module_key in sys.modules:
-                del sys.modules[module_key]
+    # Get Janapada app instance
+    return get_service_app("janapada")
 
 
 class TestJanapadaMemory:
@@ -361,7 +327,6 @@ class TestJanapadaMemory:
         """Test handling of concurrent search requests."""
 
         import threading
-        import time
 
         results = []
         errors = []
@@ -454,7 +419,9 @@ class TestJanapadaConfiguration:
 
         # The vertexai.init is called during module initialization, so we need to check if it was patched in the setup
         # Since the main module is already imported, we test the basic functionality instead
-        from main import app
+        from tests.utils.service_imports import get_service_app
+
+        app = get_service_app("janapada")
 
         # Verify app was successfully created even with mocked Google Cloud services
         assert app is not None

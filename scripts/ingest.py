@@ -5,7 +5,7 @@ Processes repository files into chunks and embeddings for vector search.
 
 This script implements Task 9: Repository Ingestion Pipeline
 - Subtask 9.1: File Collection and Filtering
-- Subtask 9.2: File Processing and Chunking Logic  
+- Subtask 9.2: File Processing and Chunking Logic
 - Subtask 9.3: Embedding Generation with Vertex AI
 - Subtask 9.4: Matching Engine Integration and CLI
 
@@ -672,9 +672,11 @@ class RepositoryIngestionPipeline:
                     "char_count": chunk["char_count"],
                     "line_count": chunk["line_count"],
                     "file_extension": chunk["file_extension"],
-                    "content_preview": chunk["content"][:200] + "..."
-                    if len(chunk["content"]) > 200
-                    else chunk["content"],
+                    "content_preview": (
+                        chunk["content"][:200] + "..."
+                        if len(chunk["content"]) > 200
+                        else chunk["content"]
+                    ),
                 }
 
                 # Create datapoint
