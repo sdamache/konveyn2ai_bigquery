@@ -12,6 +12,10 @@ node_modules/
 # Environment variables
 .env
 .env.dev
+.env.local
+.env.production
+.env.staging
+.env.test
 
 # Editor directories and files
 .idea
