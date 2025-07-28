@@ -17,7 +17,7 @@ if [ -f .env ]; then
     export $(grep -v '^#' .env | xargs)
 fi
 
-echo "🚀 Deploying KonveyN2AI services to Google Cloud Run"
+echo "🚀 Deploying KonveyN2AI services to Google Cloud Run (with service account permissions fixed)"
 echo "Project ID: $PROJECT_ID"
 echo "Region: $REGION"
 echo "Repository: $REPOSITORY_NAME"
