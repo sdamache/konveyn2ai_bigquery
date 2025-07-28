@@ -41,6 +41,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Application constants
+APP_VERSION = "1.0.0"
+MAX_CHUNKS_LIMIT = 50
+PROCESSING_TIME_PRECISION = 2
+SERVICE_NAME = "amatya-role-prompter"
+
 # Global variables for service components
 advisor_service: AdvisorService = None
 config: AmataConfig = None
@@ -84,7 +90,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Amatya Role Prompter",
     description="LLM-powered advice generation with role-specific prompting",
-    version="1.0.0",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
 
@@ -102,7 +108,7 @@ app.add_middleware(
 # Initialize GuardFort security middleware
 guard_fort = GuardFort(
     app,
-    service_name="amatya-role-prompter",
+    service_name=SERVICE_NAME,
     enable_auth=True,
     allowed_paths=["/health", "/", "/docs", "/openapi.json", "/.well-known/agent.json"],
 )
@@ -110,7 +116,7 @@ guard_fort = GuardFort(
 # Create JSON-RPC server
 rpc_server = JsonRpcServer(
     title="Amatya Role Prompter",
-    version="1.0.0",
+    version=APP_VERSION,
     description="LLM-powered advice generation with role-specific prompting",
 )
 
@@ -186,14 +192,16 @@ async def advise(
                 "metadata": {
                     "role": role,
                     "chunks_processed": 0,
-                    "processing_time": round(time.time() - start_time, 2),
+                    "processing_time": round(
+                        time.time() - start_time, PROCESSING_TIME_PRECISION
+                    ),
                     "request_id": request_id,
                     "type": "general_guidance",
                 },
             }
 
-        if len(chunks) > 50:  # Reasonable limit for performance
-            raise ValueError("Too many chunks provided (max 50)")
+        if len(chunks) > MAX_CHUNKS_LIMIT:  # Reasonable limit for performance
+            raise ValueError(f"Too many chunks provided (max {MAX_CHUNKS_LIMIT})")
 
         # Convert chunks to Snippet objects with validation
         snippet_objects = []
@@ -240,7 +248,7 @@ async def advise(
             "metadata": {
                 "role": role,
                 "chunks_processed": len(chunks),
-                "processing_time": round(elapsed_time, 2),
+                "processing_time": round(elapsed_time, PROCESSING_TIME_PRECISION),
                 "request_id": request_id,
             },
         }
@@ -308,8 +316,8 @@ async def health_check():
 
                 return {
                     "status": "healthy",
-                    "service": "amatya-role-prompter",
-                    "version": "1.0.0",
+                    "service": SERVICE_NAME,
+                    "version": APP_VERSION,
                     "mode": mode,
                     "ai_services": ai_services,
                     "cache_stats": cache_stats,
@@ -321,8 +329,8 @@ async def health_check():
                     status_code=503,
                     content={
                         "status": "unhealthy",
-                        "service": "amatya-role-prompter",
-                        "version": "1.0.0",
+                        "service": SERVICE_NAME,
+                        "version": APP_VERSION,
                         "error": "Advisor service not ready",
                     },
                 )
@@ -330,8 +338,8 @@ async def health_check():
             # Service not initialized yet (e.g., during startup or testing)
             return {
                 "status": "starting",
-                "service": "amatya-role-prompter",
-                "version": "1.0.0",
+                "service": SERVICE_NAME,
+                "version": APP_VERSION,
                 "message": "Service is starting up",
             }
     except Exception as e:
@@ -340,8 +348,8 @@ async def health_check():
             status_code=503,
             content={
                 "status": "unhealthy",
-                "service": "amatya-role-prompter",
-                "version": "1.0.0",
+                "service": SERVICE_NAME,
+                "version": APP_VERSION,
                 "error": str(e),
             },
         )
@@ -354,7 +362,7 @@ async def agent_manifest():
     return {
         "name": "Amatya Role Prompter",
         "description": "LLM-powered advice generation with role-specific prompting",
-        "version": "1.0.0",
+        "version": APP_VERSION,
         "methods": [
             {
                 "name": "advise",

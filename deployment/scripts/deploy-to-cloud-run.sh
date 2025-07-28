@@ -112,6 +112,35 @@ wait_for_deployment() {
     done
 }
 
+# Function to wait for service readiness with health checks
+wait_for_service_ready() {
+    local service_name=$1
+    local service_url=$2
+    local timeout=${3:-300}
+    local start_time=$(date +%s)
+    
+    echo "🏥 Waiting for $service_name to become ready (timeout: ${timeout}s)..."
+    
+    while true; do
+        local current_time=$(date +%s)
+        local elapsed=$((current_time - start_time))
+        
+        if [ $elapsed -gt $timeout ]; then
+            echo "❌ Service readiness timeout after ${timeout}s for $service_name"
+            return 1
+        fi
+        
+        # Test health endpoint
+        if curl -f --connect-timeout 10 --max-time 30 "${service_url}/health" > /dev/null 2>&1; then
+            echo "✅ $service_name is ready and healthy"
+            return 0
+        else
+            echo "⏳ Waiting for $service_name to be ready... (${elapsed}s elapsed)"
+            sleep 15
+        fi
+    done
+}
+
 # Build and push Docker images
 echo "🔨 Building and pushing Docker images..."
 
@@ -188,6 +217,13 @@ fi
 JANAPADA_URL=$(gcloud run services describe janapada --region=${REGION} --project=${PROJECT_ID} --format="value(status.url)")
 echo "✅ Janapada deployed at: $JANAPADA_URL"
 
+# Wait for Janapada service to be ready before proceeding
+wait_for_service_ready "janapada" "$JANAPADA_URL" 300
+if [ $? -ne 0 ]; then
+    echo "❌ Janapada service failed to become ready"
+    exit 1
+fi
+
 # Deploy Amatya Role Prompter Service
 echo "🎭 Deploying Amatya Role Prompter Service..."
 gcloud run deploy amatya \
@@ -215,6 +251,13 @@ fi
 # Get Amatya service URL
 AMATYA_URL=$(gcloud run services describe amatya --region=${REGION} --project=${PROJECT_ID} --format="value(status.url)")
 echo "✅ Amatya deployed at: $AMATYA_URL"
+
+# Wait for Amatya service to be ready before proceeding
+wait_for_service_ready "amatya" "$AMATYA_URL" 300
+if [ $? -ne 0 ]; then
+    echo "❌ Amatya service failed to become ready"
+    exit 1
+fi
 
 # Now build Svami with the service URLs
 echo "🎼 Building Svami Orchestrator Service with service URLs..."
@@ -262,6 +305,33 @@ fi
 # Get Svami service URL
 SVAMI_URL=$(gcloud run services describe svami --region=${REGION} --project=${PROJECT_ID} --format="value(status.url)")
 echo "✅ Svami deployed at: $SVAMI_URL"
+
+# Wait for Svami service to be ready before proceeding
+wait_for_service_ready "svami" "$SVAMI_URL" 300
+if [ $? -ne 0 ]; then
+    echo "❌ Svami service failed to become ready"
+    exit 1
+fi
+
+# Test inter-service connectivity before final validation
+echo "🔗 Testing inter-service connectivity..."
+
+# Test Svami's ability to connect to Janapada and Amatya
+echo "🧠 Testing Svami → Janapada connectivity..."
+JANAPADA_TEST=$(curl -s -f --connect-timeout 10 --max-time 30 "${JANAPADA_URL}/health" && echo "OK" || echo "FAIL")
+if [ "$JANAPADA_TEST" = "OK" ]; then
+    echo "✅ Svami can reach Janapada"
+else
+    echo "⚠️  Svami may have connectivity issues with Janapada"
+fi
+
+echo "🎭 Testing Svami → Amatya connectivity..."
+AMATYA_TEST=$(curl -s -f --connect-timeout 10 --max-time 30 "${AMATYA_URL}/health" && echo "OK" || echo "FAIL")
+if [ "$AMATYA_TEST" = "OK" ]; then
+    echo "✅ Svami can reach Amatya"
+else
+    echo "⚠️  Svami may have connectivity issues with Amatya"
+fi
 
 # Enhanced health endpoint testing with retry logic
 test_health_endpoint() {
