@@ -83,7 +83,13 @@ guard_fort = init_guard_fort(
     enable_auth=True,
     log_level="INFO",
     log_format="json",
-    cors_origins=["*"],  # Allow all origins for demo
+    cors_origins=[
+        "https://localhost:3000",
+        "https://localhost:8080",
+        "https://*.run.app",
+        "https://*.vercel.app",
+        "https://*.netlify.app",
+    ],  # Restrict to trusted domains
     auth_schemes=["Bearer", "ApiKey"],
     allowed_paths=[
         "/health",
@@ -120,112 +126,6 @@ def get_request_id(request: Request) -> str:
 def generate_request_id() -> str:
     """Generate a unique request ID for testing purposes."""
     return f"req-{uuid.uuid4().hex[:12]}"
-
-
-def classify_intent(question: str) -> dict:
-    """
-    Classify user intent to determine if input is a greeting vs technical query.
-
-    Args:
-        question: User's input message
-
-    Returns:
-        Dictionary with intent type and confidence level
-    """
-    question_lower = question.lower().strip()
-
-    # Define greeting patterns
-    greeting_patterns = [
-        "hi",
-        "hello",
-        "hey",
-        "hi there",
-        "hello there",
-        "good morning",
-        "good afternoon",
-        "good evening",
-        "greetings",
-        "howdy",
-        "what's up",
-        "whats up",
-        "sup",
-        "yo",
-        "hiya",
-        "hiya there",
-    ]
-
-    # Define greeting phrases that might contain other words
-    greeting_phrases = [
-        "how are you",
-        "how's it going",
-        "how is it going",
-        "nice to meet you",
-        "pleased to meet you",
-        "good to see you",
-        "how do you do",
-    ]
-
-    # Exact match for simple greetings
-    if question_lower in greeting_patterns:
-        return {"type": "greeting", "confidence": "high"}
-
-    # Check for greeting phrases
-    for phrase in greeting_phrases:
-        if phrase in question_lower:
-            return {"type": "greeting", "confidence": "high"}
-
-    # Check if message starts with greeting and is short (likely conversational)
-    words = question_lower.split()
-    if len(words) <= 5 and any(word in greeting_patterns for word in words[:2]):
-        return {"type": "greeting", "confidence": "medium"}
-
-    # Default to technical query
-    return {"type": "technical", "confidence": "high"}
-
-
-def get_conversational_response(question: str, confidence: str) -> str:
-    """
-    Generate appropriate conversational responses for greetings and casual inputs.
-
-    Args:
-        question: User's original question
-        confidence: Confidence level from intent classification
-
-    Returns:
-        Friendly conversational response
-    """
-    question_lower = question.lower().strip()
-
-    # Specific greeting responses
-    if any(greeting in question_lower for greeting in ["hi", "hello", "hey"]):
-        return (
-            "Hi there! 👋 I'm your KonveyN2AI assistant, ready to help with developer onboarding, "
-            "code understanding, and technical questions. How can I assist you today?"
-        )
-
-    if "how are you" in question_lower:
-        return (
-            "I'm doing great, thanks for asking! I'm here and ready to help you with any "
-            "developer onboarding questions, code explanations, or technical guidance. "
-            "What would you like to know?"
-        )
-
-    if any(
-        greeting in question_lower
-        for greeting in ["good morning", "good afternoon", "good evening"]
-    ):
-        return (
-            "Good day to you too! ☀️ I'm your KonveyN2AI assistant, specialized in helping "
-            "developers get up to speed quickly. Whether you need code explanations, "
-            "onboarding guidance, or technical insights, I'm here to help!"
-        )
-
-    # Generic friendly response for other casual inputs
-    return (
-        "Hello! 😊 I'm your KonveyN2AI assistant, designed to help reduce developer onboarding time "
-        "through AI-powered knowledge transfer. I can help you understand code, navigate documentation, "
-        "and get up to speed on new projects. What can I help you with today?"
-    )
 
 
 @app.get("/.well-known/agent.json")
@@ -474,22 +374,8 @@ async def answer_query(
                 detail="Service is not ready - internal services not initialized",
             )
 
-        # ORCHESTRATION WORKFLOW: intent → route → respond
-        # Step 0: Classify intent and route accordingly
-        intent_result = classify_intent(query.question)
-
-        if intent_result["type"] == "greeting":
-            # Handle greetings directly with conversational response
-            return AnswerResponse(
-                answer=get_conversational_response(
-                    query.question, intent_result["confidence"]
-                ),
-                sources=[],
-                request_id=request_id,
-            )
-
-        # TECHNICAL QUERY WORKFLOW: query → search → advise → respond
-        # This implements the complete multi-agent workflow for technical queries
+        # ORCHESTRATION WORKFLOW: query → search → advise → respond
+        # This implements the complete multi-agent workflow as specified in Task 8.3
 
         # Step 1: Call Janapada to search for relevant snippets
         print(f"[{request_id}] Step 1: Searching for relevant snippets via Janapada...")
@@ -551,7 +437,6 @@ async def answer_query(
             method="advise",
             params={
                 "role": query.role,
-                "question": query.question,
                 "chunks": [snippet.model_dump() for snippet in snippets],
             },
             id=request_id,
@@ -575,8 +460,8 @@ async def answer_query(
             )
 
         # Step 3: Format and return the final answer
-        if advise_response.result and "advice" in advise_response.result:
-            answer = advise_response.result["advice"]
+        if advise_response.result and "answer" in advise_response.result:
+            answer = advise_response.result["answer"]
             print(f"[{request_id}] Successfully generated complete response")
 
             return AnswerResponse(answer=answer, sources=sources, request_id=request_id)
