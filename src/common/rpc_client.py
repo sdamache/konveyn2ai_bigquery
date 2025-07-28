@@ -7,17 +7,56 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from .models import JsonRpcError, JsonRpcRequest, JsonRpcResponse
 
+# Connection pool configuration constants
+DEFAULT_MAX_CONNECTIONS = 100
+DEFAULT_MAX_KEEPALIVE_CONNECTIONS = 20
+DEFAULT_KEEPALIVE_EXPIRY = 5.0
+
 
 class JsonRpcClient:
-    def __init__(self, url: str, timeout: int = 30, max_retries: int = 3):
+    def __init__(
+        self,
+        url: str,
+        timeout: int = 30,
+        max_retries: int = 3,
+        max_connections: int = DEFAULT_MAX_CONNECTIONS,
+        max_keepalive_connections: int = DEFAULT_MAX_KEEPALIVE_CONNECTIONS,
+        keepalive_expiry: float = DEFAULT_KEEPALIVE_EXPIRY,
+    ):
         self.url = url
         self.timeout = timeout
         self.max_retries = max_retries
 
+        # Connection pool configuration
+        self._limits = httpx.Limits(
+            max_connections=max_connections,
+            max_keepalive_connections=max_keepalive_connections,
+            keepalive_expiry=keepalive_expiry,
+        )
+
+        # Persistent HTTP client with connection pooling
+        self._client: Optional[httpx.AsyncClient] = None
+
+    async def _ensure_client(self) -> httpx.AsyncClient:
+        """Ensure the HTTP client is initialized with connection pooling."""
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                limits=self._limits,
+                timeout=httpx.Timeout(self.timeout),
+            )
+        return self._client
+
+    async def close(self):
+        """Close the HTTP client and cleanup connections."""
+        if self._client and not self._client.is_closed:
+            await self._client.aclose()
+            self._client = None
+
     @asynccontextmanager
     async def session(self) -> Any:
-        async with httpx.AsyncClient() as client:
-            yield client
+        """Context manager for HTTP client session with connection pooling."""
+        client = await self._ensure_client()
+        yield client
 
     @retry(
         stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)

@@ -36,6 +36,11 @@ from guard_fort import init_guard_fort
 janapada_client: Optional[JsonRpcClient] = None
 amatya_client: Optional[JsonRpcClient] = None
 
+# Connection pool configuration constants
+RPC_CLIENT_MAX_CONNECTIONS = 20
+RPC_CLIENT_MAX_KEEPALIVE_CONNECTIONS = 10
+RPC_CLIENT_KEEPALIVE_EXPIRY = 30.0
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -43,12 +48,26 @@ async def lifespan(app: FastAPI):
     # Startup
     global janapada_client, amatya_client
 
-    # Initialize JSON-RPC clients with environment variables
+    # Initialize JSON-RPC clients with connection pooling
     janapada_url = os.getenv("JANAPADA_URL", "http://localhost:8001")
     amatya_url = os.getenv("AMATYA_URL", "http://localhost:8002")
 
-    janapada_client = JsonRpcClient(janapada_url, timeout=30, max_retries=3)
-    amatya_client = JsonRpcClient(amatya_url, timeout=30, max_retries=3)
+    janapada_client = JsonRpcClient(
+        janapada_url,
+        timeout=30,
+        max_retries=3,
+        max_connections=RPC_CLIENT_MAX_CONNECTIONS,
+        max_keepalive_connections=RPC_CLIENT_MAX_KEEPALIVE_CONNECTIONS,
+        keepalive_expiry=RPC_CLIENT_KEEPALIVE_EXPIRY,
+    )
+    amatya_client = JsonRpcClient(
+        amatya_url,
+        timeout=30,
+        max_retries=3,
+        max_connections=RPC_CLIENT_MAX_CONNECTIONS,
+        max_keepalive_connections=RPC_CLIENT_MAX_KEEPALIVE_CONNECTIONS,
+        keepalive_expiry=RPC_CLIENT_KEEPALIVE_EXPIRY,
+    )
 
     # Register external services for health monitoring
     await register_external_services()
@@ -57,12 +76,22 @@ async def lifespan(app: FastAPI):
     print(f"  Janapada URL: {janapada_url}")
     print(f"  Amatya URL: {amatya_url}")
     print("  Guard-Fort middleware enabled")
+    print("  Connection pooling enabled:")
+    print(f"    Max connections: {RPC_CLIENT_MAX_CONNECTIONS}")
+    print(f"    Max keepalive connections: {RPC_CLIENT_MAX_KEEPALIVE_CONNECTIONS}")
+    print(f"    Keepalive expiry: {RPC_CLIENT_KEEPALIVE_EXPIRY}s")
     print("  External services registered for health monitoring")
 
     yield
 
-    # Shutdown
+    # Shutdown - cleanup connection pools
     print("Svami Orchestrator shutting down...")
+    if janapada_client:
+        await janapada_client.close()
+        print("  Janapada client connections closed")
+    if amatya_client:
+        await amatya_client.close()
+        print("  Amatya client connections closed")
 
 
 # Initialize FastAPI application
