@@ -139,7 +139,6 @@ docker push ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY_NAME}/janapada:l
 echo "🎭 Building Amatya Role Prompter Service..."
 docker build --platform linux/amd64 -f Dockerfile.amatya \
     --build-arg GOOGLE_CLOUD_PROJECT="${PROJECT_ID}" \
-    --build-arg GOOGLE_API_KEY="${GOOGLE_API_KEY}" \
     -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY_NAME}/amatya:${IMAGE_TAG} \
     -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY_NAME}/amatya:latest \
     .

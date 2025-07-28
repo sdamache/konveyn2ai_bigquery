@@ -2,7 +2,7 @@
 # Optimized for Cloud Run deployment with Gemini AI integration
 
 # Stage 1: Build dependencies
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 # Install system dependencies for building
 RUN apt-get update && apt-get install -y \
@@ -54,21 +54,25 @@ USER appuser
 
 # Add local Python packages to PATH
 ENV PATH=/home/appuser/.local/bin:$PATH
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app:/app/src
+
+# Build arguments (passed during docker build)
+ARG GOOGLE_CLOUD_PROJECT
 
 # Environment variables for Cloud Run and Gemini AI
-ENV PORT=8082
+ENV PORT=8080
 ENV AMATYA_HOST=0.0.0.0
-ENV AMATYA_PORT=8082
+ENV AMATYA_PORT=8080
 ENV GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
-ENV GOOGLE_API_KEY=${GOOGLE_API_KEY}
+# GOOGLE_API_KEY will be set at runtime via Cloud Run environment variables
 
 # Expose port
-EXPOSE 8082
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8082/health || exit 1
+    CMD curl -f http://localhost:8080/health || exit 1
 
 # Run the application
-CMD ["python", "-m", "uvicorn", "src.amatya-role-prompter.main:app", "--host", "0.0.0.0", "--port", "8082"]
+WORKDIR /app/src/amatya-role-prompter
+CMD ["sh", "-c", "PYTHONPATH=/app:/app/src python -m uvicorn main:app --host 0.0.0.0 --port 8080"]
