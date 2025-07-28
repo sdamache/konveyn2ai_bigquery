@@ -388,13 +388,21 @@ async def answer_query(
                 method="search", params={"query": query.question, "k": 5}, id=request_id
             )
 
-            # Handle search errors
+            # Handle search errors with improved error propagation
             if search_response.error:
+                error_msg = f"Search service error: {search_response.error.message}"
                 print(
                     f"[{request_id}] Janapada search failed: {search_response.error.message}"
                 )
+                print(f"[{request_id}] Error code: {search_response.error.code}")
+                if search_response.error.data:
+                    print(f"[{request_id}] Error details: {search_response.error.data}")
                 print(f"[{request_id}] Continuing with graceful degradation...")
+
+                # Store error for potential user feedback
+                search_error = error_msg
             else:
+                search_error = None
                 # Process search results
                 if search_response.result and "snippets" in search_response.result:
                     snippet_data = search_response.result["snippets"]
@@ -418,15 +426,25 @@ async def answer_query(
                     print(f"[{request_id}] No snippets returned from Janapada")
 
         except Exception as e:
+            search_error = f"Search service unavailable: {str(e)}"
             print(f"[{request_id}] Janapada service unavailable: {str(e)}")
+            print(f"[{request_id}] Exception type: {type(e).__name__}")
             print(
                 f"[{request_id}] Continuing with graceful degradation (no code snippets)..."
             )
 
-        # If no snippets found, provide a graceful response
+        # If no snippets found, provide a graceful response with error details
         if not snippets:
+            base_message = "I couldn't find any relevant code snippets for your query."
+
+            # Add error context if available
+            if "search_error" in locals() and search_error:
+                detailed_message = f"{base_message} There was an issue with the search service: {search_error}. Please try again in a moment."
+            else:
+                detailed_message = f"{base_message} This might be because the knowledge base is still being populated or your query needs to be more specific. Please try rephrasing your question or check back later."
+
             return AnswerResponse(
-                answer="I couldn't find any relevant code snippets for your query. This might be because the knowledge base is still being populated or your query needs to be more specific. Please try rephrasing your question or check back later.",
+                answer=detailed_message,
                 sources=[],
                 request_id=request_id,
             )
@@ -442,17 +460,21 @@ async def answer_query(
             id=request_id,
         )
 
-        # Handle advice generation errors with graceful degradation
+        # Handle advice generation errors with improved error propagation
         if advise_response.error:
+            error_msg = f"Advice service error: {advise_response.error.message}"
             print(
                 f"[{request_id}] Amatya advice failed: {advise_response.error.message}"
             )
+            print(f"[{request_id}] Error code: {advise_response.error.code}")
+            if advise_response.error.data:
+                print(f"[{request_id}] Error details: {advise_response.error.data}")
 
-            # Graceful degradation: return search results without advice
+            # Graceful degradation: return search results with error context
             fallback_answer = (
                 f"I found {len(snippets)} relevant code snippets for your question about '{query.question}'. "
-                "However, I'm currently unable to provide role-specific advice. "
-                "Please review the source files for relevant implementation details."
+                f"However, there was an issue generating role-specific advice: {error_msg}. "
+                "Please review the source files for relevant implementation details, or try again in a moment."
             )
 
             return AnswerResponse(
