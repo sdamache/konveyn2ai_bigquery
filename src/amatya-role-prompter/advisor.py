@@ -79,18 +79,21 @@ class AdvisorService:
             f"AdvisorService initialized - Vertex AI: {config.model_name}, Gemini: {config.use_gemini}"
         )
 
-    def _generate_cache_key(self, role: str, chunks: list[Snippet]) -> str:
+    def _generate_cache_key(
+        self, role: str, question: str, chunks: list[Snippet]
+    ) -> str:
         """
         Generate a cache key for the request.
 
         Args:
             role: User role
+            question: User's specific question
             chunks: Code snippets
 
         Returns:
             str: SHA256 hash of the request content for caching
         """
-        content = f"{role}:{':'.join([f'{c.file_path}:{c.content}' for c in chunks])}"
+        content = f"{role}:{question}:{':'.join([f'{c.file_path}:{c.content}' for c in chunks])}"
         return hashlib.sha256(content.encode()).hexdigest()
 
     def _get_cached_response(self, cache_key: str) -> Optional[str]:
@@ -295,7 +298,9 @@ class AdvisorService:
             raise RuntimeError("AdvisorService not initialized")
 
         # Check cache first
-        cache_key = self._generate_cache_key(request.role, request.chunks)
+        cache_key = self._generate_cache_key(
+            request.role, request.question, request.chunks
+        )
         cached_response = self._get_cached_response(cache_key)
         if cached_response:
             return cached_response
@@ -304,7 +309,7 @@ class AdvisorService:
         try:
             # Construct the prompt
             prompt = self.prompt_constructor.construct_prompt(
-                role=request.role, chunks=request.chunks
+                role=request.role, question=request.question, chunks=request.chunks
             )
 
             logger.info(
