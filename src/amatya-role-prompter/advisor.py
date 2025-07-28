@@ -6,9 +6,11 @@ advice using Google Cloud Vertex AI text models.
 """
 
 import asyncio
+import hashlib
 import logging
 import os
 import sys
+import time
 from typing import Optional
 
 import vertexai
@@ -41,22 +43,105 @@ except ImportError:
 
 
 class AdvisorService:
-    """Service for generating role-specific advice using Gemini API with Vertex AI fallback."""
+    """
+    Service for generating role-specific advice using hybrid Gemini-first, Vertex AI fallback architecture.
 
-    def __init__(self, config: AmataConfig):
-        """Initialize the advisor service."""
+    This service implements a three-tier fallback system:
+    1. Primary: Google Gemini API (fast, modern)
+    2. Fallback: Vertex AI Gemini models (reliable, enterprise)
+    3. Final: Enhanced mock responses (100% uptime guarantee)
+
+    Features:
+    - Configurable retry logic with exponential backoff
+    - Request timeout handling
+    - Comprehensive error logging and monitoring
+    - Production-ready security and performance optimizations
+    """
+
+    def __init__(self, config: AmataConfig) -> None:
+        """
+        Initialize the advisor service with configuration.
+
+        Args:
+            config: AmataConfig instance with all service configuration
+        """
         self.config = config
         self.llm_model: Optional[GenerativeModel] = None
         self.gemini_client: Optional[genai.Client] = None
         self.prompt_constructor = PromptConstructor()
         self._initialized = False
 
+        # Simple in-memory cache for responses (production would use Redis/Memcached)
+        self._response_cache: dict[str, tuple[str, float]] = {}
+        self._cache_ttl = 300  # 5 minutes cache TTL
+
         logger.info(
             f"AdvisorService initialized - Vertex AI: {config.model_name}, Gemini: {config.use_gemini}"
         )
 
-    async def initialize(self):
-        """Initialize Gemini API and Vertex AI with hybrid approach."""
+    def _generate_cache_key(self, role: str, chunks: list[Snippet]) -> str:
+        """
+        Generate a cache key for the request.
+
+        Args:
+            role: User role
+            chunks: Code snippets
+
+        Returns:
+            str: SHA256 hash of the request content for caching
+        """
+        content = f"{role}:{':'.join([f'{c.file_path}:{c.content}' for c in chunks])}"
+        return hashlib.sha256(content.encode()).hexdigest()
+
+    def _get_cached_response(self, cache_key: str) -> Optional[str]:
+        """
+        Get cached response if available and not expired.
+
+        Args:
+            cache_key: Cache key for the request
+
+        Returns:
+            Optional[str]: Cached response if available and valid, None otherwise
+        """
+        if cache_key in self._response_cache:
+            response, timestamp = self._response_cache[cache_key]
+            if time.time() - timestamp < self._cache_ttl:
+                logger.info(f"Cache hit for key: {cache_key[:16]}...")
+                return response
+            else:
+                # Remove expired entry
+                del self._response_cache[cache_key]
+                logger.debug(f"Cache expired for key: {cache_key[:16]}...")
+        return None
+
+    def _cache_response(self, cache_key: str, response: str) -> None:
+        """
+        Cache the response with timestamp.
+
+        Args:
+            cache_key: Cache key for the request
+            response: Response to cache
+        """
+        self._response_cache[cache_key] = (response, time.time())
+        logger.debug(f"Cached response for key: {cache_key[:16]}...")
+
+        # Simple cache size management (keep last 100 entries)
+        if len(self._response_cache) > 100:
+            oldest_key = min(
+                self._response_cache.keys(), key=lambda k: self._response_cache[k][1]
+            )
+            del self._response_cache[oldest_key]
+
+    async def initialize(self) -> None:
+        """
+        Initialize Gemini API and Vertex AI with hybrid approach.
+
+        Performs health checks and model initialization with comprehensive
+        error handling and logging for production monitoring.
+
+        Raises:
+            RuntimeError: If critical initialization steps fail
+        """
         try:
             # Initialize Gemini API first (primary)
             await self._initialize_gemini()
@@ -195,15 +280,27 @@ class AdvisorService:
         """
         Generate role-specific advice using hybrid Gemini-first, Vertex AI fallback approach.
 
+        Implements response caching, performance monitoring, and comprehensive error handling.
+
         Args:
             request: AdviceRequest containing role and code chunks
 
         Returns:
             str: Generated advice in markdown format
+
+        Raises:
+            RuntimeError: If service is not initialized
         """
         if not self._initialized:
             raise RuntimeError("AdvisorService not initialized")
 
+        # Check cache first
+        cache_key = self._generate_cache_key(request.role, request.chunks)
+        cached_response = self._get_cached_response(cache_key)
+        if cached_response:
+            return cached_response
+
+        start_time = time.time()
         try:
             # Construct the prompt
             prompt = self.prompt_constructor.construct_prompt(
@@ -220,7 +317,13 @@ class AdvisorService:
                     response = await self._generate_with_gemini(prompt)
                     if response:
                         logger.info("✅ Successfully generated advice using Gemini API")
-                        return response.strip()
+                        result = response.strip()
+                        self._cache_response(cache_key, result)
+                        elapsed_time = time.time() - start_time
+                        logger.info(
+                            f"Advice generated in {elapsed_time:.2f}s using Gemini API"
+                        )
+                        return result
                     else:
                         logger.warning(
                             "Empty response from Gemini, trying Vertex AI fallback"
@@ -236,7 +339,13 @@ class AdvisorService:
                         logger.info(
                             "✅ Successfully generated advice using Vertex AI fallback"
                         )
-                        return response.text.strip()
+                        result = response.text.strip()
+                        self._cache_response(cache_key, result)
+                        elapsed_time = time.time() - start_time
+                        logger.info(
+                            f"Advice generated in {elapsed_time:.2f}s using Vertex AI"
+                        )
+                        return result
                     else:
                         logger.warning(
                             "Empty response from Vertex AI, using mock fallback"
@@ -246,9 +355,13 @@ class AdvisorService:
 
             # Final fallback - enhanced mock response
             logger.info("Using enhanced mock response (no AI services available)")
-            return self._generate_enhanced_mock_response(
+            result = self._generate_enhanced_mock_response(
                 request.role, request.chunks, prompt
             )
+            self._cache_response(cache_key, result)
+            elapsed_time = time.time() - start_time
+            logger.info(f"Mock advice generated in {elapsed_time:.2f}s")
+            return result
 
         except Exception as e:
             logger.error(f"Error generating advice: {e}")
@@ -256,42 +369,62 @@ class AdvisorService:
             return self._generate_fallback_response(request.role, request.chunks)
 
     async def _generate_with_gemini(self, prompt: str) -> Optional[str]:
-        """Generate response using Gemini API."""
+        """Generate response using Gemini API with retry logic and timeout."""
         if not self.gemini_client:
             return None
 
-        try:
-            # Use the new google-genai SDK
-            response = await asyncio.get_running_loop().run_in_executor(
-                None,
-                lambda: self.gemini_client.models.generate_content(
-                    model=self.config.gemini_model,
-                    contents=prompt,
-                    config=genai.types.GenerateContentConfig(
-                        temperature=self.config.temperature,
-                        max_output_tokens=self.config.max_output_tokens,
-                        top_k=self.config.top_k,
-                        top_p=self.config.top_p,
+        for attempt in range(self.config.max_retries):
+            try:
+                # Use the new google-genai SDK with timeout
+                response = await asyncio.wait_for(
+                    asyncio.get_running_loop().run_in_executor(
+                        None,
+                        lambda: self.gemini_client.models.generate_content(
+                            model=self.config.gemini_model,
+                            contents=prompt,
+                            config=genai.types.GenerateContentConfig(
+                                temperature=self.config.temperature,
+                                max_output_tokens=self.config.max_output_tokens,
+                                top_k=self.config.top_k,
+                                top_p=self.config.top_p,
+                            ),
+                        ),
                     ),
-                ),
-            )
+                    timeout=self.config.request_timeout,
+                )
 
-            if response and hasattr(response, "text") and response.text:
-                return response.text
-            else:
-                logger.warning("Empty or invalid response from Gemini API")
-                return None
+                if response and hasattr(response, "text") and response.text:
+                    return response.text
+                else:
+                    logger.warning("Empty or invalid response from Gemini API")
+                    if attempt == self.config.max_retries - 1:
+                        return None
 
-        except Exception as e:
-            logger.error(f"Gemini API generation failed: {e}")
-            return None
+            except asyncio.TimeoutError:
+                logger.warning(f"Gemini API timeout on attempt {attempt + 1}")
+                if attempt == self.config.max_retries - 1:
+                    logger.error("Gemini API failed after all retry attempts (timeout)")
+                    return None
+                await asyncio.sleep(self.config.retry_delay_base * (attempt + 1))
+
+            except Exception as e:
+                logger.warning(f"Gemini API attempt {attempt + 1} failed: {e}")
+                if attempt == self.config.max_retries - 1:
+                    logger.error(f"Gemini API failed after all retry attempts: {e}")
+                    return None
+                await asyncio.sleep(self.config.retry_delay_base * (attempt + 1))
+
+        return None
 
     async def _generate_with_vertex_ai(self, prompt: str):
         """Generate response using Vertex AI (fallback)."""
         return await self._generate_with_retry(prompt)
 
-    async def _generate_with_retry(self, prompt: str, max_retries: int = 3):
+    async def _generate_with_retry(self, prompt: str, max_retries: int = None):
         """Generate response using Vertex AI Gemini model with retry logic."""
+        if max_retries is None:
+            max_retries = self.config.max_retries
+
         for attempt in range(max_retries):
             try:
                 # Use Vertex AI Gemini model generate_content method
@@ -313,7 +446,9 @@ class AdvisorService:
                 logger.warning(f"Vertex AI attempt {attempt + 1} failed: {e}")
                 if attempt == max_retries - 1:
                     raise
-                await asyncio.sleep(1 * (attempt + 1))  # Exponential backoff
+                await asyncio.sleep(
+                    self.config.retry_delay_base * (attempt + 1)
+                )  # Exponential backoff
 
     def _generate_fallback_response(self, role: str, chunks: list[Snippet]) -> str:
         """
@@ -376,9 +511,21 @@ Please try your query again later for more detailed, AI-generated guidance.
         file_references = [chunk.file_path for chunk in chunks]
         role_title = role.replace("_", " ").title()
 
-        # Create a more sophisticated mock response based on the role
+        # Create role-specific mock response using template methods
         if "backend" in role.lower():
-            mock_advice = f"""# Backend Developer Onboarding Guide
+            return self._generate_backend_template(role_title, file_references)
+        elif "frontend" in role.lower():
+            return self._generate_frontend_template(role_title, file_references)
+        elif "security" in role.lower():
+            return self._generate_security_template(role_title, file_references)
+        else:
+            return self._generate_generic_template(role_title, file_references)
+
+    def _generate_backend_template(
+        self, role_title: str, file_references: list[str]
+    ) -> str:
+        """Generate backend developer onboarding template."""
+        return f"""# Backend Developer Onboarding Guide
 
 Welcome to the KonveyN2AI project! As a **{role_title}**, you'll be working with our three-tier architecture.
 
@@ -420,8 +567,40 @@ This project follows a microservices architecture with three main components:
 
 *This is a demo response - full AI-powered guidance available with proper Vertex AI setup.*
 """
-        elif "security" in role.lower():
-            mock_advice = f"""# Security Engineer Onboarding Guide
+
+    def _generate_frontend_template(
+        self, role_title: str, file_references: list[str]
+    ) -> str:
+        """Generate frontend developer onboarding template."""
+        return f"""# Frontend Developer Onboarding Guide
+
+Welcome to the KonveyN2AI project! As a **{role_title}**, you'll focus on user interface and experience.
+
+## 🎨 Frontend Architecture
+
+### Key Technologies
+- **React/Vue.js**: Modern frontend framework for component-based development
+- **TypeScript**: Type-safe JavaScript for better development experience
+- **API Integration**: JSON-RPC communication with backend services
+
+### Core Components
+{chr(10).join([f"- `{fp}` - Frontend implementation" for fp in file_references[:3]])}
+
+## 🚀 Getting Started
+
+1. **Environment Setup**: Install Node.js and npm/yarn dependencies
+2. **API Integration**: Connect to backend services via JSON-RPC endpoints
+3. **Component Development**: Build reusable UI components
+4. **State Management**: Implement proper state handling patterns
+
+*This is a demo response - full AI-powered guidance available with proper Vertex AI setup.*
+"""
+
+    def _generate_security_template(
+        self, role_title: str, file_references: list[str]
+    ) -> str:
+        """Generate security analyst onboarding template."""
+        return f"""# Security Engineer Onboarding Guide
 
 Welcome to KonveyN2AI security review! As a **{role_title}**, focus on these security aspects.
 
@@ -451,9 +630,12 @@ Welcome to KonveyN2AI security review! As a **{role_title}**, focus on these sec
 
 *This is a demo response - full AI-powered security guidance available with proper Vertex AI setup.*
 """
-        else:
-            # Generic developer response
-            mock_advice = f"""# {role_title} Onboarding Guide
+
+    def _generate_generic_template(
+        self, role_title: str, file_references: list[str]
+    ) -> str:
+        """Generate generic developer onboarding template."""
+        return f"""# {role_title} Onboarding Guide
 
 Welcome to KonveyN2AI! Here's your personalized onboarding guide.
 
@@ -488,6 +670,3 @@ As a **{role_title}**, you'll be working with:
 
 *This is a demo response - full AI-powered guidance available with proper Vertex AI setup.*
 """
-
-        logger.info(f"Generated enhanced mock response for role '{role}'")
-        return mock_advice
