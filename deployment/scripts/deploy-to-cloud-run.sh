@@ -68,6 +68,10 @@ fi
 
 echo "✅ All validations passed"
 
+# Configure Docker authentication for Artifact Registry
+echo "🔐 Configuring Docker authentication for Artifact Registry..."
+gcloud auth configure-docker ${REGION}-docker.pkg.dev --quiet
+
 # Build timestamp for image tagging
 BUILD_TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 IMAGE_TAG="${BUILD_TIMESTAMP}-${RANDOM}"
