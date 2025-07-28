@@ -10,9 +10,8 @@ import sys
 # Add src directory to path for imports
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from fastapi import FastAPI, Request  # noqa: E402
-
 from common.rpc_server import JsonRpcServer, logging_middleware  # noqa: E402
+from fastapi import FastAPI, Request  # noqa: E402
 
 # Create FastAPI app
 app = FastAPI(title="JSON-RPC Demo Server")

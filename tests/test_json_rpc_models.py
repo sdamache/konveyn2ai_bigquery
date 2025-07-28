@@ -6,15 +6,9 @@ for all Pydantic models in the common module.
 """
 
 import json
-import os
-import sys
 
-# Add src directory to path for imports
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
-
+# Clean import pattern using centralized utilities - no sys.path needed with PYTHONPATH=src
 import pytest  # noqa: E402
-from pydantic import ValidationError  # noqa: E402
-
 from common.models import (  # noqa: E402
     AdviceRequest,
     AnswerResponse,
@@ -31,6 +25,7 @@ from common.models import (  # noqa: E402
     SearchType,
     Snippet,
 )
+from pydantic import ValidationError  # noqa: E402
 
 
 class TestJsonRpcError:

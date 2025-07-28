@@ -4,16 +4,16 @@ Test script for the Svami orchestrator workflow logic.
 This creates mock RPC clients to test the orchestration flow.
 """
 
-import sys
 import os
-import asyncio
-from unittest.mock import AsyncMock, MagicMock
+import sys
+from unittest.mock import AsyncMock
+
+from fastapi.testclient import TestClient
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from fastapi.testclient import TestClient
+from common.models import JsonRpcError, JsonRpcResponse
 from main import app
-from common.models import JsonRpcResponse, JsonRpcError
 
 
 def create_mock_clients():
@@ -76,7 +76,7 @@ def test_successful_orchestration():
 
     if response.status_code == 200:
         data = response.json()
-        print(f"✅ Success! Full orchestration workflow completed")
+        print("✅ Success! Full orchestration workflow completed")
         print(f"Answer length: {len(data['answer'])} characters")
         print(f"Sources: {data['sources']}")
         print(f"Request ID: {data['request_id']}")

@@ -267,9 +267,11 @@ class ExceptionHandler:
         """Handle KeyError exceptions."""
         return {
             "error_code": "key_error",
-            "message": "Required key not found"
-            if not self.debug_mode
-            else f"Key not found: {exception}",
+            "message": (
+                "Required key not found"
+                if not self.debug_mode
+                else f"Key not found: {exception}"
+            ),
             "status_code": HTTP_400_BAD_REQUEST,
             "category": "client_error",
         }
@@ -280,9 +282,9 @@ class ExceptionHandler:
         """Handle ValueError exceptions."""
         return {
             "error_code": "value_error",
-            "message": "Invalid value provided"
-            if not self.debug_mode
-            else str(exception),
+            "message": (
+                "Invalid value provided" if not self.debug_mode else str(exception)
+            ),
             "status_code": HTTP_400_BAD_REQUEST,
             "category": "client_error",
         }
@@ -326,9 +328,9 @@ class ExceptionHandler:
         """Handle any unhandled exception."""
         return {
             "error_code": "internal_server_error",
-            "message": "An internal error occurred"
-            if not self.debug_mode
-            else str(exception),
+            "message": (
+                "An internal error occurred" if not self.debug_mode else str(exception)
+            ),
             "status_code": HTTP_500_INTERNAL_SERVER_ERROR,
             "category": "server_error",
         }
@@ -351,9 +353,9 @@ class ExceptionHandler:
             "category": error_data.get("category"),
             "method": request.method,
             "path": request.url.path,
-            "query_params": dict(request.query_params)
-            if request.query_params
-            else None,
+            "query_params": (
+                dict(request.query_params) if request.query_params else None
+            ),
             "user_agent": request.headers.get("User-Agent", "unknown"),
             "remote_addr": request.client.host if request.client else "unknown",
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -779,16 +781,16 @@ class MetricsCollector:
                 "median_response_time_ms": round(
                     statistics.median(all_durations) * 1000, 2
                 ),
-                "p95_response_time_ms": round(
-                    statistics.quantiles(all_durations, n=20)[18] * 1000, 2
-                )
-                if len(all_durations) >= 20
-                else None,
-                "p99_response_time_ms": round(
-                    statistics.quantiles(all_durations, n=100)[98] * 1000, 2
-                )
-                if len(all_durations) >= 100
-                else None,
+                "p95_response_time_ms": (
+                    round(statistics.quantiles(all_durations, n=20)[18] * 1000, 2)
+                    if len(all_durations) >= 20
+                    else None
+                ),
+                "p99_response_time_ms": (
+                    round(statistics.quantiles(all_durations, n=100)[98] * 1000, 2)
+                    if len(all_durations) >= 100
+                    else None
+                ),
             }
 
         # Error rate calculation
@@ -816,12 +818,14 @@ class MetricsCollector:
                 "failure_reasons": dict(self.auth_failure_reasons),
                 "success_rate_percent": round(
                     (
-                        self.auth_success_count
-                        / (self.auth_success_count + self.auth_failure_count)
-                        * 100
-                    )
-                    if (self.auth_success_count + self.auth_failure_count) > 0
-                    else 0,
+                        (
+                            self.auth_success_count
+                            / (self.auth_success_count + self.auth_failure_count)
+                            * 100
+                        )
+                        if (self.auth_success_count + self.auth_failure_count) > 0
+                        else 0
+                    ),
                     2,
                 ),
             },
@@ -1518,9 +1522,9 @@ class GuardFort:
         )
 
         # Strict Transport Security (HTTPS only)
-        response.headers[
-            "Strict-Transport-Security"
-        ] = "max-age=31536000; includeSubDomains; preload"
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains; preload"
+        )
 
     def _log_request(
         self, request: Request, response: Response, duration: float, request_id: str
@@ -1571,9 +1575,9 @@ class GuardFort:
             "request_id": request_id,
             "method": request.method,
             "path": request.url.path,
-            "query_params": dict(request.query_params)
-            if request.query_params
-            else None,
+            "query_params": (
+                dict(request.query_params) if request.query_params else None
+            ),
             "status_code": response.status_code,
             "duration_ms": round(duration * 1000, 2),
             "user_agent": request.headers.get("User-Agent", "unknown"),
@@ -1647,9 +1651,9 @@ class GuardFort:
             "request_id": request_id,
             "method": request.method,
             "path": request.url.path,
-            "query_params": dict(request.query_params)
-            if request.query_params
-            else None,
+            "query_params": (
+                dict(request.query_params) if request.query_params else None
+            ),
             "duration_ms": round(duration * 1000, 2),
             "exception_type": type(exception).__name__,
             "exception_message": str(exception),
@@ -1833,9 +1837,11 @@ class GuardFort:
                 service_status = {
                     "base_url": config["base_url"],
                     "health_endpoint": config["health_endpoint"],
-                    "last_health_check": config["last_health_check"].isoformat()
-                    if config["last_health_check"]
-                    else None,
+                    "last_health_check": (
+                        config["last_health_check"].isoformat()
+                        if config["last_health_check"]
+                        else None
+                    ),
                     "is_healthy": config["is_healthy"],
                 }
 

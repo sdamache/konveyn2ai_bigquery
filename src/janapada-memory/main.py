@@ -9,18 +9,24 @@ Implements real Vertex AI embeddings with textembedding-gecko-001 model.
 
 import logging
 import os
-from typing import Any, Optional, List
-import asyncio
+import sys
+from contextlib import asynccontextmanager
 from functools import lru_cache
+from typing import Any, Optional
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+
+# Add path for common modules
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from common.models import Snippet
+from common.rpc_server import JsonRpcServer
 
 # Google Cloud Vertex AI imports
 try:
     import vertexai
-    from vertexai.language_models import TextEmbeddingModel
     from google.cloud import aiplatform
+    from vertexai.language_models import TextEmbeddingModel
 
     VERTEX_AI_AVAILABLE = True
 except ImportError:
@@ -28,42 +34,19 @@ except ImportError:
     logger = logging.getLogger(__name__)
     logger.warning("Vertex AI not available - install google-cloud-aiplatform")
 
-# Import common models and JSON-RPC infrastructure
-import sys
-import os
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from common.models import SearchRequest, Snippet, JsonRpcError, JsonRpcErrorCode
-from common.rpc_server import JsonRpcServer
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI application
-app = FastAPI(
-    title="Janapada Memory Service",
-    description="Semantic search agent using Vertex AI embeddings and Matching Engine",
-    version="1.0.0",
-)
-
-# Initialize JSON-RPC server
-rpc_server = JsonRpcServer(
-    title="Janapada Memory Service",
-    version="1.0.0",
-    description="Semantic search agent using Vertex AI embeddings and Matching Engine",
-)
-
-# Global variables for caching (will be initialized in startup)
+# Global variables for service components
 embedding_model = None
 matching_engine_index = None
 faiss_index = None  # Fallback index
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize Vertex AI components on startup."""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager for startup and shutdown."""
     global embedding_model, matching_engine_index
 
     logger.info("Starting Janapada Memory Service...")
@@ -126,10 +109,32 @@ async def startup_event():
 
     logger.info("Janapada Memory Service startup complete")
 
+    yield  # Application is running
+
+    # Cleanup (shutdown logic)
+    logger.info("Shutting down Janapada Memory Service...")
+    # Add any cleanup logic here if needed in the future
+
+
+# Initialize FastAPI application with lifespan
+app = FastAPI(
+    title="Janapada Memory Service",
+    description="Semantic search agent using Vertex AI embeddings and Matching Engine",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+# Initialize JSON-RPC server
+rpc_server = JsonRpcServer(
+    title="Janapada Memory Service",
+    version="1.0.0",
+    description="Semantic search agent using Vertex AI embeddings and Matching Engine",
+)
+
 
 # Embedding generation with caching
 @lru_cache(maxsize=1000)
-def generate_embedding_cached(text: str) -> Optional[List[float]]:
+def generate_embedding_cached(text: str) -> Optional[list[float]]:
     """
     Generate embedding for text with LRU caching for performance.
 
@@ -169,7 +174,7 @@ def generate_embedding_cached(text: str) -> Optional[List[float]]:
         return None
 
 
-def search_with_matching_engine(query: str, k: int) -> List[Snippet]:
+def search_with_matching_engine(query: str, k: int) -> list[Snippet]:
     """
     Search for relevant code snippets using Vertex AI Matching Engine.
 
@@ -212,15 +217,17 @@ def search_with_matching_engine(query: str, k: int) -> List[Snippet]:
             ),
             Snippet(
                 file_path="src/auth/token_validator.py",
-                content=f"# Vector search result (similarity: 0.85)\ndef verify_jwt_token(token: str) -> bool:\n    try:\n        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])\n        return payload.get('user_id') is not None\n    except jwt.InvalidTokenError:\n        return False",
+                content="# Vector search result (similarity: 0.85)\ndef verify_jwt_token(token: str) -> bool:\n    try:\n        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])\n        return payload.get('user_id') is not None\n    except jwt.InvalidTokenError:\n        return False",
             ),
             Snippet(
                 file_path="src/middleware/auth_handler.py",
-                content=f"# Vector search result (similarity: 0.82)\nclass AuthenticationMiddleware:\n    def __init__(self, secret_key: str):\n        self.secret_key = secret_key\n    \n    def authenticate(self, token: str) -> Optional[dict]:\n        return jwt.decode(token, self.secret_key)",
+                content="# Vector search result (similarity: 0.82)\nclass AuthenticationMiddleware:\n    def __init__(self, secret_key: str):\n        self.secret_key = secret_key\n    \n    def authenticate(self, token: str) -> Optional[dict]:\n        return jwt.decode(token, self.secret_key)",
             ),
         ]
 
-        logger.info(f"✅ Vector search completed: {len(vector_search_snippets)} results")
+        logger.info(
+            f"✅ Vector search completed: {len(vector_search_snippets)} results"
+        )
         return vector_search_snippets[:k]
 
     except Exception as e:
@@ -230,8 +237,8 @@ def search_with_matching_engine(query: str, k: int) -> List[Snippet]:
 
 
 def get_enhanced_mock_snippets(
-    query: str, query_embedding: List[float], k: int
-) -> List[Snippet]:
+    query: str, query_embedding: list[float], k: int
+) -> list[Snippet]:
     """Enhanced mock snippets that show embedding was generated successfully."""
     enhanced_snippets = [
         Snippet(
@@ -250,7 +257,7 @@ def get_enhanced_mock_snippets(
     return enhanced_snippets[:k]
 
 
-def search_with_embeddings(query: str, k: int) -> List[Snippet]:
+def search_with_embeddings(query: str, k: int) -> list[Snippet]:
     """
     Search for relevant code snippets using embedding-based similarity.
 
@@ -278,7 +285,7 @@ def search_with_embeddings(query: str, k: int) -> List[Snippet]:
     return get_enhanced_mock_snippets(query, query_embedding, k)
 
 
-def get_mock_snippets(query: str, k: int) -> List[Snippet]:
+def get_mock_snippets(query: str, k: int) -> list[Snippet]:
     """Fallback mock snippets when embedding generation fails."""
     mock_snippets = [
         Snippet(
@@ -335,7 +342,7 @@ def search_snippets(
 
     except Exception as e:
         logger.error(f"❌ Search failed: {str(e)}")
-        raise RuntimeError(f"Search operation failed: {str(e)}")
+        raise RuntimeError(f"Search operation failed: {str(e)}") from e
 
 
 # JSON-RPC endpoint
@@ -360,18 +367,18 @@ async def health_check():
         "components": {
             "vertex_ai_available": VERTEX_AI_AVAILABLE,
             "embedding_model": embedding_status,
-            "embedding_dimensions": 768
-            if embedding_model
-            else None,  # Updated for text-embedding-004
+            "embedding_dimensions": (
+                768 if embedding_model else None
+            ),  # Updated for text-embedding-004
             "embedding_model_name": "text-embedding-004" if embedding_model else None,
-            "matching_engine": "ready"
-            if matching_engine_index is not None
-            else "unavailable",
-            "matching_engine_index_id": os.environ.get(
-                "VECTOR_INDEX_ID", "805460437066842112"
-            )
-            if matching_engine_index is not None
-            else None,
+            "matching_engine": (
+                "ready" if matching_engine_index is not None else "unavailable"
+            ),
+            "matching_engine_index_id": (
+                os.environ.get("VECTOR_INDEX_ID", "805460437066842112")
+                if matching_engine_index is not None
+                else None
+            ),
             "faiss_fallback": "placeholder" if faiss_index is None else "ready",
         },
         "features": {

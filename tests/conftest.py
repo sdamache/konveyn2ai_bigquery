@@ -5,12 +5,11 @@ Shared pytest fixtures and configuration for KonveyN2AI tests.
 import asyncio
 import json
 import os
-from typing import AsyncGenerator, Dict, Any
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 import httpx
-from fastapi.testclient import TestClient
+import pytest
 
 # Test configuration
 TEST_CONFIG = {
@@ -25,11 +24,18 @@ TEST_CONFIG = {
 
 
 @pytest.fixture(scope="session")
-def event_loop():
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+def event_loop_policy():
+    """Provide the event loop policy for the test session."""
+    return asyncio.get_event_loop_policy()
+
+
+# ROLLBACK CODE (if needed):
+# @pytest.fixture(scope="session")
+# def event_loop():
+#     """Create an instance of the default event loop for the test session."""
+#     loop = asyncio.get_event_loop_policy().new_event_loop()
+#     yield loop
+#     loop.close()
 
 
 @pytest.fixture
@@ -95,9 +101,12 @@ def mock_google_credentials():
 @pytest.fixture
 def mock_vertex_ai():
     """Mock Vertex AI services."""
-    with patch("vertexai.init") as mock_init, patch(
-        "vertexai.language_models.TextEmbeddingModel.from_pretrained"
-    ) as mock_model:
+    with (
+        patch("vertexai.init") as mock_init,
+        patch(
+            "vertexai.language_models.TextEmbeddingModel.from_pretrained"
+        ) as mock_model,
+    ):
         # Mock embedding model
         embedding_mock = MagicMock()
         embedding_mock.values = [0.1, 0.2, 0.3] * 1024  # 3072 dimensions
@@ -135,23 +144,60 @@ def mock_matching_engine(sample_snippets):
 
 @pytest.fixture
 def mock_gemini_ai():
-    """Mock Google Gemini AI."""
-    with patch("google.generativeai.configure") as mock_configure, patch(
-        "google.generativeai.GenerativeModel"
-    ) as mock_model:
-        # Mock model response
+    """Mock Google Gemini AI using the correct google.genai import path."""
+    with patch("google.genai.Client") as mock_client_class:
+        # Mock client response
         response_mock = MagicMock()
         response_mock.text = "Based on the code snippets provided, here's how to implement authentication in FastAPI:\n\n1. Create JWT tokens using the create_jwt_token function\n2. Use middleware to authenticate requests\n3. Define User models for user data"
 
-        model_instance = MagicMock()
-        model_instance.generate_content.return_value = response_mock
-        mock_model.return_value = model_instance
+        # Mock client instance
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = response_mock
+        mock_client_class.return_value = mock_client
 
         yield {
-            "configure": mock_configure,
-            "model": mock_model,
+            "client_class": mock_client_class,
+            "client": mock_client,
             "response": response_mock,
         }
+
+
+@pytest.fixture
+def mock_gemini_new_api():
+    """Mock new Google Gemini API (google-genai SDK)."""
+    with patch("google.genai.Client") as mock_client_class:
+        # Mock client instance
+        mock_client = MagicMock()
+
+        # Mock successful response
+        mock_response = MagicMock()
+        mock_response.text = "Generated advice using Gemini API: Based on the provided code snippets, here are my recommendations for a backend developer..."
+
+        # Mock the generate_content method
+        mock_client.models.generate_content.return_value = mock_response
+        mock_client_class.return_value = mock_client
+
+        yield {
+            "client_class": mock_client_class,
+            "client": mock_client,
+            "response": mock_response,
+        }
+
+
+@pytest.fixture
+def gemini_migration_env():
+    """Environment variables for Gemini migration testing."""
+    env_vars = {
+        "GOOGLE_CLOUD_PROJECT": "konveyn2ai",
+        "GOOGLE_CLOUD_LOCATION": "us-central1",
+        "GEMINI_API_KEY": "test_gemini_api_key_12345",
+        "GEMINI_MODEL": "gemini-2.0-flash-001",
+        "VERTEX_AI_MODEL": "gemini-2.0-flash-001",
+        "PYTEST_CURRENT_TEST": "test_gemini_migration",
+    }
+
+    with patch.dict(os.environ, env_vars):
+        yield env_vars
 
 
 @pytest.fixture
@@ -227,7 +273,7 @@ def degraded_response():
 class MockResponse:
     """Mock HTTP response for testing."""
 
-    def __init__(self, json_data: Dict[str, Any], status_code: int = 200):
+    def __init__(self, json_data: dict[str, Any], status_code: int = 200):
         self.json_data = json_data
         self.status_code = status_code
 

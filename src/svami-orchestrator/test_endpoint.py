@@ -4,14 +4,15 @@ Quick test script for the Svami orchestrator /answer endpoint.
 This validates the endpoint structure and response format.
 """
 
-import sys
 import os
+import sys
+
+from fastapi.testclient import TestClient
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from fastapi.testclient import TestClient
+from common.models import AnswerResponse
 from main import app
-from common.models import QueryRequest, AnswerResponse
 
 
 def test_answer_endpoint():
@@ -39,7 +40,7 @@ def test_answer_endpoint():
 
         # Validate response structure
         answer_response = AnswerResponse(**data)
-        print(f"✅ Response validation passed!")
+        print("✅ Response validation passed!")
         print(f"Answer: {answer_response.answer}")
         print(f"Sources: {answer_response.sources}")
         print(f"Request ID: {answer_response.request_id}")

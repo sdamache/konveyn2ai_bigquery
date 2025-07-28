@@ -224,7 +224,7 @@ class TestJsonRpcServer:
         request_data = {
             "jsonrpc": "2.0",
             "method": "notify",
-            "params": {"message": "hello"}
+            "params": {"message": "hello"},
             # No 'id' field = notification
         }
 

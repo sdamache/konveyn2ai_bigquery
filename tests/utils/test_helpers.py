@@ -3,12 +3,12 @@ Test utility functions and helpers for KonveyN2AI testing.
 """
 
 import asyncio
-import json
 import random
 import string
 import time
-from typing import Dict, List, Any, Optional, Callable
-from unittest.mock import MagicMock, AsyncMock
+from typing import Any, Callable
+from unittest.mock import AsyncMock, MagicMock
+
 import httpx
 
 
@@ -20,8 +20,8 @@ class JSONRPCTestClient:
         self.timeout = timeout
 
     async def call(
-        self, method: str, params: Dict[str, Any] = None, request_id: str = None
-    ) -> Dict[str, Any]:
+        self, method: str, params: dict[str, Any] = None, request_id: str = None
+    ) -> dict[str, Any]:
         """Make a JSON-RPC call."""
 
         request_id = request_id or self.generate_request_id()
@@ -42,11 +42,11 @@ class JSONRPCTestClient:
         """Generate a unique request ID."""
         return f"test-{int(time.time())}-{''.join(random.choices(string.ascii_lowercase, k=6))}"
 
-    def is_success_response(self, response: Dict[str, Any]) -> bool:
+    def is_success_response(self, response: dict[str, Any]) -> bool:
         """Check if response indicates success."""
         return "result" in response and "error" not in response
 
-    def is_error_response(self, response: Dict[str, Any]) -> bool:
+    def is_error_response(self, response: dict[str, Any]) -> bool:
         """Check if response indicates error."""
         return "error" in response and "result" not in response
 
@@ -57,7 +57,7 @@ class MockDataGenerator:
     @staticmethod
     def generate_code_snippet(
         file_path: str = None, language: str = "python"
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """Generate a mock code snippet."""
 
         file_path = file_path or f"src/test_{random.randint(1, 1000)}.{language}"
@@ -95,14 +95,14 @@ class MockDataGenerator:
 
     @staticmethod
     def generate_multiple_snippets(
-        count: int = 5, languages: List[str] = None
-    ) -> List[Dict[str, str]]:
+        count: int = 5, languages: list[str] = None
+    ) -> list[dict[str, str]]:
         """Generate multiple code snippets."""
 
         languages = languages or ["python", "javascript", "typescript"]
         snippets = []
 
-        for i in range(count):
+        for _i in range(count):
             language = random.choice(languages)
             snippet = MockDataGenerator.generate_code_snippet(language=language)
             snippets.append(snippet)
@@ -110,7 +110,7 @@ class MockDataGenerator:
         return snippets
 
     @staticmethod
-    def generate_query_request(role: str = None) -> Dict[str, str]:
+    def generate_query_request(role: str = None) -> dict[str, str]:
         """Generate a mock query request."""
 
         roles = [
@@ -163,7 +163,7 @@ class TestResponseValidator:
 
     @staticmethod
     def validate_jsonrpc_response(
-        response: Dict[str, Any], expected_id: str = None
+        response: dict[str, Any], expected_id: str = None
     ) -> bool:
         """Validate JSON-RPC response format."""
 
@@ -193,7 +193,7 @@ class TestResponseValidator:
         return True
 
     @staticmethod
-    def validate_search_response(response: Dict[str, Any]) -> bool:
+    def validate_search_response(response: dict[str, Any]) -> bool:
         """Validate search response format."""
 
         if not TestResponseValidator.validate_jsonrpc_response(response):
@@ -226,7 +226,7 @@ class TestResponseValidator:
         return True
 
     @staticmethod
-    def validate_advise_response(response: Dict[str, Any]) -> bool:
+    def validate_advise_response(response: dict[str, Any]) -> bool:
         """Validate advise response format."""
 
         if not TestResponseValidator.validate_jsonrpc_response(response):
@@ -249,7 +249,7 @@ class TestResponseValidator:
         return True
 
     @staticmethod
-    def validate_health_response(response: Dict[str, Any]) -> bool:
+    def validate_health_response(response: dict[str, Any]) -> bool:
         """Validate health check response format."""
 
         required_fields = ["status", "timestamp"]
@@ -296,7 +296,7 @@ class PerformanceTestHelper:
     @staticmethod
     async def run_concurrent_requests(
         async_func: Callable, request_count: int = 10, *args, **kwargs
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Run multiple concurrent requests."""
 
         tasks = [async_func(*args, **kwargs) for _ in range(request_count)]
@@ -306,8 +306,8 @@ class PerformanceTestHelper:
 
     @staticmethod
     def calculate_percentiles(
-        values: List[float], percentiles: List[int] = None
-    ) -> Dict[int, float]:
+        values: list[float], percentiles: list[int] = None
+    ) -> dict[int, float]:
         """Calculate percentiles from a list of values."""
 
         percentiles = percentiles or [50, 90, 95, 99]
@@ -323,7 +323,7 @@ class PerformanceTestHelper:
         return result
 
     @staticmethod
-    def analyze_performance_results(response_times: List[float]) -> Dict[str, Any]:
+    def analyze_performance_results(response_times: list[float]) -> dict[str, Any]:
         """Analyze performance test results."""
 
         if not response_times:
@@ -363,7 +363,7 @@ class ErrorTestHelper:
     @staticmethod
     def create_jsonrpc_error(
         code: int = -32603, message: str = "Internal error"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Create a JSON-RPC error response."""
         return {
             "jsonrpc": "2.0",
@@ -376,12 +376,12 @@ class MockServiceFactory:
     """Factory for creating mock services."""
 
     @staticmethod
-    def create_mock_janapada(snippets: List[Dict[str, str]] = None):
+    def create_mock_janapada(snippets: list[dict[str, str]] = None):
         """Create a mock Janapada service."""
 
         mock = AsyncMock()
 
-        async def mock_search(method: str, params: Dict[str, Any], **kwargs):
+        async def mock_search(method: str, params: dict[str, Any], **kwargs):
             if method == "search":
                 return {
                     "snippets": snippets
@@ -399,7 +399,7 @@ class MockServiceFactory:
 
         mock = AsyncMock()
 
-        async def mock_advise(method: str, params: Dict[str, Any], **kwargs):
+        async def mock_advise(method: str, params: dict[str, Any], **kwargs):
             if method == "advise":
                 role = params.get("role", "developer")
                 default_advice = (
@@ -425,11 +425,11 @@ class TestDataLoader:
     """Load test data from files."""
 
     @staticmethod
-    def load_sample_code_files(directory: str) -> List[Dict[str, str]]:
+    def load_sample_code_files(directory: str) -> list[dict[str, str]]:
         """Load sample code files from a directory."""
 
-        import os
         import glob
+        import os
 
         snippets = []
 
@@ -444,7 +444,7 @@ class TestDataLoader:
 
             for file_path in files:
                 try:
-                    with open(file_path, "r", encoding="utf-8") as f:
+                    with open(file_path, encoding="utf-8") as f:
                         content = f.read()
 
                     # Make path relative to directory
@@ -480,14 +480,14 @@ class AssertionHelpers:
             )
 
     @staticmethod
-    def assert_contains_all(container: List[Any], items: List[Any]):
+    def assert_contains_all(container: list[Any], items: list[Any]):
         """Assert that container contains all specified items."""
         missing = [item for item in items if item not in container]
         if missing:
             raise AssertionError(f"Container missing items: {missing}")
 
     @staticmethod
-    def assert_no_duplicates(items: List[Any]):
+    def assert_no_duplicates(items: list[Any]):
         """Assert that a list contains no duplicates."""
         unique_items = set(items)
         if len(unique_items) != len(items):
@@ -497,7 +497,7 @@ class AssertionHelpers:
 
     @staticmethod
     def assert_json_structure(
-        data: Dict[str, Any], expected_structure: Dict[str, type]
+        data: dict[str, Any], expected_structure: dict[str, type]
     ):
         """Assert that JSON data matches expected structure."""
         for key, expected_type in expected_structure.items():

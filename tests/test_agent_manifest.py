@@ -9,11 +9,11 @@ Tests cover:
 """
 
 import json
-from typing import Dict, List, Optional
+from typing import Optional
 from unittest.mock import AsyncMock, Mock, patch
 
-import pytest
 import httpx
+import pytest
 
 from src.common.agent_manifest import (
     AgentCapability,
@@ -115,9 +115,9 @@ class TestAgentManifestGenerator:
         def complex_method(
             required_param: str,
             optional_param: int = 42,
-            list_param: List[str] = None,
-            dict_param: Optional[Dict[str, int]] = None,
-        ) -> Dict[str, any]:
+            list_param: list[str] = None,
+            dict_param: Optional[dict[str, int]] = None,
+        ) -> dict[str, any]:
             """
             A complex method for testing.
 

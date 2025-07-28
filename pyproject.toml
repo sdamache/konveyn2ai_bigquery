@@ -46,10 +46,12 @@ requests = ">=2.31.0"
 aiohttp = ">=3.9.0"
 
 [tool.poetry.group.dev.dependencies]
-pytest = ">=7.4.0"
-black = ">=23.0.0"
-ruff = ">=0.1.0"
-mypy = ">=1.7.0"
+pytest = "==7.4.4"
+black = "==25.1.0" 
+ruff = "==0.1.15"
+mypy = "==1.8.0"
+bandit = "==1.8.6"
+pre-commit = "==3.6.2"
 
 [project.urls]
 Homepage = "https://github.com/neeharve/KonveyN2AI"
@@ -94,6 +96,12 @@ ignore = [
 
 [tool.ruff.per-file-ignores]
 "__init__.py" = ["F401"]
+# Allow imports after sys.path.append for project structure
+"src/*/main.py" = ["E402"]
+"src/*/advisor.py" = ["E402"]
+"src/*/test_*.py" = ["E402"]
+"tests/utils/service_imports.py" = ["B904"]  # Exception chaining not needed for utility functions
+"tests/utils/test_helpers.py" = ["B904"]  # Exception chaining not needed for test helpers
 
 [tool.mypy]
 python_version = "3.9"

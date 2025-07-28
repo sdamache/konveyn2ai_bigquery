@@ -4,16 +4,17 @@ Test script for the Svami orchestrator health monitoring functionality.
 Tests both basic and detailed health check endpoints.
 """
 
-import sys
-import os
 import asyncio
-from unittest.mock import AsyncMock, MagicMock
+import os
+import sys
+from unittest.mock import AsyncMock
+
+from fastapi.testclient import TestClient
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from fastapi.testclient import TestClient
+from common.models import JsonRpcError, JsonRpcResponse
 from main import app
-from common.models import JsonRpcResponse, JsonRpcError
 
 
 def test_basic_health_endpoint():

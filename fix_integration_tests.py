@@ -12,7 +12,7 @@ def fix_integration_tests():
 
     file_path = "tests/integration/test_service_interactions.py"
 
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         content = f.read()
 
     # Pattern 1: Remove async_client from function parameters

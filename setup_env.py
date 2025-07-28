@@ -4,9 +4,9 @@ KonveyN2AI Environment Setup Script
 Simple environment setup and dependency check for hackathon development
 """
 
+import os
 import subprocess
 import sys
-import os
 from pathlib import Path
 
 

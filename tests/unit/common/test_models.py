@@ -3,15 +3,10 @@ Unit tests for common models and data structures.
 """
 
 import pytest
+
+# Clean import pattern using centralized utilities - no sys.path needed with PYTHONPATH=src
+from common.models import AdviceRequest, QueryRequest, SearchRequest, Snippet
 from pydantic import ValidationError
-
-# Import the common models
-import sys
-import os
-
-sys.path.append(os.path.join(os.path.dirname(__file__), "../../.."))
-
-from src.common.models import QueryRequest, Snippet, SearchRequest, AdviceRequest
 
 
 class TestQueryRequest:

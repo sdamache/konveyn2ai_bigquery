@@ -207,7 +207,7 @@ docker-compose logs amatya
 # Execute commands inside containers
 docker-compose exec svami /bin/bash
 docker-compose exec janapada python -c "import vertexai; print('Vertex AI available')"
-docker-compose exec amatya python -c "import google.generativeai; print('Gemini available')"
+docker-compose exec amatya python -c "from google import genai; print('Gemini available')"
 
 # Test internal connectivity
 docker-compose exec svami curl http://janapada:8081/health

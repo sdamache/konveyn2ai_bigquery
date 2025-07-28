@@ -29,7 +29,7 @@ KonveyN2AI uses a comprehensive testing strategy with:
 - **pytest-asyncio**: Async test support
 - **pytest-cov**: Coverage reporting
 - **pytest-mock**: Mocking utilities
-- **pytest-httpx**: HTTP client testing
+- **httpx**: HTTP client for integration tests
 - **docker**: Container testing
 
 ## Test Structure
@@ -206,7 +206,7 @@ async def test_async_operation():
 ### Mocking External Dependencies
 
 ```python
-@patch("google.generativeai.GenerativeModel")
+@patch("google.genai.GenerativeModel")
 def test_with_mocked_gemini(mock_model):
     """Test with mocked external service."""
     mock_model.return_value.generate_content.return_value.text = "test response"

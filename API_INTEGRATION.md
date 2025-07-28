@@ -26,7 +26,7 @@ KonveyN2AI showcases advanced integration with Google's Gemini API, demonstratin
 ### Amatya Role Prompter - Gemini Integration
 
 ```python
-import google.generativeai as genai
+from google import genai
 from vertexai.language_models import TextGenerationModel
 
 class AdvisorService:

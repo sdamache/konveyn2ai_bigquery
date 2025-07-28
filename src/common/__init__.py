@@ -10,6 +10,14 @@ Includes JSON-RPC protocol implementation, shared data models,
 configuration management, and inter-service communication utilities.
 """
 
+from .agent_manifest import (
+    AgentCapability,
+    AgentDiscovery,
+    AgentManifest,
+    AgentManifestGenerator,
+    MethodSchema,
+    ParameterSchema,
+)
 from .models import (
     AdviceRequest,
     AnswerResponse,
@@ -25,14 +33,6 @@ from .models import (
     SearchResult,
     SearchType,
     Snippet,
-)
-from .agent_manifest import (
-    AgentCapability,
-    AgentDiscovery,
-    AgentManifest,
-    AgentManifestGenerator,
-    MethodSchema,
-    ParameterSchema,
 )
 
 __version__ = "1.0.0"

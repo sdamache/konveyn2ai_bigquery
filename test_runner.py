@@ -3,9 +3,9 @@
 Simple test runner for KonveyN2AI with interactive options.
 """
 
+import os
 import subprocess
 import sys
-import os
 from pathlib import Path
 
 

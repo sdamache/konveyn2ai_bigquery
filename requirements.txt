@@ -1,4 +1,5 @@
 # KonveyN2AI Dependencies - PINNED VERSIONS FOR CONSISTENCY
+# FastAPI 0.116.1 resolves TestClient compatibility with httpx 0.28.1
 #
 # CRITICAL: All versions are pinned (==) to prevent CI/CD conflicts
 # Lessons learned from Task 1 protocol violations:
@@ -12,11 +13,11 @@
 
 # Core Google Cloud AI Platform dependencies
 google-cloud-aiplatform==1.42.1
-google-generativeai==0.4.0
+google-genai==1.27.0
 
 # Web framework and API
 streamlit==1.30.0
-fastapi==0.108.0
+fastapi==0.116.1
 uvicorn[standard]==0.25.0
 
 # Data processing and numerical computing
@@ -32,8 +33,8 @@ pytest==7.4.4
 pytest-asyncio==0.23.3
 pytest-cov==4.0.0
 pytest-mock==3.12.0
-pytest-httpx==0.29.0
-black==23.12.1
+
+black==25.1.0
 ruff==0.1.15
 pre-commit==3.6.0
 mypy==1.8.0
@@ -44,4 +45,4 @@ bandit==1.7.6
 requests==2.31.0
 aiohttp==3.9.3
 tenacity==8.2.3
-httpx==0.26.0
+httpx==0.28.1
