@@ -262,7 +262,7 @@ function evaluate_agent_performance() {
 
     log_info "Starting comprehensive agent evaluation..."
 
-    local evaluation_success=true
+    local evaluation_success=0
     local total_score=0
     local max_score=60  # 6 categories × 10 points each
 
@@ -296,7 +296,7 @@ function evaluate_agent_performance() {
         log_warning "Response relevance: GOOD ($relevance_score/10)"
     else
         log_error "Response relevance: NEEDS IMPROVEMENT ($relevance_score/10)"
-        evaluation_success=false
+        evaluation_success=1
     fi
     echo ""
 
@@ -313,7 +313,7 @@ function evaluate_agent_performance() {
         log_warning "Contextual understanding: GOOD ($contextual_score/10)"
     else
         log_error "Contextual understanding: NEEDS IMPROVEMENT ($contextual_score/10)"
-        evaluation_success=false
+        evaluation_success=1
     fi
     echo ""
 
@@ -330,7 +330,7 @@ function evaluate_agent_performance() {
         log_warning "Role-based customization: GOOD ($role_based_score/10)"
     else
         log_error "Role-based customization: NEEDS IMPROVEMENT ($role_based_score/10)"
-        evaluation_success=false
+        evaluation_success=1
     fi
     echo ""
 
@@ -347,7 +347,7 @@ function evaluate_agent_performance() {
         log_warning "Error handling: GOOD ($error_handling_score/10)"
     else
         log_error "Error handling: NEEDS IMPROVEMENT ($error_handling_score/10)"
-        evaluation_success=false
+        evaluation_success=1
     fi
     echo ""
 
@@ -364,7 +364,7 @@ function evaluate_agent_performance() {
         log_warning "Performance: GOOD ($performance_score/10)"
     else
         log_error "Performance: NEEDS IMPROVEMENT ($performance_score/10)"
-        evaluation_success=false
+        evaluation_success=1
     fi
     echo ""
 
@@ -381,7 +381,7 @@ function evaluate_agent_performance() {
         log_warning "Security compliance: GOOD ($security_score/10)"
     else
         log_error "Security compliance: NEEDS IMPROVEMENT ($security_score/10)"
-        evaluation_success=false
+        evaluation_success=1
     fi
     echo ""
 
@@ -409,102 +409,7 @@ function evaluate_agent_performance() {
     else
         log_error "❌ AGENT EVALUATION: SIGNIFICANT IMPROVEMENTS REQUIRED ($percentage%)"
         echo "   🚨 Major issues must be addressed before production deployment"
-        evaluation_success=false
-    fi
-
-    # Category 3: Role-Based Customization (10 points)
-    echo "👥 Category 3: Role-Based Customization"
-    echo "--------------------------------------"
-
-    role_based_score=$(evaluate_role_based_customization)
-    total_score=$((total_score + role_based_score))
-
-    if [ $role_based_score -ge 8 ]; then
-        log_success "Role-based customization: EXCELLENT ($role_based_score/10)"
-    elif [ $role_based_score -ge 6 ]; then
-        log_warning "Role-based customization: GOOD ($role_based_score/10)"
-    else
-        log_error "Role-based customization: NEEDS IMPROVEMENT ($role_based_score/10)"
-        evaluation_success=false
-    fi
-    echo ""
-
-    # Category 4: Error Handling and Graceful Degradation (10 points)
-    echo "🛡️ Category 4: Error Handling and Graceful Degradation"
-    echo "----------------------------------------------------"
-
-    error_handling_score=$(evaluate_error_handling)
-    total_score=$((total_score + error_handling_score))
-
-    if [ $error_handling_score -ge 8 ]; then
-        log_success "Error handling: EXCELLENT ($error_handling_score/10)"
-    elif [ $error_handling_score -ge 6 ]; then
-        log_warning "Error handling: GOOD ($error_handling_score/10)"
-    else
-        log_error "Error handling: NEEDS IMPROVEMENT ($error_handling_score/10)"
-        evaluation_success=false
-    fi
-    echo ""
-
-    # Category 5: Performance Benchmarks (10 points)
-    echo "⚡ Category 5: Performance Benchmarks"
-    echo "-----------------------------------"
-
-    performance_score=$(evaluate_performance_benchmarks)
-    total_score=$((total_score + performance_score))
-
-    if [ $performance_score -ge 8 ]; then
-        log_success "Performance: EXCELLENT ($performance_score/10)"
-    elif [ $performance_score -ge 6 ]; then
-        log_warning "Performance: GOOD ($performance_score/10)"
-    else
-        log_error "Performance: NEEDS IMPROVEMENT ($performance_score/10)"
-        evaluation_success=false
-    fi
-    echo ""
-
-    # Category 6: Security Compliance (10 points)
-    echo "🔒 Category 6: Security Compliance"
-    echo "---------------------------------"
-
-    security_score=$(evaluate_security_compliance)
-    total_score=$((total_score + security_score))
-
-    if [ $security_score -ge 8 ]; then
-        log_success "Security compliance: EXCELLENT ($security_score/10)"
-    elif [ $security_score -ge 6 ]; then
-        log_warning "Security compliance: GOOD ($security_score/10)"
-    else
-        log_error "Security compliance: NEEDS IMPROVEMENT ($security_score/10)"
-        evaluation_success=false
-    fi
-    echo ""
-
-    # Final Evaluation Summary
-    echo "📊 AGENT EVALUATION SUMMARY"
-    echo "=========================="
-    local percentage=$((total_score * 100 / max_score))
-    echo "   Total Score: $total_score/$max_score ($percentage%)"
-    echo ""
-    echo "   📈 Category Breakdown:"
-    echo "   • Response Relevance: $relevance_score/10"
-    echo "   • Contextual Understanding: $contextual_score/10"
-    echo "   • Role-Based Customization: $role_based_score/10"
-    echo "   • Error Handling: $error_handling_score/10"
-    echo "   • Performance: $performance_score/10"
-    echo "   • Security Compliance: $security_score/10"
-    echo ""
-
-    if [ $percentage -ge 80 ]; then
-        log_success "🏆 AGENT EVALUATION: PRODUCTION READY ($percentage%)"
-        echo "   ✅ Meets industry best practices for production AI systems"
-    elif [ $percentage -ge 70 ]; then
-        log_warning "⚠️ AGENT EVALUATION: GOOD WITH IMPROVEMENTS NEEDED ($percentage%)"
-        echo "   🔧 Some areas need optimization before full production deployment"
-    else
-        log_error "❌ AGENT EVALUATION: SIGNIFICANT IMPROVEMENTS REQUIRED ($percentage%)"
-        echo "   🚨 Major issues must be addressed before production deployment"
-        evaluation_success=false
+        evaluation_success=1
     fi
 
     return $evaluation_success
@@ -530,7 +435,7 @@ function evaluate_response_relevance() {
         "What testing strategies work best for microservices?|testing|strategies|microservices|best"
     )
 
-    echo "   🔍 Testing response relevance across technical domains..."
+    echo "   🔍 Testing response relevance across technical domains..." >&2
 
     for query_data in "${test_queries[@]}"; do
         IFS='|' read -r question keywords <<< "$query_data"
@@ -561,7 +466,7 @@ function evaluate_response_relevance() {
             total_relevance=$((total_relevance + question_score))
             test_count=$((test_count + 1))
 
-            echo "     • Question relevance: $question_score/10 ($relevance_percentage% keyword match)"
+            echo "     • Question relevance: $question_score/10 ($relevance_percentage% keyword match)" >&2
         fi
     done
 
@@ -571,7 +476,7 @@ function evaluate_response_relevance() {
         avg_relevance=$((total_relevance / test_count))
     fi
 
-    echo "   📊 Average relevance score: $avg_relevance/10"
+    echo "   📊 Average relevance score: $avg_relevance/10" >&2
     echo $avg_relevance
 }
 
@@ -579,7 +484,7 @@ function evaluate_contextual_understanding() {
     # Evaluate contextual understanding using response coherence and domain expertise.
     # Scoring: 0-10 based on context awareness, technical depth, and logical flow.
 
-    echo "   🧠 Testing contextual understanding and domain expertise..."
+    echo "   🧠 Testing contextual understanding and domain expertise..." >&2
 
     local context_score=0
     local technical_depth_score=0
@@ -628,10 +533,10 @@ function evaluate_contextual_understanding() {
 
     local total_contextual=$((context_score + technical_depth_score + coherence_score))
 
-    echo "     • Context awareness: $context_score/4"
-    echo "     • Technical depth: $technical_depth_score/3"
-    echo "     • Response coherence: $coherence_score/3"
-    echo "   📊 Total contextual understanding: $total_contextual/10"
+    echo "     • Context awareness: $context_score/4" >&2
+    echo "     • Technical depth: $technical_depth_score/3" >&2
+    echo "     • Response coherence: $coherence_score/3" >&2
+    echo "   📊 Total contextual understanding: $total_contextual/10" >&2
 
     echo $total_contextual
 }
@@ -640,7 +545,7 @@ function evaluate_role_based_customization() {
     # Evaluate role-based response customization and expertise differentiation.
     # Scoring: 0-10 based on role-specific terminology, perspective, and recommendations.
 
-    echo "   👥 Testing role-based customization across different personas..."
+    echo "   👥 Testing role-based customization across different personas..." >&2
 
     local role_differentiation_score=0
     local terminology_score=0
@@ -650,7 +555,7 @@ function evaluate_role_based_customization() {
     local test_question="How do I implement authentication in this system?"
 
     local auth_header=$(create_auth_header "bearer")
-    
+
     # Backend Developer Response
     local backend_response=$(curl -s -X POST "$SVAMI_URL/answer" \
         -H "Content-Type: application/json" \
@@ -707,10 +612,10 @@ function evaluate_role_based_customization() {
 
     local total_role_based=$((role_differentiation_score + terminology_score + perspective_score))
 
-    echo "     • Role differentiation: $role_differentiation_score/4"
-    echo "     • Terminology appropriateness: $terminology_score/3"
-    echo "     • Perspective variation: $perspective_score/3"
-    echo "   📊 Total role-based customization: $total_role_based/10"
+    echo "     • Role differentiation: $role_differentiation_score/4" >&2
+    echo "     • Terminology appropriateness: $terminology_score/3" >&2
+    echo "     • Perspective variation: $perspective_score/3" >&2
+    echo "   📊 Total role-based customization: $total_role_based/10" >&2
 
     echo $total_role_based
 }
@@ -719,7 +624,7 @@ function evaluate_error_handling() {
     # Evaluate error handling and graceful degradation capabilities.
     # Scoring: 0-10 based on authentication handling, malformed requests, and service resilience.
 
-    echo "   🛡️ Testing error handling and graceful degradation..."
+    echo "   🛡️ Testing error handling and graceful degradation..." >&2
 
     local auth_handling_score=0
     local malformed_request_score=0
@@ -733,10 +638,10 @@ function evaluate_error_handling() {
 
     if echo "$unauth_response" | grep -qiE "(authentication|auth|unauthorized|401)"; then
         auth_handling_score=4  # Proper auth error
-        echo "     • Authentication errors: HANDLED CORRECTLY"
+        echo "     • Authentication errors: HANDLED CORRECTLY" >&2
     else
         auth_handling_score=2  # Some handling
-        echo "     • Authentication errors: PARTIALLY HANDLED"
+        echo "     • Authentication errors: PARTIALLY HANDLED" >&2
     fi
 
     # Test 2: Malformed Request Handling (0-3 points)
@@ -747,13 +652,13 @@ function evaluate_error_handling() {
 
     if echo "$malformed_response" | grep -qiE "(error|invalid|bad.request|400)"; then
         malformed_request_score=3  # Proper error handling
-        echo "     • Malformed requests: HANDLED CORRECTLY"
+        echo "     • Malformed requests: HANDLED CORRECTLY" >&2
     elif [ -n "$malformed_response" ]; then
         malformed_request_score=2  # Some response
-        echo "     • Malformed requests: PARTIALLY HANDLED"
+        echo "     • Malformed requests: PARTIALLY HANDLED" >&2
     else
         malformed_request_score=1  # No response
-        echo "     • Malformed requests: MINIMAL HANDLING"
+        echo "     • Malformed requests: MINIMAL HANDLING" >&2
     fi
 
     # Test 3: Service Resilience (0-3 points)
@@ -765,18 +670,18 @@ function evaluate_error_handling() {
 
     if [ -n "$empty_response" ] && ! echo "$empty_response" | grep -qiE "(error|null)"; then
         service_resilience_score=3  # Handles edge cases
-        echo "     • Edge case handling: ROBUST"
+        echo "     • Edge case handling: ROBUST" >&2
     elif [ -n "$empty_response" ]; then
         service_resilience_score=2  # Some handling
-        echo "     • Edge case handling: ADEQUATE"
+        echo "     • Edge case handling: ADEQUATE" >&2
     else
         service_resilience_score=1  # Minimal handling
-        echo "     • Edge case handling: BASIC"
+        echo "     • Edge case handling: BASIC" >&2
     fi
 
     local total_error_handling=$((auth_handling_score + malformed_request_score + service_resilience_score))
 
-    echo "   📊 Total error handling score: $total_error_handling/10"
+    echo "   📊 Total error handling score: $total_error_handling/10" >&2
 
     echo $total_error_handling
 }
@@ -785,7 +690,7 @@ function evaluate_performance_benchmarks() {
     # Evaluate performance benchmarks against industry standards.
     # Scoring: 0-10 based on response times, throughput, and consistency.
 
-    echo "   ⚡ Testing performance benchmarks..."
+    echo "   ⚡ Testing performance benchmarks..." >&2
 
     local response_time_score=0
     local consistency_score=0
@@ -797,7 +702,7 @@ function evaluate_performance_benchmarks() {
     local test_count=5
     local fast_responses=0
 
-    echo "     • Measuring response times across $test_count requests..."
+    echo "     • Measuring response times across $test_count requests..." >&2
 
     for i in $(seq 1 $test_count); do
         local start_time=$(date +%s.%N)
@@ -828,8 +733,8 @@ function evaluate_performance_benchmarks() {
         response_time_score=1  # Slow (>5s)
     fi
 
-    echo "     • Average response time: ${avg_time}s"
-    echo "     • Fast responses (<3s): $fast_responses/$test_count"
+    echo "     • Average response time: ${avg_time}s" >&2
+    echo "     • Fast responses (<3s): $fast_responses/$test_count" >&2
 
     # Test 2: Consistency Score (0-3 points)
     consistency_score=$((fast_responses * 3 / test_count))
@@ -845,10 +750,10 @@ function evaluate_performance_benchmarks() {
 
     local total_performance=$((response_time_score + consistency_score + throughput_score))
 
-    echo "     • Response time quality: $response_time_score/4"
-    echo "     • Consistency: $consistency_score/3"
-    echo "     • Throughput: $throughput_score/3"
-    echo "   📊 Total performance score: $total_performance/10"
+    echo "     • Response time quality: $response_time_score/4" >&2
+    echo "     • Consistency: $consistency_score/3" >&2
+    echo "     • Throughput: $throughput_score/3" >&2
+    echo "   📊 Total performance score: $total_performance/10" >&2
 
     echo $total_performance
 }
@@ -857,7 +762,7 @@ function evaluate_security_compliance() {
     # Evaluate security compliance and authentication mechanisms.
     # Scoring: 0-10 based on authentication enforcement, secure headers, and data protection.
 
-    echo "   🔒 Testing security compliance..."
+    echo "   🔒 Testing security compliance..." >&2
 
     local auth_enforcement_score=0
     local secure_headers_score=0
@@ -865,7 +770,7 @@ function evaluate_security_compliance() {
     local auth_header=$(create_auth_header "bearer")
 
     # Test 1: Authentication Enforcement (0-4 points)
-    echo "     • Testing authentication enforcement..."
+    echo "     • Testing authentication enforcement..." >&2
 
     # Test without auth token
     local unauth_status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$SVAMI_URL/answer" \
@@ -887,17 +792,17 @@ function evaluate_security_compliance() {
     # Score authentication enforcement
     if [ "$unauth_status" != "200" ] && [ "$invalid_auth_status" != "200" ] && [ "$valid_auth_status" = "200" ]; then
         auth_enforcement_score=4  # Perfect auth enforcement
-        echo "       ✅ Authentication properly enforced"
+        echo "       ✅ Authentication properly enforced" >&2
     elif [ "$valid_auth_status" = "200" ]; then
         auth_enforcement_score=2  # Valid auth works, but may not block invalid
-        echo "       ⚠️ Authentication partially enforced"
+        echo "       ⚠️ Authentication partially enforced" >&2
     else
         auth_enforcement_score=1  # Minimal auth
-        echo "       ❌ Authentication issues detected"
+        echo "       ❌ Authentication issues detected" >&2
     fi
 
     # Test 2: Secure Headers (0-3 points)
-    echo "     • Testing security headers..."
+    echo "     • Testing security headers..." >&2
     local headers=$(curl -s -I "$SVAMI_URL/health")
 
     local header_count=0
@@ -916,10 +821,10 @@ function evaluate_security_compliance() {
         secure_headers_score=3
     fi
 
-    echo "       • Security headers present: $header_count"
+    echo "       • Security headers present: $header_count" >&2
 
     # Test 3: Data Protection (0-3 points)
-    echo "     • Testing data protection..."
+    echo "     • Testing data protection..." >&2
 
     # Test for sensitive data exposure
     local response_content=$(curl -s -X POST "$SVAMI_URL/answer" \
@@ -930,18 +835,18 @@ function evaluate_security_compliance() {
     # Check if response contains potential sensitive data patterns
     if echo "$response_content" | grep -qiE "(api.key|secret|password|token.*[a-zA-Z0-9]{20,})"; then
         data_protection_score=1  # Potential data exposure
-        echo "       ⚠️ Potential sensitive data patterns detected"
+        echo "       ⚠️ Potential sensitive data patterns detected" >&2
     else
         data_protection_score=3  # No obvious sensitive data
-        echo "       ✅ No sensitive data exposure detected"
+        echo "       ✅ No sensitive data exposure detected" >&2
     fi
 
     local total_security=$((auth_enforcement_score + secure_headers_score + data_protection_score))
 
-    echo "     • Authentication enforcement: $auth_enforcement_score/4"
-    echo "     • Secure headers: $secure_headers_score/3"
-    echo "     • Data protection: $data_protection_score/3"
-    echo "   📊 Total security compliance: $total_security/10"
+    echo "     • Authentication enforcement: $auth_enforcement_score/4" >&2
+    echo "     • Secure headers: $secure_headers_score/3" >&2
+    echo "     • Data protection: $data_protection_score/3" >&2
+    echo "   📊 Total security compliance: $total_security/10" >&2
 
     echo $total_security
 }
