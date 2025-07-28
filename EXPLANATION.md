@@ -113,12 +113,12 @@ async def generate_advice(request: AdviceRequest) -> str:
 
 ### Google Gemini API
 **Usage**: Advanced language understanding and response generation
-**Integration**: Direct API calls via `google.generativeai` SDK
+**Integration**: Direct API calls via `google.genai` SDK
 **Performance**: ~200ms average response time
 **Fallback**: Vertex AI text models when unavailable
 
 ```python
-import google.generativeai as genai
+from google import genai
 
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 model = genai.GenerativeModel("gemini-1.5-flash")

@@ -206,7 +206,7 @@ async def test_async_operation():
 ### Mocking External Dependencies
 
 ```python
-@patch("google.generativeai.GenerativeModel")
+@patch("google.genai.GenerativeModel")
 def test_with_mocked_gemini(mock_model):
     """Test with mocked external service."""
     mock_model.return_value.generate_content.return_value.text = "test response"

@@ -169,11 +169,13 @@ class TestAmatyaRolePrompter:
     ):
         """Test advise when Gemini AI fails."""
 
-        with patch("google.generativeai.GenerativeModel") as mock_model:
-            # Mock Gemini failure
-            model_instance = MagicMock()
-            model_instance.generate_content.side_effect = Exception("Gemini API error")
-            mock_model.return_value = model_instance
+        with patch("google.genai.Client") as mock_client_class:
+            # Mock Gemini client failure
+            mock_client = MagicMock()
+            mock_client.models.generate_content.side_effect = Exception(
+                "Gemini API error"
+            )
+            mock_client_class.return_value = mock_client
 
             jsonrpc_request = {
                 "jsonrpc": "2.0",

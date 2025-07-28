@@ -137,22 +137,20 @@ def mock_matching_engine(sample_snippets):
 
 @pytest.fixture
 def mock_gemini_ai():
-    """Mock Google Gemini AI (legacy - for backward compatibility)."""
-    with (
-        patch("google.generativeai.configure") as mock_configure,
-        patch("google.generativeai.GenerativeModel") as mock_model,
-    ):
-        # Mock model response
+    """Mock Google Gemini AI using the correct google.genai import path."""
+    with patch("google.genai.Client") as mock_client_class:
+        # Mock client response
         response_mock = MagicMock()
         response_mock.text = "Based on the code snippets provided, here's how to implement authentication in FastAPI:\n\n1. Create JWT tokens using the create_jwt_token function\n2. Use middleware to authenticate requests\n3. Define User models for user data"
 
-        model_instance = MagicMock()
-        model_instance.generate_content.return_value = response_mock
-        mock_model.return_value = model_instance
+        # Mock client instance
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = response_mock
+        mock_client_class.return_value = mock_client
 
         yield {
-            "configure": mock_configure,
-            "model": mock_model,
+            "client_class": mock_client_class,
+            "client": mock_client,
             "response": response_mock,
         }
 
