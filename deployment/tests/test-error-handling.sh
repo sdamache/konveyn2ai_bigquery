@@ -8,7 +8,7 @@ error_score=0
 
 echo "Testing authentication error handling..."
 # Test without auth token
-unauth_response=$(curl -s -X POST "https://svami-72021522495.us-central1.run.app/answer" \
+unauth_response=$(curl -s -X POST "${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}/answer" \
     -H "Content-Type: application/json" \
     -d '{"question": "test", "role": "backend_developer"}')
 
@@ -21,7 +21,7 @@ fi
 
 echo "Testing malformed request handling..."
 # Test with malformed request
-malformed_response=$(curl -s -X POST "https://svami-72021522495.us-central1.run.app/answer" \
+malformed_response=$(curl -s -X POST "${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}/answer" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer demo-token" \
     -d '{"invalid": "json", "structure": true}')
@@ -35,7 +35,7 @@ fi
 
 echo "Testing edge case handling..."
 # Test with empty question
-empty_response=$(curl -s -X POST "https://svami-72021522495.us-central1.run.app/answer" \
+empty_response=$(curl -s -X POST "${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}/answer" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer demo-token" \
     -d '{"question": "", "role": "backend_developer"}')

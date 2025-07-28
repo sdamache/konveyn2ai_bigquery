@@ -12,7 +12,7 @@ echo "Measuring response times across $test_count requests..."
 
 for i in $(seq 1 $test_count); do
     start_time=$(date +%s.%N)
-    curl -s -X POST "https://svami-72021522495.us-central1.run.app/answer" \
+    curl -s -X POST "${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}/answer" \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer demo-token" \
         -d '{"question": "What is JWT authentication?", "role": "backend_developer"}' > /dev/null

@@ -5,10 +5,10 @@
 
 set -e
 
-# Service URLs (production deployment)
-SVAMI_URL="https://svami-72021522495.us-central1.run.app"
-JANAPADA_URL="https://janapada-nfsp5dohya-uc.a.run.app"
-AMATYA_URL="https://amatya-72021522495.us-central1.run.app"
+# Service URLs (from environment variables with fallbacks)
+SVAMI_URL="${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}"
+JANAPADA_URL="${JANAPADA_URL:-https://janapada-nfsp5dohya-uc.a.run.app}"
+AMATYA_URL="${AMATYA_URL:-https://amatya-72021522495.us-central1.run.app}"
 
 # Colors for output
 RED='\033[0;31m'

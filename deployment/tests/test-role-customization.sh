@@ -10,13 +10,13 @@ test_question="How do I implement authentication in this system?"
 echo "Testing role differentiation with authentication question..."
 
 # Backend Developer Response
-backend_response=$(curl -s -X POST "https://svami-72021522495.us-central1.run.app/answer" \
+backend_response=$(curl -s -X POST "${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}/answer" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer demo-token" \
     -d "{\"question\": \"$test_question\", \"role\": \"backend_developer\"}")
 
 # Security Engineer Response  
-security_response=$(curl -s -X POST "https://svami-72021522495.us-central1.run.app/answer" \
+security_response=$(curl -s -X POST "${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}/answer" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer demo-token" \
     -d "{\"question\": \"$test_question\", \"role\": \"security_engineer\"}")

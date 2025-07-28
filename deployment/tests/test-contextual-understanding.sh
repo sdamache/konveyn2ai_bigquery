@@ -7,7 +7,7 @@ echo "=============================================="
 # Test contextual understanding with complex technical question
 echo "Testing contextual understanding with complex JWT security question..."
 
-response=$(curl -s -X POST "https://svami-72021522495.us-central1.run.app/answer" \
+response=$(curl -s -X POST "${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}/answer" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer demo-token" \
     -d '{"question": "How do I implement secure JWT authentication with refresh tokens and role-based access control?", "role": "security_engineer"}')
