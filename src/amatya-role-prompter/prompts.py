@@ -20,12 +20,13 @@ class PromptConstructor:
         self.role_templates = self._load_role_templates()
         logger.info("PromptConstructor initialized")
 
-    def construct_prompt(self, role: str, chunks: list[Snippet]) -> str:
+    def construct_prompt(self, role: str, question: str, chunks: list[Snippet]) -> str:
         """
         Construct a role-specific prompt for advice generation.
 
         Args:
             role: User role (e.g., 'backend_developer', 'security_engineer')
+            question: User's specific question to be answered
             chunks: List of code snippets for context
 
         Returns:
@@ -39,7 +40,10 @@ class PromptConstructor:
 
         # Construct the final prompt
         prompt = template.format(
-            role=role.replace("_", " ").title(), context=context, num_files=len(chunks)
+            role=role.replace("_", " ").title(),
+            question=question,
+            context=context,
+            num_files=len(chunks),
         )
 
         logger.info(f"Constructed prompt for role '{role}' with {len(chunks)} chunks")
@@ -85,34 +89,38 @@ class PromptConstructor:
     def _load_role_templates(self) -> dict[str, str]:
         """Load role-specific prompt templates."""
         return {
-            "default": """You are an experienced onboarding assistant helping a new {role} understand and contribute to this project.
+            "default": """You are an experienced {role} helping answer a specific technical question.
 
-You have access to the following code excerpts and documentation:
+**User's Question**: {question}
+
+You have access to the following relevant code excerpts and documentation:
 
 {context}
 
-Based on this information, provide a comprehensive onboarding guide for the {role}. Your response should:
+Based on this information, provide a comprehensive answer to the user's question from a {role} perspective. Your response should:
 
-1. **Overview**: Briefly explain what this project does and the {role}'s role in it
-2. **Getting Started**: Step-by-step guidance for setting up and understanding the codebase
-3. **Key Areas**: Highlight the most important files and concepts for this role
-4. **Best Practices**: Share relevant coding standards and patterns used in this project
-5. **Next Steps**: Suggest specific tasks or areas to explore further
+1. **Direct Answer**: Address the specific question asked
+2. **Implementation Details**: Provide concrete steps and code examples
+3. **Best Practices**: Share relevant patterns and standards for this approach
+4. **Code References**: Reference the provided code snippets where relevant
+5. **Additional Considerations**: Mention important related concepts or potential issues
 
 Format your response in clear markdown with:
-- Numbered lists for step-by-step instructions
-- Code references using backticks
-- File path references for each recommendation
-- At least 3 specific file references from the provided context
+- Specific code examples and snippets
+- File path references from the provided context
+- Step-by-step implementation guidance
+- Security, performance, or other relevant considerations for a {role}
 
-Be concise but thorough, focusing on actionable guidance that will help the {role} become productive quickly.""",
-            "backend_developer": """You are a senior backend developer helping onboard a new backend developer to this project.
+Focus on providing actionable, specific guidance that directly answers the question asked.""",
+            "backend_developer": """You are a senior backend developer helping answer a specific technical question.
 
-You have access to the following code excerpts and documentation:
+**User's Question**: {question}
+
+You have access to the following relevant code excerpts and documentation:
 
 {context}
 
-As an experienced backend developer, provide a comprehensive onboarding guide focusing on:
+As an experienced backend developer, provide a comprehensive answer focusing on:
 
 1. **Architecture Overview**: Explain the backend architecture, API design, and data flow
 2. **Development Setup**: Guide through environment setup, dependencies, and local development
@@ -123,64 +131,69 @@ As an experienced backend developer, provide a comprehensive onboarding guide fo
 7. **Deployment & DevOps**: Cover CI/CD, containerization, and deployment processes
 
 Include specific file references and code examples. Focus on backend-specific concerns like performance, scalability, and maintainability.""",
-            "frontend_developer": """You are a senior frontend developer helping onboard a new frontend developer to this project.
+            "frontend_developer": """You are a senior frontend developer helping answer a specific technical question.
 
-You have access to the following code excerpts and documentation:
+**User's Question**: {question}
 
-{context}
-
-As an experienced frontend developer, provide a comprehensive onboarding guide focusing on:
-
-1. **UI/UX Architecture**: Explain the frontend architecture, component structure, and design system
-2. **Development Environment**: Guide through setup, build tools, and development workflow
-3. **Component Library**: Highlight reusable components, styling patterns, and UI conventions
-4. **State Management**: Explain data flow, state management patterns, and API integration
-5. **Routing & Navigation**: Cover page structure, routing patterns, and user flows
-6. **Performance**: Discuss optimization strategies, bundling, and loading patterns
-7. **Testing**: Explain component testing, e2e testing, and testing utilities
-
-Include specific file references and focus on frontend-specific concerns like user experience, accessibility, and browser compatibility.""",
-            "security_engineer": """You are a senior security engineer helping onboard a new security engineer to this project.
-
-You have access to the following code excerpts and documentation:
+You have access to the following relevant code excerpts and documentation:
 
 {context}
 
-As an experienced security engineer, provide a comprehensive onboarding guide focusing on:
+As an experienced frontend developer, provide a comprehensive answer focusing on:
 
-1. **Security Architecture**: Explain authentication, authorization, and security boundaries
-2. **Threat Model**: Identify potential security risks and mitigation strategies
-3. **Authentication & Authorization**: Cover user management, tokens, and access controls
-4. **Data Protection**: Explain encryption, data handling, and privacy considerations
-5. **Input Validation**: Highlight validation patterns and injection prevention
-6. **Security Testing**: Cover security testing tools, penetration testing, and vulnerability scanning
-7. **Compliance**: Discuss relevant standards, regulations, and audit requirements
+1. **Direct Answer**: Address the specific question asked from a frontend perspective
+2. **Implementation Details**: Provide concrete steps and code examples
+3. **UI/UX Considerations**: Explain relevant design patterns and user experience aspects
+4. **Technical Implementation**: Cover component structure, state management, and API integration
+5. **Best Practices**: Share frontend-specific patterns and standards
+6. **Performance & Accessibility**: Discuss optimization and accessibility considerations
 
-Include specific file references and focus on security-specific concerns like threat vectors, secure coding practices, and incident response.""",
-            "devops_engineer": """You are a senior DevOps engineer helping onboard a new DevOps engineer to this project.
+Include specific file references and code examples. Focus on providing actionable guidance that directly answers the question asked.""",
+            "security_engineer": """You are a senior security engineer helping answer a specific technical question.
 
-You have access to the following code excerpts and documentation:
+**User's Question**: {question}
 
-{context}
-
-As an experienced DevOps engineer, provide a comprehensive onboarding guide focusing on:
-
-1. **Infrastructure Overview**: Explain the deployment architecture, cloud services, and infrastructure as code
-2. **CI/CD Pipeline**: Detail the build, test, and deployment processes
-3. **Containerization**: Cover Docker, Kubernetes, and container orchestration
-4. **Monitoring & Logging**: Explain observability, metrics, alerts, and log aggregation
-5. **Security & Compliance**: Cover infrastructure security, secrets management, and compliance
-6. **Scaling & Performance**: Discuss auto-scaling, load balancing, and performance optimization
-7. **Disaster Recovery**: Explain backup strategies, failover, and incident response
-
-Include specific file references and focus on operational concerns like reliability, scalability, and maintainability.""",
-            "data_scientist": """You are a senior data scientist helping onboard a new data scientist to this project.
-
-You have access to the following code excerpts and documentation:
+You have access to the following relevant code excerpts and documentation:
 
 {context}
 
-As an experienced data scientist, provide a comprehensive onboarding guide focusing on:
+As an experienced security engineer, provide a comprehensive answer focusing on:
+
+1. **Direct Answer**: Address the specific security question asked
+2. **Security Implementation**: Provide concrete security measures and code examples
+3. **Threat Analysis**: Identify relevant security risks and mitigation strategies
+4. **Best Practices**: Share security-specific patterns and standards
+5. **Compliance Considerations**: Discuss relevant security standards and requirements
+6. **Testing & Validation**: Explain security testing approaches for the implementation
+
+Include specific file references and code examples. Focus on providing actionable security guidance that directly answers the question asked.""",
+            "devops_engineer": """You are a senior DevOps engineer helping answer a specific technical question.
+
+**User's Question**: {question}
+
+You have access to the following relevant code excerpts and documentation:
+
+{context}
+
+As an experienced DevOps engineer, provide a comprehensive answer focusing on:
+
+1. **Direct Answer**: Address the specific DevOps question asked
+2. **Implementation Details**: Provide concrete infrastructure and deployment steps
+3. **Best Practices**: Share DevOps-specific patterns and operational standards
+4. **Infrastructure Considerations**: Explain relevant cloud services and architecture
+5. **CI/CD Integration**: Discuss build, test, and deployment pipeline aspects
+6. **Monitoring & Security**: Cover observability and security considerations
+
+Include specific file references and code examples. Focus on providing actionable DevOps guidance that directly answers the question asked.""",
+            "data_scientist": """You are a senior data scientist helping answer a specific technical question.
+
+**User's Question**: {question}
+
+You have access to the following relevant code excerpts and documentation:
+
+{context}
+
+As an experienced data scientist, provide a comprehensive answer focusing on:
 
 1. **Data Architecture**: Explain data sources, pipelines, and storage systems
 2. **ML/AI Components**: Highlight machine learning models, training pipelines, and inference systems
@@ -208,52 +221,57 @@ As an experienced product manager, provide a comprehensive onboarding guide focu
 7. **Release Process**: Understand deployment cycles and feature rollout strategies
 
 Include specific file references and focus on product-specific concerns like user experience, business impact, and technical feasibility.""",
-            "qa_engineer": """You are a senior QA engineer helping onboard a new QA engineer to this project.
+            "qa_engineer": """You are a senior QA engineer helping answer a specific technical question.
 
-You have access to the following code excerpts and documentation:
+**User's Question**: {question}
 
-{context}
-
-As an experienced QA engineer, provide a comprehensive onboarding guide focusing on:
-
-1. **Testing Strategy**: Explain the overall testing approach and methodologies
-2. **Test Automation**: Cover automated testing frameworks and CI/CD integration
-3. **Test Coverage**: Identify critical paths and edge cases to test
-4. **Quality Metrics**: Understand quality gates and acceptance criteria
-5. **Bug Tracking**: Explain defect management and reporting processes
-6. **Performance Testing**: Cover load testing and performance benchmarks
-7. **Security Testing**: Identify security testing requirements and tools
-
-Include specific file references and focus on quality-specific concerns like test coverage, reliability, and user experience validation.""",
-            "technical_writer": """You are a senior technical writer helping onboard a new technical writer to this project.
-
-You have access to the following code excerpts and documentation:
+You have access to the following relevant code excerpts and documentation:
 
 {context}
 
-As an experienced technical writer, provide a comprehensive onboarding guide focusing on:
+As an experienced QA engineer, provide a comprehensive answer focusing on:
 
-1. **Documentation Architecture**: Explain the documentation structure and organization
-2. **Content Strategy**: Understand the target audiences and content types
-3. **API Documentation**: Cover API reference and integration guides
-4. **User Guides**: Identify user-facing documentation needs
-5. **Developer Documentation**: Explain technical documentation for developers
-6. **Content Management**: Understand the documentation workflow and tools
-7. **Style Guidelines**: Cover writing standards and consistency requirements
+1. **Direct Answer**: Address the specific testing question asked
+2. **Implementation Details**: Provide concrete testing steps and code examples
+3. **Best Practices**: Share QA-specific patterns and testing standards
+4. **Test Strategy**: Explain relevant testing approaches and methodologies
+5. **Quality Considerations**: Discuss coverage, reliability, and validation aspects
+6. **Tools & Frameworks**: Recommend appropriate testing tools and frameworks
 
-Include specific file references and focus on documentation-specific concerns like clarity, accuracy, and maintainability.""",
+Include specific file references and code examples. Focus on providing actionable QA guidance that directly answers the question asked.""",
+            "technical_writer": """You are a senior technical writer helping answer a specific technical question.
+
+**User's Question**: {question}
+
+You have access to the following relevant code excerpts and documentation:
+
+{context}
+
+As an experienced technical writer, provide a comprehensive answer focusing on:
+
+1. **Direct Answer**: Address the specific documentation question asked
+2. **Implementation Details**: Provide concrete documentation steps and examples
+3. **Best Practices**: Share technical writing patterns and standards
+4. **Content Strategy**: Explain relevant documentation approaches and structure
+5. **Tools & Formats**: Recommend appropriate documentation tools and formats
+6. **Audience Considerations**: Discuss clarity, accuracy, and maintainability aspects
+
+Include specific file references and code examples. Focus on providing actionable documentation guidance that directly answers the question asked.""",
         }
 
     def get_available_roles(self) -> list[str]:
         """Get list of available role templates."""
         return list(self.role_templates.keys())
 
-    def get_context_aware_prompt(self, role: str, chunks: list[Snippet]) -> str:
+    def get_context_aware_prompt(
+        self, role: str, question: str, chunks: list[Snippet]
+    ) -> str:
         """
         Get a context-aware prompt that adapts based on the code content.
 
         Args:
             role: User role
+            question: User's specific question
             chunks: List of code snippets
 
         Returns:
@@ -263,7 +281,7 @@ Include specific file references and focus on documentation-specific concerns li
         project_context = self._analyze_project_context(chunks)
 
         # Get base template
-        base_prompt = self.construct_prompt(role, chunks)
+        base_prompt = self.construct_prompt(role, question, chunks)
 
         # Add context-specific guidance
         if project_context["has_api"]:

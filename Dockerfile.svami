@@ -2,7 +2,7 @@
 # Optimized for Cloud Run deployment
 
 # Stage 1: Build dependencies
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 # Install system dependencies for building
 RUN apt-get update && apt-get install -y \
@@ -54,14 +54,18 @@ USER appuser
 
 # Add local Python packages to PATH
 ENV PATH=/home/appuser/.local/bin:$PATH
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app:/app/src
+
+# Build arguments (passed during docker build)
+ARG JANAPADA_URL
+ARG AMATYA_URL
 
 # Environment variables for Cloud Run
 ENV PORT=8080
 ENV SVAMI_HOST=0.0.0.0
 ENV SVAMI_PORT=8080
-ENV JANAPADA_URL=http://janapada:8081
-ENV AMATYA_URL=http://amatya:8082
+ENV JANAPADA_URL=${JANAPADA_URL:-http://janapada:8080}
+ENV AMATYA_URL=${AMATYA_URL:-http://amatya:8080}
 
 # Expose port
 EXPOSE 8080
@@ -71,4 +75,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
 # Run the application
-CMD ["python", "-m", "uvicorn", "src.svami-orchestrator.main:app", "--host", "0.0.0.0", "--port", "8080"]
+WORKDIR /app/src/svami-orchestrator
+CMD ["sh", "-c", "PYTHONPATH=/app:/app/src python -m uvicorn main:app --host 0.0.0.0 --port 8080"]

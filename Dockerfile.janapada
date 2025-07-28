@@ -2,7 +2,7 @@
 # Optimized for Cloud Run deployment with Vertex AI integration
 
 # Stage 1: Build dependencies
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 # Install system dependencies for building
 RUN apt-get update && apt-get install -y \
@@ -56,20 +56,24 @@ USER appuser
 ENV PATH=/home/appuser/.local/bin:$PATH
 ENV PYTHONPATH=/app
 
+# Build arguments (passed during docker build)
+ARG GOOGLE_CLOUD_PROJECT
+ARG INDEX_ID
+
 # Environment variables for Cloud Run and Vertex AI
-ENV PORT=8081
-ENV JANAPADA_HOST=0.0.0.0
-ENV JANAPADA_PORT=8081
+ENV PORT=8080
+ENV JANAPADA_HOST=0.0.0.0  
+ENV JANAPADA_PORT=8080
 ENV GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
-ENV INDEX_ENDPOINT_ID=${INDEX_ENDPOINT_ID}
-ENV INDEX_ID=${INDEX_ID}
+ENV VECTOR_INDEX_ID=${INDEX_ID}
 
 # Expose port
-EXPOSE 8081
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8081/health || exit 1
+    CMD curl -f http://localhost:8080/health || exit 1
 
-# Run the application
-CMD ["python", "-m", "uvicorn", "src.janapada-memory.main:app", "--host", "0.0.0.0", "--port", "8081"]
+# Run the application  
+WORKDIR /app/src/janapada-memory
+CMD ["sh", "-c", "PYTHONPATH=/app:/app/src python -m uvicorn main:app --host 0.0.0.0 --port 8080"]

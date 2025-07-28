@@ -84,7 +84,11 @@ class TestAmatyaRolePrompter:
                 "jsonrpc": "2.0",
                 "id": "test-advise-123",
                 "method": "advise",
-                "params": {"role": "backend engineer", "chunks": sample_snippets},
+                "params": {
+                    "role": "backend engineer",
+                    "question": "How do I implement this?",
+                    "chunks": sample_snippets,
+                },
             }
 
             response = client.post("/", json=jsonrpc_request)
@@ -181,7 +185,11 @@ class TestAmatyaRolePrompter:
                 "jsonrpc": "2.0",
                 "id": "test-gemini-fail",
                 "method": "advise",
-                "params": {"role": "backend engineer", "chunks": sample_snippets},
+                "params": {
+                    "role": "backend engineer",
+                    "question": "How do I implement this?",
+                    "chunks": sample_snippets,
+                },
             }
 
             response = client.post("/", json=jsonrpc_request)
@@ -229,7 +237,11 @@ class TestAmatyaRolePrompter:
                     "jsonrpc": "2.0",
                     "id": f"test-role-{role.replace(' ', '-')}",
                     "method": "advise",
-                    "params": {"role": role, "chunks": sample_snippets},
+                    "params": {
+                        "role": role,
+                        "question": "How do I implement this?",
+                        "chunks": sample_snippets,
+                    },
                 }
 
                 response = client.post("/", json=jsonrpc_request)
@@ -266,7 +278,11 @@ class TestAmatyaRolePrompter:
                 "jsonrpc": "2.0",
                 "id": "test-empty-chunks",
                 "method": "advise",
-                "params": {"role": "developer", "chunks": []},
+                "params": {
+                    "role": "developer",
+                    "question": "How do I implement this?",
+                    "chunks": [],
+                },
             }
 
             response = client.post("/", json=jsonrpc_request)
@@ -299,7 +315,11 @@ class TestAmatyaRolePrompter:
             "jsonrpc": "2.0",
             "id": "test-large-chunks",
             "method": "advise",
-            "params": {"role": "backend engineer", "chunks": large_chunks},
+            "params": {
+                "role": "backend engineer",
+                "question": "How do I implement this?",
+                "chunks": large_chunks,
+            },
         }
 
         response = client.post("/", json=jsonrpc_request)
@@ -332,7 +352,11 @@ class TestAmatyaRolePrompter:
             "jsonrpc": "2.0",
             "id": "test-special-chars",
             "method": "advise",
-            "params": {"role": "backend engineer", "chunks": special_chunks},
+            "params": {
+                "role": "backend engineer",
+                "question": "How do I implement this?",
+                "chunks": special_chunks,
+            },
         }
 
         response = client.post("/", json=jsonrpc_request)
@@ -424,7 +448,11 @@ class TestAmatyaRolePrompter:
                     "jsonrpc": "2.0",
                     "id": f"test-prompt-{role.replace(' ', '-')}",
                     "method": "advise",
-                    "params": {"role": role, "chunks": sample_snippets},
+                    "params": {
+                        "role": role,
+                        "question": "How do I implement this?",
+                        "chunks": sample_snippets,
+                    },
                 }
 
                 response = client.post("/", json=jsonrpc_request)
@@ -537,7 +565,11 @@ class TestAmatyaPerformance:
                 "jsonrpc": "2.0",
                 "id": f"perf-test-{i}",
                 "method": "advise",
-                "params": {"role": "developer", "chunks": sample_snippets},
+                "params": {
+                    "role": "developer",
+                    "question": "How do I implement this?",
+                    "chunks": sample_snippets,
+                },
             }
 
             response = client.post("/", json=jsonrpc_request)
@@ -569,7 +601,11 @@ class TestAmatyaPerformance:
             "jsonrpc": "2.0",
             "id": "memory-test",
             "method": "advise",
-            "params": {"role": "developer", "chunks": large_chunks},
+            "params": {
+                "role": "developer",
+                "question": "How do I implement this?",
+                "chunks": large_chunks,
+            },
         }
 
         response = client.post("/", json=jsonrpc_request)

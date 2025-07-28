@@ -1,0 +1,41 @@
+name: Continuous Deployment
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+env:
+  GOOGLE_PROJECT_ID: konveyn2ai
+  GOOGLE_REGION: us-central1
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GOOGLE_CLOUD_CREDENTIALS }}
+          
+      - name: Deploy to Cloud Run
+        run: |
+          chmod +x deployment/scripts/deploy-to-cloud-run.sh
+          ./deployment/scripts/deploy-to-cloud-run.sh
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          DEMO_TOKEN: ${{ vars.DEMO_TOKEN }}
+          
+      - name: Validate Deployment
+        run: |
+          chmod +x deployment/tests/validate-deployment.sh
+          ./deployment/tests/validate-deployment.sh
+          
+      - name: Run Integration Tests
+        run: |
+          chmod +x deployment/tests/test-real-integration.sh
+          ./deployment/tests/test-real-integration.sh authenticated-only

@@ -41,6 +41,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Application constants
+APP_VERSION = "1.0.0"
+MAX_CHUNKS_LIMIT = 50
+PROCESSING_TIME_PRECISION = 2
+SERVICE_NAME = "amatya-role-prompter"
+
 # Global variables for service components
 advisor_service: AdvisorService = None
 config: AmataConfig = None
@@ -61,15 +67,7 @@ async def lifespan(app: FastAPI):
         # Configure CORS middleware with environment-specific settings
         global cors_origins
         cors_origins = config.cors_origins if config.cors_origins else ["*"]
-
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=cors_origins,
-            allow_credentials=True,
-            allow_methods=["GET", "POST", "OPTIONS"],
-            allow_headers=["*"],
-        )
-        logger.info(f"CORS configured for origins: {cors_origins}")
+        logger.info(f"CORS origins determined: {cors_origins}")
 
         # Initialize advisor service
         advisor_service = AdvisorService(config)
@@ -92,18 +90,25 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Amatya Role Prompter",
     description="LLM-powered advice generation with role-specific prompting",
-    version="1.0.0",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
 
-# Add CORS middleware with environment-specific configuration
+# Add CORS middleware with default configuration
 # CORS origins will be configured based on environment in lifespan
-cors_origins = ["*"]  # Will be updated during startup
+cors_origins = ["*"]  # Default configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
 
 # Initialize GuardFort security middleware
 guard_fort = GuardFort(
     app,
-    service_name="amatya-role-prompter",
+    service_name=SERVICE_NAME,
     enable_auth=True,
     allowed_paths=["/health", "/", "/docs", "/openapi.json", "/.well-known/agent.json"],
 )
@@ -111,13 +116,15 @@ guard_fort = GuardFort(
 # Create JSON-RPC server
 rpc_server = JsonRpcServer(
     title="Amatya Role Prompter",
-    version="1.0.0",
+    version=APP_VERSION,
     description="LLM-powered advice generation with role-specific prompting",
 )
 
 
 @rpc_server.method("advise", "Generate role-specific advice based on code snippets")
-async def advise(role: str, chunks: list[dict], request_id: str = None) -> dict:
+async def advise(
+    role: str, question: str, chunks: list[dict], request_id: str = None
+) -> dict:
     """
     Generate role-specific advice based on provided code snippets.
 
@@ -126,6 +133,7 @@ async def advise(role: str, chunks: list[dict], request_id: str = None) -> dict:
 
     Args:
         role: User role (e.g., 'backend_developer', 'security_engineer')
+        question: User's specific question to be answered
         chunks: List of code snippets with file_path and content
         request_id: Optional request ID for tracking
 
@@ -184,14 +192,16 @@ async def advise(role: str, chunks: list[dict], request_id: str = None) -> dict:
                 "metadata": {
                     "role": role,
                     "chunks_processed": 0,
-                    "processing_time": round(time.time() - start_time, 2),
+                    "processing_time": round(
+                        time.time() - start_time, PROCESSING_TIME_PRECISION
+                    ),
                     "request_id": request_id,
                     "type": "general_guidance",
                 },
             }
 
-        if len(chunks) > 50:  # Reasonable limit for performance
-            raise ValueError("Too many chunks provided (max 50)")
+        if len(chunks) > MAX_CHUNKS_LIMIT:  # Reasonable limit for performance
+            raise ValueError(f"Too many chunks provided (max {MAX_CHUNKS_LIMIT})")
 
         # Convert chunks to Snippet objects with validation
         snippet_objects = []
@@ -202,7 +212,9 @@ async def advise(role: str, chunks: list[dict], request_id: str = None) -> dict:
                 raise ValueError(f"Invalid chunk at index {i}: {e}") from e
 
         # Create advice request
-        advice_request = AdviceRequest(role=role, chunks=snippet_objects)
+        advice_request = AdviceRequest(
+            role=role, question=question, chunks=snippet_objects
+        )
 
         logger.info(
             f"Processing advice request for role '{role}' with {len(chunks)} chunks (request_id: {request_id})"
@@ -236,7 +248,7 @@ async def advise(role: str, chunks: list[dict], request_id: str = None) -> dict:
             "metadata": {
                 "role": role,
                 "chunks_processed": len(chunks),
-                "processing_time": round(elapsed_time, 2),
+                "processing_time": round(elapsed_time, PROCESSING_TIME_PRECISION),
                 "request_id": request_id,
             },
         }
@@ -304,8 +316,8 @@ async def health_check():
 
                 return {
                     "status": "healthy",
-                    "service": "amatya-role-prompter",
-                    "version": "1.0.0",
+                    "service": SERVICE_NAME,
+                    "version": APP_VERSION,
                     "mode": mode,
                     "ai_services": ai_services,
                     "cache_stats": cache_stats,
@@ -317,8 +329,8 @@ async def health_check():
                     status_code=503,
                     content={
                         "status": "unhealthy",
-                        "service": "amatya-role-prompter",
-                        "version": "1.0.0",
+                        "service": SERVICE_NAME,
+                        "version": APP_VERSION,
                         "error": "Advisor service not ready",
                     },
                 )
@@ -326,8 +338,8 @@ async def health_check():
             # Service not initialized yet (e.g., during startup or testing)
             return {
                 "status": "starting",
-                "service": "amatya-role-prompter",
-                "version": "1.0.0",
+                "service": SERVICE_NAME,
+                "version": APP_VERSION,
                 "message": "Service is starting up",
             }
     except Exception as e:
@@ -336,8 +348,8 @@ async def health_check():
             status_code=503,
             content={
                 "status": "unhealthy",
-                "service": "amatya-role-prompter",
-                "version": "1.0.0",
+                "service": SERVICE_NAME,
+                "version": APP_VERSION,
                 "error": str(e),
             },
         )
@@ -350,7 +362,7 @@ async def agent_manifest():
     return {
         "name": "Amatya Role Prompter",
         "description": "LLM-powered advice generation with role-specific prompting",
-        "version": "1.0.0",
+        "version": APP_VERSION,
         "methods": [
             {
                 "name": "advise",

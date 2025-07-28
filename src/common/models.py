@@ -382,6 +382,7 @@ class AdviceRequest(BaseModel):
     role: str = Field(
         ..., description="User role (e.g., 'backend_developer', 'security_engineer')"
     )
+    question: str = Field(..., description="User's specific question to be answered")
     chunks: list[Snippet] = Field(..., description="Code snippets for context")
 
     model_config = ConfigDict(
@@ -389,6 +390,7 @@ class AdviceRequest(BaseModel):
         json_schema_extra={
             "example": {
                 "role": "backend_developer",
+                "question": "How do I implement authentication middleware?",
                 "chunks": [
                     {
                         "file_path": "src/auth.py",

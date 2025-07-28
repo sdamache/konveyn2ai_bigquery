@@ -87,6 +87,7 @@ def sample_advice_request():
     """Sample advice request for testing."""
     return {
         "role": "backend_developer",
+        "question": "How do I implement this?",
         "chunks": [
             {
                 "file_path": "src/api/auth.py",

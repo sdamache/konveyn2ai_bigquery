@@ -36,6 +36,11 @@ from guard_fort import init_guard_fort
 janapada_client: Optional[JsonRpcClient] = None
 amatya_client: Optional[JsonRpcClient] = None
 
+# Connection pool configuration constants
+RPC_CLIENT_MAX_CONNECTIONS = 20
+RPC_CLIENT_MAX_KEEPALIVE_CONNECTIONS = 10
+RPC_CLIENT_KEEPALIVE_EXPIRY = 30.0
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -43,12 +48,26 @@ async def lifespan(app: FastAPI):
     # Startup
     global janapada_client, amatya_client
 
-    # Initialize JSON-RPC clients with environment variables
+    # Initialize JSON-RPC clients with connection pooling
     janapada_url = os.getenv("JANAPADA_URL", "http://localhost:8001")
     amatya_url = os.getenv("AMATYA_URL", "http://localhost:8002")
 
-    janapada_client = JsonRpcClient(janapada_url, timeout=30, max_retries=3)
-    amatya_client = JsonRpcClient(amatya_url, timeout=30, max_retries=3)
+    janapada_client = JsonRpcClient(
+        janapada_url,
+        timeout=30,
+        max_retries=3,
+        max_connections=RPC_CLIENT_MAX_CONNECTIONS,
+        max_keepalive_connections=RPC_CLIENT_MAX_KEEPALIVE_CONNECTIONS,
+        keepalive_expiry=RPC_CLIENT_KEEPALIVE_EXPIRY,
+    )
+    amatya_client = JsonRpcClient(
+        amatya_url,
+        timeout=30,
+        max_retries=3,
+        max_connections=RPC_CLIENT_MAX_CONNECTIONS,
+        max_keepalive_connections=RPC_CLIENT_MAX_KEEPALIVE_CONNECTIONS,
+        keepalive_expiry=RPC_CLIENT_KEEPALIVE_EXPIRY,
+    )
 
     # Register external services for health monitoring
     await register_external_services()
@@ -57,12 +76,22 @@ async def lifespan(app: FastAPI):
     print(f"  Janapada URL: {janapada_url}")
     print(f"  Amatya URL: {amatya_url}")
     print("  Guard-Fort middleware enabled")
+    print("  Connection pooling enabled:")
+    print(f"    Max connections: {RPC_CLIENT_MAX_CONNECTIONS}")
+    print(f"    Max keepalive connections: {RPC_CLIENT_MAX_KEEPALIVE_CONNECTIONS}")
+    print(f"    Keepalive expiry: {RPC_CLIENT_KEEPALIVE_EXPIRY}s")
     print("  External services registered for health monitoring")
 
     yield
 
-    # Shutdown
+    # Shutdown - cleanup connection pools
     print("Svami Orchestrator shutting down...")
+    if janapada_client:
+        await janapada_client.close()
+        print("  Janapada client connections closed")
+    if amatya_client:
+        await amatya_client.close()
+        print("  Amatya client connections closed")
 
 
 # Initialize FastAPI application
@@ -83,7 +112,13 @@ guard_fort = init_guard_fort(
     enable_auth=True,
     log_level="INFO",
     log_format="json",
-    cors_origins=["*"],  # Allow all origins for demo
+    cors_origins=[
+        "https://localhost:3000",
+        "https://localhost:8080",
+        "https://*.run.app",
+        "https://*.vercel.app",
+        "https://*.netlify.app",
+    ],  # Restrict to trusted domains
     auth_schemes=["Bearer", "ApiKey"],
     allowed_paths=[
         "/health",
@@ -382,13 +417,21 @@ async def answer_query(
                 method="search", params={"query": query.question, "k": 5}, id=request_id
             )
 
-            # Handle search errors
+            # Handle search errors with improved error propagation
             if search_response.error:
+                error_msg = f"Search service error: {search_response.error.message}"
                 print(
                     f"[{request_id}] Janapada search failed: {search_response.error.message}"
                 )
+                print(f"[{request_id}] Error code: {search_response.error.code}")
+                if search_response.error.data:
+                    print(f"[{request_id}] Error details: {search_response.error.data}")
                 print(f"[{request_id}] Continuing with graceful degradation...")
+
+                # Store error for potential user feedback
+                search_error = error_msg
             else:
+                search_error = None
                 # Process search results
                 if search_response.result and "snippets" in search_response.result:
                     snippet_data = search_response.result["snippets"]
@@ -412,15 +455,25 @@ async def answer_query(
                     print(f"[{request_id}] No snippets returned from Janapada")
 
         except Exception as e:
+            search_error = f"Search service unavailable: {str(e)}"
             print(f"[{request_id}] Janapada service unavailable: {str(e)}")
+            print(f"[{request_id}] Exception type: {type(e).__name__}")
             print(
                 f"[{request_id}] Continuing with graceful degradation (no code snippets)..."
             )
 
-        # If no snippets found, provide a graceful response
+        # If no snippets found, provide a graceful response with error details
         if not snippets:
+            base_message = "I couldn't find any relevant code snippets for your query."
+
+            # Add error context if available
+            if "search_error" in locals() and search_error:
+                detailed_message = f"{base_message} There was an issue with the search service: {search_error}. Please try again in a moment."
+            else:
+                detailed_message = f"{base_message} This might be because the knowledge base is still being populated or your query needs to be more specific. Please try rephrasing your question or check back later."
+
             return AnswerResponse(
-                answer="I couldn't find any relevant code snippets for your query. This might be because the knowledge base is still being populated or your query needs to be more specific. Please try rephrasing your question or check back later.",
+                answer=detailed_message,
                 sources=[],
                 request_id=request_id,
             )
@@ -436,17 +489,21 @@ async def answer_query(
             id=request_id,
         )
 
-        # Handle advice generation errors with graceful degradation
+        # Handle advice generation errors with improved error propagation
         if advise_response.error:
+            error_msg = f"Advice service error: {advise_response.error.message}"
             print(
                 f"[{request_id}] Amatya advice failed: {advise_response.error.message}"
             )
+            print(f"[{request_id}] Error code: {advise_response.error.code}")
+            if advise_response.error.data:
+                print(f"[{request_id}] Error details: {advise_response.error.data}")
 
-            # Graceful degradation: return search results without advice
+            # Graceful degradation: return search results with error context
             fallback_answer = (
                 f"I found {len(snippets)} relevant code snippets for your question about '{query.question}'. "
-                "However, I'm currently unable to provide role-specific advice. "
-                "Please review the source files for relevant implementation details."
+                f"However, there was an issue generating role-specific advice: {error_msg}. "
+                "Please review the source files for relevant implementation details, or try again in a moment."
             )
 
             return AnswerResponse(
