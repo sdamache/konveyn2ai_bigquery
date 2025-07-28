@@ -264,7 +264,9 @@ class TestAdviceRequest:
             Snippet(file_path="main.py", content="if __name__ == '__main__': pass"),
         ]
 
-        advice = AdviceRequest(role="backend engineer", chunks=chunks)
+        advice = AdviceRequest(
+            role="backend engineer", question="How do I implement this?", chunks=chunks
+        )
 
         assert advice.role == "backend engineer"
         assert len(advice.chunks) == 2
@@ -286,7 +288,11 @@ class TestAdviceRequest:
             Snippet(file_path="main.py", content="if __name__ == '__main__': pass"),
         ]
 
-        advice = AdviceRequest(role="backend engineer", chunks=snippets)
+        advice = AdviceRequest(
+            role="backend engineer",
+            question="How do I implement this?",
+            chunks=snippets,
+        )
 
         assert len(advice.chunks) == 2
         assert advice.chunks[0].file_path == "test.py"
@@ -294,7 +300,9 @@ class TestAdviceRequest:
     def test_advice_request_empty_chunks(self):
         """Test AdviceRequest with empty chunks."""
 
-        advice = AdviceRequest(role="developer", chunks=[])
+        advice = AdviceRequest(
+            role="developer", question="How do I implement this?", chunks=[]
+        )
 
         assert advice.role == "developer"
         assert len(advice.chunks) == 0
@@ -304,7 +312,9 @@ class TestAdviceRequest:
 
         chunks = [Snippet(file_path="test.py", content="code")]
 
-        advice = AdviceRequest(role="developer", chunks=chunks)
+        advice = AdviceRequest(
+            role="developer", question="How do I implement this?", chunks=chunks
+        )
         data = advice.model_dump()
 
         assert data["role"] == "developer"
@@ -335,7 +345,11 @@ class TestModelInteroperability:
             Snippet(file_path="models.py", content="class User: pass"),
         ]
 
-        advice = AdviceRequest(role="backend engineer", chunks=snippets)
+        advice = AdviceRequest(
+            role="backend engineer",
+            question="How do I implement this?",
+            chunks=snippets,
+        )
 
         assert len(advice.chunks) == 2
         assert advice.chunks[0].file_path == "auth.py"
@@ -349,7 +363,9 @@ class TestModelInteroperability:
         query = QueryRequest(question="test", role="developer")
         snippet = Snippet(file_path="test.py", content="code")
         search = SearchRequest(query="test", k=5)
-        advice = AdviceRequest(role="dev", chunks=[snippet])
+        advice = AdviceRequest(
+            role="dev", question="How do I implement this?", chunks=[snippet]
+        )
 
         models = [query, snippet, search, advice]
 

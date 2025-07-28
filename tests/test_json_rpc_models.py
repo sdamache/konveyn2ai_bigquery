@@ -208,7 +208,11 @@ class TestSharedDataModels:
             Snippet(file_path="middleware.py", content="class Middleware: pass"),
         ]
 
-        request = AdviceRequest(role="backend_developer", chunks=snippets)
+        request = AdviceRequest(
+            role="backend_developer",
+            question="How do I implement this?",
+            chunks=snippets,
+        )
 
         assert request.role == "backend_developer"
         assert len(request.chunks) == 2
