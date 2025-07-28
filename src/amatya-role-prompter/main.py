@@ -61,15 +61,7 @@ async def lifespan(app: FastAPI):
         # Configure CORS middleware with environment-specific settings
         global cors_origins
         cors_origins = config.cors_origins if config.cors_origins else ["*"]
-
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=cors_origins,
-            allow_credentials=True,
-            allow_methods=["GET", "POST", "OPTIONS"],
-            allow_headers=["*"],
-        )
-        logger.info(f"CORS configured for origins: {cors_origins}")
+        logger.info(f"CORS origins determined: {cors_origins}")
 
         # Initialize advisor service
         advisor_service = AdvisorService(config)
@@ -96,9 +88,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add CORS middleware with environment-specific configuration
+# Add CORS middleware with default configuration
 # CORS origins will be configured based on environment in lifespan
-cors_origins = ["*"]  # Will be updated during startup
+cors_origins = ["*"]  # Default configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
 
 # Initialize GuardFort security middleware
 guard_fort = GuardFort(
@@ -117,7 +116,9 @@ rpc_server = JsonRpcServer(
 
 
 @rpc_server.method("advise", "Generate role-specific advice based on code snippets")
-async def advise(role: str, chunks: list[dict], request_id: str = None) -> dict:
+async def advise(
+    role: str, question: str, chunks: list[dict], request_id: str = None
+) -> dict:
     """
     Generate role-specific advice based on provided code snippets.
 
@@ -126,6 +127,7 @@ async def advise(role: str, chunks: list[dict], request_id: str = None) -> dict:
 
     Args:
         role: User role (e.g., 'backend_developer', 'security_engineer')
+        question: User's specific question to be answered
         chunks: List of code snippets with file_path and content
         request_id: Optional request ID for tracking
 
@@ -202,7 +204,9 @@ async def advise(role: str, chunks: list[dict], request_id: str = None) -> dict:
                 raise ValueError(f"Invalid chunk at index {i}: {e}") from e
 
         # Create advice request
-        advice_request = AdviceRequest(role=role, chunks=snippet_objects)
+        advice_request = AdviceRequest(
+            role=role, question=question, chunks=snippet_objects
+        )
 
         logger.info(
             f"Processing advice request for role '{role}' with {len(chunks)} chunks (request_id: {request_id})"
