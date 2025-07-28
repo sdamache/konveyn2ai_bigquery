@@ -17,6 +17,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
+from pydantic_core import ErrorDetails
 
 # Add path for common modules
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -141,8 +142,6 @@ async def advise(role: str, chunks: list[dict], request_id: str = None) -> dict:
         # Input validation with proper JSON-RPC error codes
         if not role or not isinstance(role, str):
             # Create a proper ValidationError for JSON-RPC INVALID_PARAMS
-            from pydantic_core import ErrorDetails
-
             raise ValidationError.from_exception_data(
                 "ValidationError",
                 [
@@ -157,8 +156,6 @@ async def advise(role: str, chunks: list[dict], request_id: str = None) -> dict:
 
         if chunks is None or not isinstance(chunks, list):
             # Create a proper ValidationError for JSON-RPC INVALID_PARAMS
-            from pydantic_core import ErrorDetails
-
             raise ValidationError.from_exception_data(
                 "ValidationError",
                 [
