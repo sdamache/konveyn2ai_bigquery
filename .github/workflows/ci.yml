@@ -70,4 +70,4 @@ jobs:
 
     - name: Run project setup tests
       run: |
-        python tests/test_project_setup.py
+        PYTHONPATH=src python tests/test_project_setup.py
