@@ -10,6 +10,7 @@ Implements real Vertex AI embeddings with textembedding-gecko-001 model.
 import logging
 import os
 import sys
+from contextlib import asynccontextmanager
 from functools import lru_cache
 from typing import Any, Optional
 
@@ -37,29 +38,15 @@ except ImportError:
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI application
-app = FastAPI(
-    title="Janapada Memory Service",
-    description="Semantic search agent using Vertex AI embeddings and Matching Engine",
-    version="1.0.0",
-)
-
-# Initialize JSON-RPC server
-rpc_server = JsonRpcServer(
-    title="Janapada Memory Service",
-    version="1.0.0",
-    description="Semantic search agent using Vertex AI embeddings and Matching Engine",
-)
-
-# Global variables for caching (will be initialized in startup)
+# Global variables for service components
 embedding_model = None
 matching_engine_index = None
 faiss_index = None  # Fallback index
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize Vertex AI components on startup."""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager for startup and shutdown."""
     global embedding_model, matching_engine_index
 
     logger.info("Starting Janapada Memory Service...")
@@ -121,6 +108,28 @@ async def startup_event():
         logger.warning(f"FAISS initialization failed: {e}")
 
     logger.info("Janapada Memory Service startup complete")
+
+    yield  # Application is running
+
+    # Cleanup (shutdown logic)
+    logger.info("Shutting down Janapada Memory Service...")
+    # Add any cleanup logic here if needed in the future
+
+
+# Initialize FastAPI application with lifespan
+app = FastAPI(
+    title="Janapada Memory Service",
+    description="Semantic search agent using Vertex AI embeddings and Matching Engine",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+# Initialize JSON-RPC server
+rpc_server = JsonRpcServer(
+    title="Janapada Memory Service",
+    version="1.0.0",
+    description="Semantic search agent using Vertex AI embeddings and Matching Engine",
+)
 
 
 # Embedding generation with caching
