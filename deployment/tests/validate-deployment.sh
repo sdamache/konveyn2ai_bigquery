@@ -3,11 +3,15 @@
 
 set -e
 
-# Service URLs from environment variables
+# Load secure test configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/test-config.sh"
+
+# Service URLs from secure configuration (no hard-coded fallbacks)
 SERVICES=(
-    "${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}"
-    "${JANAPADA_URL:-https://janapada-nfsp5dohya-uc.a.run.app}"
-    "${AMATYA_URL:-https://amatya-72021522495.us-central1.run.app}"
+    "$SVAMI_URL"
+    "$JANAPADA_URL"
+    "$AMATYA_URL"
 )
 
 echo "🔍 Validating deployment health..."

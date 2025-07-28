@@ -1,5 +1,9 @@
 #!/bin/bash
-# Phase 5: Performance Evaluation
+# Phase 5: Performance Evaluation with Secure Configuration
+
+# Load secure test configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/test-config.sh"
 
 echo "⚡ Phase 5: Performance Evaluation"
 echo "================================"
@@ -7,14 +11,16 @@ echo "================================"
 total_time=0
 test_count=5
 fast_responses=0
+auth_header=$(create_auth_header "bearer")
 
 echo "Measuring response times across $test_count requests..."
+echo "Using secure authentication token..."
 
 for i in $(seq 1 $test_count); do
     start_time=$(date +%s.%N)
-    curl -s -X POST "${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}/answer" \
+    curl -s -X POST "$SVAMI_URL/answer" \
         -H "Content-Type: application/json" \
-        -H "Authorization: Bearer demo-token" \
+        -H "Authorization: $auth_header" \
         -d '{"question": "What is JWT authentication?", "role": "backend_developer"}' > /dev/null
     end_time=$(date +%s.%N)
     response_time=$(echo "$end_time - $start_time" | bc -l)

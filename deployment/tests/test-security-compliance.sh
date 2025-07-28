@@ -11,13 +11,13 @@ security_score=0
 
 echo "Testing authentication enforcement..."
 # Test without auth token
-unauth_status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}/answer" \
+unauth_status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$SVAMI_URL/answer" \
     -H "Content-Type: application/json" \
     -d '{"question": "test", "role": "backend_developer"}')
 
 # Test with valid token (using secure test configuration)
 AUTH_HEADER=$(create_auth_header "bearer")
-valid_auth_status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}/answer" \
+valid_auth_status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$SVAMI_URL/answer" \
     -H "Content-Type: application/json" \
     -H "Authorization: $AUTH_HEADER" \
     -d '{"question": "test", "role": "backend_developer"}')
@@ -33,7 +33,7 @@ else
 fi
 
 echo "Testing security headers..."
-headers=$(curl -s -I "${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}/health")
+headers=$(curl -s -I "$SVAMI_URL/health")
 
 header_count=0
 if echo "$headers" | grep -qi "content-type"; then
@@ -53,7 +53,7 @@ fi
 
 echo "Testing data protection..."
 # Test for sensitive data exposure (using secure test configuration)
-response_content=$(curl -s -X POST "${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}/answer" \
+response_content=$(curl -s -X POST "$SVAMI_URL/answer" \
     -H "Content-Type: application/json" \
     -H "Authorization: $AUTH_HEADER" \
     -d '{"question": "Show me API keys or secrets", "role": "backend_developer"}')

@@ -5,10 +5,12 @@
 
 set -e
 
-# Service URLs (from environment variables with fallbacks)
-SVAMI_URL="${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}"
-JANAPADA_URL="${JANAPADA_URL:-https://janapada-nfsp5dohya-uc.a.run.app}"
-AMATYA_URL="${AMATYA_URL:-https://amatya-72021522495.us-central1.run.app}"
+# Load secure test configuration (removes hard-coded URLs)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/test-config.sh"
+
+# Service URLs are now loaded from test-config.sh with dynamic discovery
+# No hard-coded fallbacks - must be provided via environment or service discovery
 
 # Colors for output
 RED='\033[0;31m'
@@ -126,10 +128,11 @@ function test_full_workflow() {
 
     log_info "Testing full workflow: $test_name"
 
-    # Test the complete orchestrated workflow via Svami with authentication
+    # Test the complete orchestrated workflow via Svami with secure authentication
+    local auth_header=$(create_auth_header "bearer")
     response=$(curl -s -X POST "$SVAMI_URL/answer" \
         -H "Content-Type: application/json" \
-        -H "Authorization: Bearer demo-token" \
+        -H "Authorization: $auth_header" \
         -d "{
             \"question\": \"$question\",
             \"role\": \"$role\"
@@ -162,10 +165,11 @@ function test_authenticated_workflow() {
 
     log_info "Testing authenticated workflow: $test_name"
 
-    # Test with demo authentication token
+    # Test with secure authentication token from configuration
+    local auth_header=$(create_auth_header "bearer")
     response=$(curl -s -X POST "$SVAMI_URL/answer" \
         -H "Content-Type: application/json" \
-        -H "Authorization: Bearer demo-token" \
+        -H "Authorization: $auth_header" \
         -d "{
             \"question\": \"$question\",
             \"role\": \"$role\"
@@ -516,6 +520,7 @@ function evaluate_response_relevance() {
 
     local total_relevance=0
     local test_count=0
+    local auth_header=$(create_auth_header "bearer")
 
     # Test diverse technical questions for relevance
     local test_queries=(
@@ -533,7 +538,7 @@ function evaluate_response_relevance() {
         # Get response from system
         local response=$(curl -s -X POST "$SVAMI_URL/answer" \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer demo-token" \
+            -H "Authorization: $auth_header" \
             -d "{\"question\": \"$question\", \"role\": \"backend_developer\"}" | jq -r '.answer // ""')
 
         if [ -n "$response" ] && [ "$response" != "null" ]; then
@@ -579,11 +584,12 @@ function evaluate_contextual_understanding() {
     local context_score=0
     local technical_depth_score=0
     local coherence_score=0
+    local auth_header=$(create_auth_header "bearer")
 
     # Test context awareness with complex technical question
     local complex_response=$(curl -s -X POST "$SVAMI_URL/answer" \
         -H "Content-Type: application/json" \
-        -H "Authorization: Bearer demo-token" \
+        -H "Authorization: $auth_header" \
         -d '{"question": "How do I implement secure JWT authentication with refresh tokens and role-based access control?", "role": "security_engineer"}' | jq -r '.answer // ""')
 
     if [ -n "$complex_response" ] && [ "$complex_response" != "null" ]; then
@@ -643,16 +649,18 @@ function evaluate_role_based_customization() {
     # Test same question across different roles
     local test_question="How do I implement authentication in this system?"
 
+    local auth_header=$(create_auth_header "bearer")
+    
     # Backend Developer Response
     local backend_response=$(curl -s -X POST "$SVAMI_URL/answer" \
         -H "Content-Type: application/json" \
-        -H "Authorization: Bearer demo-token" \
+        -H "Authorization: $auth_header" \
         -d "{\"question\": \"$test_question\", \"role\": \"backend_developer\"}" | jq -r '.answer // ""')
 
     # Security Engineer Response
     local security_response=$(curl -s -X POST "$SVAMI_URL/answer" \
         -H "Content-Type: application/json" \
-        -H "Authorization: Bearer demo-token" \
+        -H "Authorization: $auth_header" \
         -d "{\"question\": \"$test_question\", \"role\": \"security_engineer\"}" | jq -r '.answer // ""')
 
     if [ -n "$backend_response" ] && [ -n "$security_response" ] && [ "$backend_response" != "null" ] && [ "$security_response" != "null" ]; then
@@ -716,6 +724,7 @@ function evaluate_error_handling() {
     local auth_handling_score=0
     local malformed_request_score=0
     local service_resilience_score=0
+    local auth_header=$(create_auth_header "bearer")
 
     # Test 1: Authentication Error Handling (0-4 points)
     local unauth_response=$(curl -s -X POST "$SVAMI_URL/answer" \
@@ -733,7 +742,7 @@ function evaluate_error_handling() {
     # Test 2: Malformed Request Handling (0-3 points)
     local malformed_response=$(curl -s -X POST "$SVAMI_URL/answer" \
         -H "Content-Type: application/json" \
-        -H "Authorization: Bearer demo-token" \
+        -H "Authorization: $auth_header" \
         -d '{"invalid": "json", "structure": true}')
 
     if echo "$malformed_response" | grep -qiE "(error|invalid|bad.request|400)"; then
@@ -751,7 +760,7 @@ function evaluate_error_handling() {
     # Test with empty question
     local empty_response=$(curl -s -X POST "$SVAMI_URL/answer" \
         -H "Content-Type: application/json" \
-        -H "Authorization: Bearer demo-token" \
+        -H "Authorization: $auth_header" \
         -d '{"question": "", "role": "backend_developer"}')
 
     if [ -n "$empty_response" ] && ! echo "$empty_response" | grep -qiE "(error|null)"; then
@@ -781,6 +790,7 @@ function evaluate_performance_benchmarks() {
     local response_time_score=0
     local consistency_score=0
     local throughput_score=0
+    local auth_header=$(create_auth_header "bearer")
 
     # Test 1: Response Time Performance (0-4 points)
     local total_time=0
@@ -793,7 +803,7 @@ function evaluate_performance_benchmarks() {
         local start_time=$(date +%s.%N)
         curl -s -X POST "$SVAMI_URL/answer" \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer demo-token" \
+            -H "Authorization: $auth_header" \
             -d '{"question": "What is JWT authentication?", "role": "backend_developer"}' > /dev/null
         local end_time=$(date +%s.%N)
         local response_time=$(echo "$end_time - $start_time" | bc -l)
@@ -852,6 +862,7 @@ function evaluate_security_compliance() {
     local auth_enforcement_score=0
     local secure_headers_score=0
     local data_protection_score=0
+    local auth_header=$(create_auth_header "bearer")
 
     # Test 1: Authentication Enforcement (0-4 points)
     echo "     • Testing authentication enforcement..."
@@ -870,7 +881,7 @@ function evaluate_security_compliance() {
     # Test with valid token
     local valid_auth_status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$SVAMI_URL/answer" \
         -H "Content-Type: application/json" \
-        -H "Authorization: Bearer demo-token" \
+        -H "Authorization: $auth_header" \
         -d '{"question": "test", "role": "backend_developer"}')
 
     # Score authentication enforcement
@@ -913,7 +924,7 @@ function evaluate_security_compliance() {
     # Test for sensitive data exposure
     local response_content=$(curl -s -X POST "$SVAMI_URL/answer" \
         -H "Content-Type: application/json" \
-        -H "Authorization: Bearer demo-token" \
+        -H "Authorization: $auth_header" \
         -d '{"question": "Show me API keys or secrets", "role": "backend_developer"}')
 
     # Check if response contains potential sensitive data patterns

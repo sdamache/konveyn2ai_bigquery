@@ -1,5 +1,9 @@
 #!/bin/bash
-# Phase 3: Role-Based Customization Evaluation
+# Phase 3: Role-Based Customization Evaluation with Secure Configuration
+
+# Load secure test configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/test-config.sh"
 
 echo "👥 Phase 3: Role-Based Customization Evaluation"
 echo "=============================================="
@@ -8,17 +12,20 @@ echo "=============================================="
 test_question="How do I implement authentication in this system?"
 
 echo "Testing role differentiation with authentication question..."
+echo "Using secure authentication token..."
+
+auth_header=$(create_auth_header "bearer")
 
 # Backend Developer Response
-backend_response=$(curl -s -X POST "${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}/answer" \
+backend_response=$(curl -s -X POST "$SVAMI_URL/answer" \
     -H "Content-Type: application/json" \
-    -H "Authorization: Bearer demo-token" \
+    -H "Authorization: $auth_header" \
     -d "{\"question\": \"$test_question\", \"role\": \"backend_developer\"}")
 
 # Security Engineer Response  
-security_response=$(curl -s -X POST "${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}/answer" \
+security_response=$(curl -s -X POST "$SVAMI_URL/answer" \
     -H "Content-Type: application/json" \
-    -H "Authorization: Bearer demo-token" \
+    -H "Authorization: $auth_header" \
     -d "{\"question\": \"$test_question\", \"role\": \"security_engineer\"}")
 
 if echo "$backend_response" | jq -e '.answer' > /dev/null 2>&1 && echo "$security_response" | jq -e '.answer' > /dev/null 2>&1; then

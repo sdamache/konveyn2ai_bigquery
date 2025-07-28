@@ -1,15 +1,22 @@
 #!/bin/bash
-# Phase 2: Contextual Understanding Evaluation
+# Phase 2: Contextual Understanding Evaluation with Secure Configuration
+
+# Load secure test configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/test-config.sh"
 
 echo "🧠 Phase 2: Contextual Understanding Evaluation"
 echo "=============================================="
 
 # Test contextual understanding with complex technical question
 echo "Testing contextual understanding with complex JWT security question..."
+echo "Using secure authentication token..."
 
-response=$(curl -s -X POST "${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}/answer" \
+auth_header=$(create_auth_header "bearer")
+
+response=$(curl -s -X POST "$SVAMI_URL/answer" \
     -H "Content-Type: application/json" \
-    -H "Authorization: Bearer demo-token" \
+    -H "Authorization: $auth_header" \
     -d '{"question": "How do I implement secure JWT authentication with refresh tokens and role-based access control?", "role": "security_engineer"}')
 
 if echo "$response" | jq -e '.answer' > /dev/null 2>&1; then
