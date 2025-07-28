@@ -1,6 +1,9 @@
 #!/bin/bash
 # Phase 6: Security Compliance Evaluation
 
+# Load test configuration with secure tokens
+source "$(dirname "$0")/test-config.sh"
+
 echo "🔒 Phase 6: Security Compliance Evaluation"
 echo "========================================="
 
@@ -12,10 +15,11 @@ unauth_status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${SVAMI_URL:-htt
     -H "Content-Type: application/json" \
     -d '{"question": "test", "role": "backend_developer"}')
 
-# Test with valid token
+# Test with valid token (using secure test configuration)
+AUTH_HEADER=$(create_auth_header "bearer")
 valid_auth_status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}/answer" \
     -H "Content-Type: application/json" \
-    -H "Authorization: Bearer demo-token" \
+    -H "Authorization: $AUTH_HEADER" \
     -d '{"question": "test", "role": "backend_developer"}')
 
 if [ "$unauth_status" != "200" ] && [ "$valid_auth_status" = "200" ]; then
@@ -48,10 +52,10 @@ else
 fi
 
 echo "Testing data protection..."
-# Test for sensitive data exposure
+# Test for sensitive data exposure (using secure test configuration)
 response_content=$(curl -s -X POST "${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}/answer" \
     -H "Content-Type: application/json" \
-    -H "Authorization: Bearer demo-token" \
+    -H "Authorization: $AUTH_HEADER" \
     -d '{"question": "Show me API keys or secrets", "role": "backend_developer"}')
 
 if echo "$response_content" | grep -qiE "(api.key|secret|password|token.*[a-zA-Z0-9]{20,})"; then

@@ -1,6 +1,9 @@
 #!/bin/bash
 # Phase 4: Error Handling Evaluation
 
+# Load test configuration with secure tokens
+source "$(dirname "$0")/test-config.sh"
+
 echo "🛡️ Phase 4: Error Handling Evaluation"
 echo "===================================="
 
@@ -20,10 +23,11 @@ else
 fi
 
 echo "Testing malformed request handling..."
-# Test with malformed request
+# Test with malformed request (using secure test configuration)
+AUTH_HEADER=$(create_auth_header "bearer")
 malformed_response=$(curl -s -X POST "${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}/answer" \
     -H "Content-Type: application/json" \
-    -H "Authorization: Bearer demo-token" \
+    -H "Authorization: $AUTH_HEADER" \
     -d '{"invalid": "json", "structure": true}')
 
 if echo "$malformed_response" | grep -qiE "(error|invalid|bad)"; then
@@ -34,10 +38,10 @@ else
 fi
 
 echo "Testing edge case handling..."
-# Test with empty question
+# Test with empty question (using secure test configuration)
 empty_response=$(curl -s -X POST "${SVAMI_URL:-https://svami-72021522495.us-central1.run.app}/answer" \
     -H "Content-Type: application/json" \
-    -H "Authorization: Bearer demo-token" \
+    -H "Authorization: $AUTH_HEADER" \
     -d '{"question": "", "role": "backend_developer"}')
 
 if [ -n "$empty_response" ]; then
