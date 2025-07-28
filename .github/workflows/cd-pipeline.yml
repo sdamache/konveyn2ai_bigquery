@@ -28,6 +28,7 @@ jobs:
           ./deployment/scripts/deploy-to-cloud-run.sh
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          INDEX_ID: ${{ secrets.INDEX_ID }}
           DEMO_TOKEN: ${{ vars.DEMO_TOKEN }}
           
       - name: Validate Deployment
