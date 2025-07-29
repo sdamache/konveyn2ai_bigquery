@@ -157,6 +157,119 @@ def generate_request_id() -> str:
     return f"req-{uuid.uuid4().hex[:12]}"
 
 
+def classify_intent(question: str) -> dict:
+    """
+    Classify user intent to determine if question requires full workflow or quick response.
+
+    Args:
+        question: User's input question
+
+    Returns:
+        Dict with intent type and confidence level
+    """
+    question_lower = question.lower().strip()
+
+    # Greeting patterns (18+ variations)
+    greeting_patterns = [
+        "hi",
+        "hello",
+        "hey",
+        "hiya",
+        "howdy",
+        "good morning",
+        "good afternoon",
+        "good evening",
+        "what's up",
+        "whats up",
+        "how are you",
+        "how's it going",
+        "greetings",
+        "salutations",
+        "yo",
+        "sup",
+        "nice to meet you",
+        "pleasure to meet you",
+    ]
+
+    # Check for exact greeting matches
+    if question_lower in greeting_patterns:
+        return {"intent": "greeting", "confidence": "high"}
+
+    # Check for greeting starts (short phrases ≤5 words)
+    words = question_lower.split()
+    if len(words) <= 5 and any(
+        question_lower.startswith(pattern) for pattern in greeting_patterns
+    ):
+        return {"intent": "greeting", "confidence": "high"}
+
+    # Check for conversational patterns
+    conversational_patterns = [
+        "how are things",
+        "how's everything",
+        "what's new",
+        "nice weather",
+        "how's your day",
+        "thanks",
+        "thank you",
+    ]
+
+    if any(pattern in question_lower for pattern in conversational_patterns):
+        return {"intent": "conversational", "confidence": "medium"}
+
+    # Default to technical query
+    return {"intent": "technical", "confidence": "high"}
+
+
+def get_conversational_response(question: str, role: str) -> str:
+    """
+    Generate personalized conversational responses for greetings and small talk.
+
+    Args:
+        question: User's input question
+        role: User's role context
+
+    Returns:
+        Friendly, role-aware response with KonveyN2AI branding and playful personality
+    """
+    question_lower = question.lower().strip()
+
+    # Role-specific technical expertise for enhanced greetings
+    role_expertise = {
+        "developer": "development questions, code understanding, and technical guidance",
+        "backend_developer": "backend development, APIs, databases, and architecture questions",
+        "frontend_developer": "frontend development, UI/UX, and client-side questions",
+        "security_engineer": "security, authentication, and best practices questions",
+        "devops_specialist": "deployment, infrastructure, and DevOps questions",
+        "data_engineer": "data pipelines, analytics, and ML-related questions",
+        "qa_engineer": "testing strategies, quality assurance, and automation",
+        "technical_writer": "documentation, API docs, and technical writing questions",
+    }
+
+    # Get role expertise or default
+    expertise = role_expertise.get(role, "technical questions and developer onboarding")
+
+    # Handle specific greeting types with playful personality and KonveyN2AI branding
+    if question_lower in ["hi", "hello", "hey", "hiya"]:
+        return f"Hi there! 👋 I'm your KonveyN2AI assistant, ready to help with {expertise}. How can I assist you today?"
+    elif "morning" in question_lower:
+        return f"Good morning! ☀️ I'm your KonveyN2AI assistant, specialized in helping developers get up to speed quickly. Whether you need help with {expertise}, I'm here to help!"
+    elif "afternoon" in question_lower:
+        return f"Good afternoon! ☀️ I'm your KonveyN2AI assistant, designed to help reduce developer onboarding time through AI-powered knowledge transfer. I can help you with {expertise}. What can I help you with today?"
+    elif "evening" in question_lower:
+        return f"Good evening! 🌙 I'm your KonveyN2AI assistant, ready to help with {expertise}. How can I assist you this evening?"
+    elif "how are you" in question_lower:
+        return "I'm doing great, thanks for asking! 😊 I'm here and ready to help you with any developer onboarding questions, code explanations, or technical guidance. What would you like to know?"
+    elif any(thanks in question_lower for thanks in ["thanks", "thank you"]):
+        return "You're welcome! 😊 I'm always here to help with development questions. Feel free to ask anything about code, onboarding, or technical guidance!"
+    elif any(casual in question_lower for casual in ["what's up", "whats up", "sup"]):
+        return f"Hey there! 👋 Just here being your friendly KonveyN2AI assistant, ready to help with {expertise}. What's up with your code today?"
+    elif "nice to meet you" in question_lower:
+        return "Nice to meet you too! 😊 I'm your KonveyN2AI assistant, designed to help reduce developer onboarding time through AI-powered knowledge transfer. I can help you understand code, navigate documentation, and get up to speed on new projects. What can I help you with today?"
+
+    # Generic friendly response with full KonveyN2AI value proposition
+    return f"Hello! 😊 I'm your KonveyN2AI assistant, designed to help reduce developer onboarding time through AI-powered knowledge transfer. I can help you understand code, navigate documentation, and get up to speed on projects with {expertise}. What can I help you with today?"
+
+
 @app.get("/.well-known/agent.json")
 async def agent_manifest():
     """Return agent manifest for service discovery and capability description."""
@@ -403,6 +516,25 @@ async def answer_query(
                 detail="Service is not ready - internal services not initialized",
             )
 
+        # FAST-PATH ROUTING: Handle greetings and conversational queries immediately
+        intent_classification = classify_intent(query.question)
+
+        if intent_classification["intent"] in ["greeting", "conversational"]:
+            print(
+                f"[{request_id}] Fast-path: Detected {intent_classification['intent']} with {intent_classification['confidence']} confidence"
+            )
+
+            # Generate immediate conversational response (sub-millisecond)
+            conversational_answer = get_conversational_response(
+                query.question, query.role
+            )
+
+            return AnswerResponse(
+                answer=conversational_answer,
+                sources=[],  # No sources needed for greetings
+                request_id=request_id,
+            )
+
         # ORCHESTRATION WORKFLOW: query → search → advise → respond
         # This implements the complete multi-agent workflow as specified in Task 8.3
 
@@ -484,6 +616,7 @@ async def answer_query(
             method="advise",
             params={
                 "role": query.role,
+                "question": query.question,
                 "chunks": [snippet.model_dump() for snippet in snippets],
             },
             id=request_id,
@@ -511,8 +644,8 @@ async def answer_query(
             )
 
         # Step 3: Format and return the final answer
-        if advise_response.result and "answer" in advise_response.result:
-            answer = advise_response.result["answer"]
+        if advise_response.result and "advice" in advise_response.result:
+            answer = advise_response.result["advice"]
             print(f"[{request_id}] Successfully generated complete response")
 
             return AnswerResponse(answer=answer, sources=sources, request_id=request_id)

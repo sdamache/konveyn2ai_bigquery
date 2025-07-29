@@ -388,7 +388,7 @@ else
     GREETING_TEST=$(curl -s -X POST "${SVAMI_URL}/answer" \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer demo-token" \
-        -d '{"question": "hi", "role": "developer"}' | grep -o '"answer":"[^"]*"' | cut -d'"' -f4 || echo "")
+        -d '{"question": "hi", "role": "developer"}' | jq -r '.answer // ""' | head -c 100 || echo "")
     
     if [[ "$GREETING_TEST" == *"Hi there"* ]] || [[ "$GREETING_TEST" == *"Hello"* ]]; then
         echo "✅ Conversational intelligence working - greeting response detected"
