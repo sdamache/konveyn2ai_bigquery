@@ -4,7 +4,6 @@ Provides time-limited, origin-restricted demo token authentication for hackathon
 """
 
 import logging
-import re
 import time
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -37,9 +36,17 @@ class SecureDemoAuthenticator:
     RATE_LIMIT_REQUESTS = 100
     RATE_LIMIT_WINDOW = 60  # seconds
 
+    # Cache limits to prevent memory exhaustion
+    MAX_CACHE_ORIGINS = 1000  # Maximum number of origins to track
+    MAX_CACHE_ENTRIES_PER_ORIGIN = (
+        200  # Maximum entries per origin (2x rate limit for safety)
+    )
+
     def __init__(self):
-        # Rate limiting storage: origin -> [(timestamp, count), ...]
+        # Rate limiting storage: origin -> [timestamp, ...]
         self._rate_limit_cache = defaultdict(list)
+        # Track cache access time for LRU eviction
+        self._cache_access_time = defaultdict(float)
 
         # Demo token usage statistics
         self._usage_stats = {
@@ -130,34 +137,51 @@ class SecureDemoAuthenticator:
                 return True
             return False
 
-        # Parse origin to get hostname
+        # Parse origin to get hostname and scheme
         try:
             parsed = urlparse(origin)
             hostname = parsed.hostname or ""
+            scheme = parsed.scheme or ""
         except Exception:
             return False
 
-        # Check against allowed origins (with wildcard support)
+        # Check against allowed origins (with secure wildcard support)
         for allowed in self.ALLOWED_ORIGINS:
-            if allowed.startswith("*"):
-                # Wildcard matching
-                domain_suffix = allowed[2:]  # Remove "*."
-                if hostname.endswith(domain_suffix):
-                    return True
+            if "*" in allowed:
+                # Secure wildcard matching - only support *.domain.com format
+                if allowed.startswith("https://*.") or allowed.startswith("http://*."):
+                    # Extract scheme and domain suffix
+                    allowed_scheme = (
+                        "https" if allowed.startswith("https://") else "http"
+                    )
+                    domain_suffix = allowed.split("://")[1][
+                        2:
+                    ]  # Remove scheme and "*."
+
+                    # Validate: scheme must match, hostname must end with domain and have subdomain
+                    if (
+                        scheme == allowed_scheme
+                        and hostname.endswith("." + domain_suffix)
+                        and hostname
+                        != domain_suffix  # Prevent bypass with exact domain
+                        and len(hostname[: -len(domain_suffix) - 1]) > 0
+                    ):  # Ensure subdomain exists (any length)
+                        return True
+                else:
+                    # Unsupported wildcard pattern - reject for security
+                    continue
             elif origin == allowed:
                 # Exact match
                 return True
-            elif "*" in allowed:
-                # Pattern matching for wildcards
-                pattern = allowed.replace("*", ".*")
-                if re.match(pattern, origin):
-                    return True
 
         return False
 
     def _check_rate_limit(self, origin: str) -> bool:
-        """Check if origin has exceeded rate limit."""
+        """Check if origin has exceeded rate limit with bounded cache."""
         current_time = time.time()
+
+        # Update access time for LRU tracking
+        self._cache_access_time[origin] = current_time
 
         # Clean old entries outside the window
         cutoff_time = current_time - self.RATE_LIMIT_WINDOW
@@ -167,13 +191,50 @@ class SecureDemoAuthenticator:
             if timestamp > cutoff_time
         ]
 
+        # Enforce per-origin entry limit
+        if len(self._rate_limit_cache[origin]) > self.MAX_CACHE_ENTRIES_PER_ORIGIN:
+            # Keep only the most recent entries
+            self._rate_limit_cache[origin] = self._rate_limit_cache[origin][
+                -self.MAX_CACHE_ENTRIES_PER_ORIGIN :
+            ]
+
         # Check if rate limit exceeded
         if len(self._rate_limit_cache[origin]) >= self.RATE_LIMIT_REQUESTS:
             return False
 
+        # Enforce global cache size limit using LRU eviction
+        if len(self._rate_limit_cache) >= self.MAX_CACHE_ORIGINS:
+            self._evict_lru_origins()
+
         # Add current request
         self._rate_limit_cache[origin].append(current_time)
         return True
+
+    def _evict_lru_origins(self):
+        """Evict least recently used origins from cache to prevent memory exhaustion."""
+        # Sort origins by last access time and remove oldest 10%
+        origins_by_access = sorted(self._cache_access_time.items(), key=lambda x: x[1])
+
+        # Remove oldest 10% of origins
+        evict_count = max(1, len(origins_by_access) // 10)
+        for origin, _ in origins_by_access[:evict_count]:
+            if origin in self._rate_limit_cache:
+                del self._rate_limit_cache[origin]
+            if origin in self._cache_access_time:
+                del self._cache_access_time[origin]
+
+        logger.info(f"Evicted {evict_count} origins from rate limit cache (LRU)")
+
+    def get_cache_stats(self) -> dict[str, int]:
+        """Get current cache statistics for monitoring."""
+        return {
+            "origins_tracked": len(self._rate_limit_cache),
+            "total_entries": sum(
+                len(entries) for entries in self._rate_limit_cache.values()
+            ),
+            "max_origins": self.MAX_CACHE_ORIGINS,
+            "max_entries_per_origin": self.MAX_CACHE_ENTRIES_PER_ORIGIN,
+        }
 
     def _is_bot_request(self, user_agent: str) -> bool:
         """Basic bot detection based on user agent."""

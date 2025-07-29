@@ -14,6 +14,7 @@ Key Features:
 """
 
 import asyncio
+import logging
 import os
 import sys
 import uuid
@@ -31,6 +32,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from common.models import AnswerResponse, JsonRpcError, QueryRequest, Snippet
 from common.rpc_client import JsonRpcClient
 from guard_fort import init_guard_fort
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 # Global variables for JSON-RPC clients
 janapada_client: Optional[JsonRpcClient] = None
@@ -489,9 +493,7 @@ async def demo_token_status():
             }
         )
     except Exception as e:
-        print(
-            f"Error getting demo token status: {str(e)}"
-        )  # Simple logging for demo endpoint
+        logger.error(f"Error getting demo token status: {str(e)}", exc_info=True)
         return JSONResponse(
             status_code=500,
             content={"error": "Failed to get demo token status", "details": str(e)},
