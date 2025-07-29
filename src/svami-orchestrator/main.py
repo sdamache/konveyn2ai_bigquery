@@ -451,6 +451,53 @@ async def detailed_health_check():
     return JSONResponse(status_code=status_code, content=health_data)
 
 
+@app.get("/auth/demo-status")
+async def demo_token_status():
+    """
+    Get current demo token status and usage statistics.
+
+    Returns information about demo token expiry, usage stats, and validation status.
+    """
+    try:
+        # Import here to avoid circular imports
+        from guard_fort.secure_demo_auth import (
+            get_demo_usage_stats,
+            is_demo_period_active,
+        )
+
+        stats = get_demo_usage_stats()
+        is_active = is_demo_period_active()
+
+        return JSONResponse(
+            content={
+                "demo_period_active": is_active,
+                "token_expires_at": stats["expires_at"],
+                "expires_in_seconds": stats["expires_in_seconds"],
+                "usage_statistics": {
+                    "total_requests": stats["total_requests"],
+                    "unique_origins": stats["unique_origins"],
+                    "rate_limit_violations": stats["rate_limit_violations"],
+                    "origin_violations": stats["origin_violations"],
+                    "expired_token_attempts": stats["expired_token_attempts"],
+                },
+                "status": "active" if is_active else "expired",
+                "message": (
+                    "Demo token is active and accepting requests from authorized origins"
+                    if is_active
+                    else "Demo period has ended"
+                ),
+            }
+        )
+    except Exception as e:
+        print(
+            f"Error getting demo token status: {str(e)}"
+        )  # Simple logging for demo endpoint
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Failed to get demo token status", "details": str(e)},
+        )
+
+
 def handle_rpc_error(error: JsonRpcError, request_id: str) -> AnswerResponse:
     """Handle JSON-RPC errors and generate a friendly error response.
 
