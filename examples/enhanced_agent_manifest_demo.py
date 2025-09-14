@@ -52,7 +52,7 @@ rpc_server.add_endpoint("metrics", "/metrics")
 # Set metadata
 rpc_server.set_metadata("author", "KonveyN2AI Team")
 rpc_server.set_metadata("license", "MIT")
-rpc_server.set_metadata("repository", "https://github.com/neeharve/KonveyN2AI")
+rpc_server.set_metadata("repository", "https://github.com/sdamache/konveyn2ai_bigquery")
 
 
 # Register enhanced JSON-RPC methods with detailed type hints and docstrings

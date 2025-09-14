@@ -54,9 +54,9 @@ bandit = "==1.8.6"
 pre-commit = "==3.6.2"
 
 [project.urls]
-Homepage = "https://github.com/neeharve/KonveyN2AI"
-Repository = "https://github.com/neeharve/KonveyN2AI.git"
-Issues = "https://github.com/neeharve/KonveyN2AI/issues"
+Homepage = "https://github.com/sdamache/konveyn2ai_bigquery"
+Repository = "https://github.com/sdamache/konveyn2ai_bigquery.git"
+Issues = "https://github.com/sdamache/konveyn2ai_bigquery/issues"
 
 [tool.black]
 line-length = 88
