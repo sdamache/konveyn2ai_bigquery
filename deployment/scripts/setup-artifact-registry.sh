@@ -69,8 +69,8 @@ cat > cloudbuild-trigger.yaml << EOF
 name: konveyn2ai-deploy-trigger
 description: Deploy KonveyN2AI services to Cloud Run
 github:
-  owner: neeharve
-  name: KonveyN2AI
+  owner: sdamache
+  name: konveyn2ai_bigquery
   push:
     branch: ^main$
 filename: cloudbuild.yaml
@@ -98,4 +98,4 @@ echo "2. Run the deployment script: ./deploy-to-cloud-run.sh"
 echo "3. Test the deployed services"
 echo ""
 echo "💡 Manual Cloud Build trigger creation:"
-echo "gcloud builds triggers create github --repo-name=KonveyN2AI --repo-owner=neeharve --branch-pattern=^main$ --build-config=cloudbuild.yaml --project=$PROJECT_ID"
+echo "gcloud builds triggers create github --repo-name=konveyn2ai_bigquery --repo-owner=sdamache --branch-pattern=^main$ --build-config=cloudbuild.yaml --project=$PROJECT_ID"

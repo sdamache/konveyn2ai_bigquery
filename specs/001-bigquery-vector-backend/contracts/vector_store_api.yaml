@@ -1,0 +1,554 @@
+openapi: 3.0.3
+info:
+  title: BigQuery Vector Store API
+  description: API contract for BigQuery-based vector storage and similarity search operations
+  version: 1.0.0
+  contact:
+    name: KonveyN2AI Team
+    url: https://github.com/sdamache/konveyn2ai_bigquery
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: https://konveyn2ai-api.run.app
+    description: Production Cloud Run deployment
+
+paths:
+  /vector-store/embeddings:
+    post:
+      summary: Insert vector embedding with metadata
+      operationId: insertEmbedding
+      tags:
+        - Vector Operations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbeddingInsertRequest'
+            examples:
+              code_embedding:
+                summary: Code chunk embedding
+                value:
+                  chunk_id: "func_calculate_similarity_001"
+                  text_content: "def calculate_similarity(vector1, vector2): return cosine_similarity(vector1, vector2)"
+                  source: "src/utils/similarity.py"
+                  artifact_type: "code"
+                  kind: "function"
+                  embedding: [0.1, 0.2, 0.3, "... 765 more values"]
+      responses:
+        '201':
+          description: Embedding successfully inserted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingInsertResponse'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Chunk ID already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      summary: List embeddings with pagination
+      operationId: listEmbeddings
+      tags:
+        - Vector Operations
+      parameters:
+        - name: limit
+          in: query
+          description: Number of embeddings to return
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: offset
+          in: query
+          description: Number of embeddings to skip
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: artifact_type
+          in: query
+          description: Filter by artifact type
+          schema:
+            type: string
+            enum: [code, documentation, api, schema, test]
+        - name: created_since
+          in: query
+          description: Filter embeddings created since timestamp
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: List of embeddings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingListResponse'
+
+  /vector-store/search:
+    post:
+      summary: Search for similar embeddings
+      operationId: searchSimilar
+      tags:
+        - Vector Search
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimilaritySearchRequest'
+            examples:
+              text_query:
+                summary: Text-based similarity search
+                value:
+                  query_text: "function that calculates cosine similarity between vectors"
+                  limit: 5
+                  similarity_threshold: 0.7
+                  artifact_types: ["code"]
+              vector_query:
+                summary: Direct vector similarity search
+                value:
+                  query_embedding: [0.1, 0.2, 0.3, "... 765 more values"]
+                  limit: 10
+                  similarity_threshold: 0.6
+      responses:
+        '200':
+          description: Similar embeddings found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimilaritySearchResponse'
+        '400':
+          description: Invalid search parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /vector-store/embeddings/{chunk_id}:
+    get:
+      summary: Get specific embedding by chunk ID
+      operationId: getEmbedding
+      tags:
+        - Vector Operations
+      parameters:
+        - name: chunk_id
+          in: path
+          required: true
+          description: Unique chunk identifier
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Embedding found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingResponse'
+        '404':
+          description: Embedding not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Delete embedding by chunk ID
+      operationId: deleteEmbedding
+      tags:
+        - Vector Operations
+      parameters:
+        - name: chunk_id
+          in: path
+          required: true
+          description: Unique chunk identifier
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Embedding successfully deleted
+        '404':
+          description: Embedding not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /schema/setup:
+    post:
+      summary: Create BigQuery tables and indexes
+      operationId: setupSchema
+      tags:
+        - Schema Management
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SchemaSetupRequest'
+      responses:
+        '200':
+          description: Schema setup completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchemaSetupResponse'
+        '409':
+          description: Tables already exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /schema/validate:
+    get:
+      summary: Validate BigQuery table schemas
+      operationId: validateSchema
+      tags:
+        - Schema Management
+      responses:
+        '200':
+          description: Schema validation results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchemaValidationResponse'
+
+  /health:
+    get:
+      summary: Health check endpoint
+      operationId: healthCheck
+      tags:
+        - System
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  timestamp:
+                    type: string
+                    format: date-time
+                  bigquery_connection:
+                    type: boolean
+                  vector_index_status:
+                    type: string
+                    enum: [active, building, error]
+
+components:
+  schemas:
+    EmbeddingInsertRequest:
+      type: object
+      required:
+        - chunk_id
+        - text_content
+        - source
+        - artifact_type
+        - embedding
+      properties:
+        chunk_id:
+          type: string
+          description: Unique identifier for the text chunk
+          example: "func_calculate_similarity_001"
+        text_content:
+          type: string
+          description: Raw text content of the chunk
+          minLength: 10
+          example: "def calculate_similarity(vector1, vector2): return cosine_similarity(vector1, vector2)"
+        source:
+          type: string
+          description: Source file path or identifier
+          example: "src/utils/similarity.py"
+        artifact_type:
+          type: string
+          enum: [code, documentation, api, schema, test]
+          description: Type of artifact
+        kind:
+          type: string
+          description: Specific kind within artifact type
+          example: "function"
+        api_path:
+          type: string
+          description: API endpoint path if applicable
+          example: "/api/v1/similarity"
+        record_name:
+          type: string
+          description: Specific record or entity name
+          example: "calculate_similarity"
+        embedding:
+          type: array
+          items:
+            type: number
+            format: float
+          minItems: 768
+          maxItems: 768
+          description: 768-dimensional embedding vector
+
+    EmbeddingInsertResponse:
+      type: object
+      properties:
+        chunk_id:
+          type: string
+        status:
+          type: string
+          example: "inserted"
+        created_at:
+          type: string
+          format: date-time
+
+    EmbeddingListResponse:
+      type: object
+      properties:
+        embeddings:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmbeddingResponse'
+        total_count:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        next_offset:
+          type: integer
+          nullable: true
+
+    EmbeddingResponse:
+      type: object
+      properties:
+        chunk_id:
+          type: string
+        text_content:
+          type: string
+        source:
+          type: string
+        artifact_type:
+          type: string
+          enum: [code, documentation, api, schema, test]
+        kind:
+          type: string
+        api_path:
+          type: string
+        record_name:
+          type: string
+        embedding:
+          type: array
+          items:
+            type: number
+            format: float
+        created_at:
+          type: string
+          format: date-time
+
+    SimilaritySearchRequest:
+      type: object
+      properties:
+        query_text:
+          type: string
+          description: Text to search for (will be embedded automatically)
+          example: "function that calculates cosine similarity"
+        query_embedding:
+          type: array
+          items:
+            type: number
+            format: float
+          minItems: 768
+          maxItems: 768
+          description: Pre-computed 768-dimensional query vector
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+          description: Number of similar results to return
+        similarity_threshold:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          default: 0.5
+          description: Minimum similarity score to include
+        artifact_types:
+          type: array
+          items:
+            type: string
+            enum: [code, documentation, api, schema, test]
+          description: Filter results by artifact types
+        sources:
+          type: array
+          items:
+            type: string
+          description: Filter results by source files
+      oneOf:
+        - required: [query_text]
+        - required: [query_embedding]
+
+    SimilaritySearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimilarityResult'
+        query_embedding:
+          type: array
+          items:
+            type: number
+            format: float
+          description: The embedding used for search (generated or provided)
+        total_results:
+          type: integer
+        search_time_ms:
+          type: integer
+
+    SimilarityResult:
+      type: object
+      properties:
+        chunk_id:
+          type: string
+        similarity_score:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+        text_content:
+          type: string
+        source:
+          type: string
+        artifact_type:
+          type: string
+          enum: [code, documentation, api, schema, test]
+        kind:
+          type: string
+        api_path:
+          type: string
+        record_name:
+          type: string
+
+    SchemaSetupRequest:
+      type: object
+      properties:
+        force_recreate:
+          type: boolean
+          default: false
+          description: Force recreation of existing tables
+        create_indexes:
+          type: boolean
+          default: true
+          description: Create vector indexes after table creation
+
+    SchemaSetupResponse:
+      type: object
+      properties:
+        tables_created:
+          type: array
+          items:
+            type: string
+          example: ["source_metadata", "source_embeddings", "gap_metrics"]
+        indexes_created:
+          type: array
+          items:
+            type: string
+          example: ["embedding_similarity_index"]
+        setup_time_ms:
+          type: integer
+
+    SchemaValidationResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        tables:
+          type: object
+          properties:
+            source_metadata:
+              $ref: '#/components/schemas/TableValidation'
+            source_embeddings:
+              $ref: '#/components/schemas/TableValidation'
+            gap_metrics:
+              $ref: '#/components/schemas/TableValidation'
+        indexes:
+          type: object
+          properties:
+            embedding_similarity_index:
+              $ref: '#/components/schemas/IndexValidation'
+
+    TableValidation:
+      type: object
+      properties:
+        exists:
+          type: boolean
+        schema_valid:
+          type: boolean
+        row_count:
+          type: integer
+        partition_count:
+          type: integer
+        last_modified:
+          type: string
+          format: date-time
+
+    IndexValidation:
+      type: object
+      properties:
+        exists:
+          type: boolean
+        status:
+          type: string
+          enum: [active, building, error]
+        coverage_percentage:
+          type: number
+          format: float
+        last_refresh:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+        details:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+
+  securitySchemes:
+    GoogleCloudAuth:
+      type: http
+      scheme: bearer
+      description: Google Cloud service account token
+
+security:
+  - GoogleCloudAuth: []
+
+tags:
+  - name: Vector Operations
+    description: Core vector storage and retrieval operations
+  - name: Vector Search
+    description: Semantic similarity search functionality
+  - name: Schema Management
+    description: BigQuery schema setup and validation
+  - name: System
+    description: Health checks and system status

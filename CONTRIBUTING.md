@@ -6,7 +6,7 @@ Thank you for your interest in contributing to KonveyN2AI! This document provide
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/neeharve/KonveyN2AI.git
+   git clone https://github.com/sdamache/konveyn2ai_bigquery.git
    cd KonveyN2AI
    ```
 

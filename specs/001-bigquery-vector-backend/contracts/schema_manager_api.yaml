@@ -1,0 +1,559 @@
+openapi: 3.0.3
+info:
+  title: Schema Manager API
+  description: API contract for BigQuery schema management and table operations
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+paths:
+  /schema/tables:
+    post:
+      summary: Create BigQuery tables
+      operationId: createTables
+      tags:
+        - Table Management
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTablesRequest'
+      responses:
+        '201':
+          description: Tables created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateTablesResponse'
+        '409':
+          description: Tables already exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      summary: List existing tables
+      operationId: listTables
+      tags:
+        - Table Management
+      responses:
+        '200':
+          description: List of tables
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TableListResponse'
+
+    delete:
+      summary: Drop all tables
+      operationId: dropTables
+      tags:
+        - Table Management
+      parameters:
+        - name: confirm
+          in: query
+          required: true
+          schema:
+            type: boolean
+          description: Confirmation flag to prevent accidental deletion
+      responses:
+        '204':
+          description: Tables dropped successfully
+        '400':
+          description: Confirmation required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /schema/indexes:
+    post:
+      summary: Create vector indexes
+      operationId: createIndexes
+      tags:
+        - Index Management
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateIndexesRequest'
+      responses:
+        '201':
+          description: Indexes created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateIndexesResponse'
+        '400':
+          description: Invalid index configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      summary: List existing indexes
+      operationId: listIndexes
+      tags:
+        - Index Management
+      responses:
+        '200':
+          description: List of indexes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndexListResponse'
+
+  /schema/validate:
+    post:
+      summary: Validate schema compliance
+      operationId: validateSchema
+      tags:
+        - Validation
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidationRequest'
+      responses:
+        '200':
+          description: Validation completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResponse'
+
+  /schema/migrate:
+    post:
+      summary: Execute schema migration
+      operationId: migrateSchema
+      tags:
+        - Migration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MigrationRequest'
+      responses:
+        '200':
+          description: Migration completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MigrationResponse'
+        '400':
+          description: Migration validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    CreateTablesRequest:
+      type: object
+      properties:
+        force_recreate:
+          type: boolean
+          default: false
+          description: Drop existing tables before creating new ones
+        tables:
+          type: array
+          items:
+            type: string
+            enum: [source_metadata, source_embeddings, gap_metrics, all]
+          default: ["all"]
+          description: Specific tables to create
+        partition_expiration_days:
+          type: integer
+          minimum: 1
+          maximum: 3653
+          default: 365
+          description: Auto-expiration for table partitions
+
+    CreateTablesResponse:
+      type: object
+      properties:
+        tables_created:
+          type: array
+          items:
+            $ref: '#/components/schemas/TableInfo'
+        creation_time_ms:
+          type: integer
+        warnings:
+          type: array
+          items:
+            type: string
+
+    TableInfo:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "source_metadata"
+        full_name:
+          type: string
+          example: "konveyn2ai.semantic_gap_detector.source_metadata"
+        schema:
+          type: array
+          items:
+            $ref: '#/components/schemas/SchemaField'
+        partitioning:
+          $ref: '#/components/schemas/PartitionInfo'
+        clustering:
+          type: array
+          items:
+            type: string
+
+    SchemaField:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [STRING, FLOAT64, ARRAY, TIMESTAMP, DATE, JSON]
+        mode:
+          type: string
+          enum: [NULLABLE, REQUIRED, REPEATED]
+        description:
+          type: string
+
+    PartitionInfo:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [TIME, RANGE, INTEGER]
+        field:
+          type: string
+        expiration_days:
+          type: integer
+
+    CreateIndexesRequest:
+      type: object
+      properties:
+        indexes:
+          type: array
+          items:
+            $ref: '#/components/schemas/IndexConfig'
+          default: []
+
+    IndexConfig:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "embedding_similarity_index"
+        table:
+          type: string
+          example: "source_embeddings"
+        column:
+          type: string
+          example: "embedding"
+        index_type:
+          type: string
+          enum: [IVF, TREE_AH]
+          default: "IVF"
+        distance_type:
+          type: string
+          enum: [COSINE, EUCLIDEAN, DOT_PRODUCT]
+          default: "COSINE"
+        options:
+          type: object
+          properties:
+            num_lists:
+              type: integer
+              minimum: 1
+              maximum: 5000
+              default: 1000
+            fraction_lists_to_search:
+              type: number
+              minimum: 0.0
+              maximum: 1.0
+              default: 0.01
+
+    CreateIndexesResponse:
+      type: object
+      properties:
+        indexes_created:
+          type: array
+          items:
+            $ref: '#/components/schemas/IndexInfo'
+        creation_time_ms:
+          type: integer
+
+    IndexInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        table:
+          type: string
+        status:
+          type: string
+          enum: [CREATING, ACTIVE, ERROR]
+        coverage_percentage:
+          type: number
+          format: float
+
+    TableListResponse:
+      type: object
+      properties:
+        tables:
+          type: array
+          items:
+            $ref: '#/components/schemas/TableStatus'
+        dataset_info:
+          $ref: '#/components/schemas/DatasetInfo'
+
+    TableStatus:
+      type: object
+      properties:
+        name:
+          type: string
+        exists:
+          type: boolean
+        row_count:
+          type: integer
+        size_bytes:
+          type: integer
+        created:
+          type: string
+          format: date-time
+        modified:
+          type: string
+          format: date-time
+        partition_count:
+          type: integer
+
+    DatasetInfo:
+      type: object
+      properties:
+        project_id:
+          type: string
+        dataset_id:
+          type: string
+        location:
+          type: string
+        created:
+          type: string
+          format: date-time
+
+    IndexListResponse:
+      type: object
+      properties:
+        indexes:
+          type: array
+          items:
+            $ref: '#/components/schemas/IndexStatus'
+
+    IndexStatus:
+      type: object
+      properties:
+        name:
+          type: string
+        table:
+          type: string
+        column:
+          type: string
+        status:
+          type: string
+          enum: [CREATING, ACTIVE, ERROR, DISABLED]
+        index_type:
+          type: string
+        distance_type:
+          type: string
+        coverage_percentage:
+          type: number
+          format: float
+        last_refresh:
+          type: string
+          format: date-time
+        error_message:
+          type: string
+
+    ValidationRequest:
+      type: object
+      properties:
+        validate_data:
+          type: boolean
+          default: false
+          description: Run data validation checks (slower)
+        check_indexes:
+          type: boolean
+          default: true
+          description: Validate index status
+        sample_size:
+          type: integer
+          minimum: 1
+          maximum: 10000
+          default: 1000
+          description: Sample size for data validation
+
+    ValidationResponse:
+      type: object
+      properties:
+        overall_status:
+          type: string
+          enum: [VALID, INVALID, WARNING]
+        tables:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/TableValidationResult'
+        indexes:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/IndexValidationResult'
+        data_quality:
+          $ref: '#/components/schemas/DataQualityReport'
+        recommendations:
+          type: array
+          items:
+            type: string
+
+    TableValidationResult:
+      type: object
+      properties:
+        exists:
+          type: boolean
+        schema_valid:
+          type: boolean
+        schema_issues:
+          type: array
+          items:
+            type: string
+        row_count:
+          type: integer
+        data_quality_score:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+
+    IndexValidationResult:
+      type: object
+      properties:
+        exists:
+          type: boolean
+        status:
+          type: string
+        performance_score:
+          type: number
+          format: float
+          minimum: 0.0
+          maximum: 1.0
+        issues:
+          type: array
+          items:
+            type: string
+
+    DataQualityReport:
+      type: object
+      properties:
+        embedding_quality:
+          type: object
+          properties:
+            dimension_consistency:
+              type: boolean
+            nan_count:
+              type: integer
+            infinity_count:
+              type: integer
+            zero_vector_count:
+              type: integer
+        metadata_quality:
+          type: object
+          properties:
+            missing_fields:
+              type: integer
+            duplicate_chunk_ids:
+              type: integer
+            invalid_artifact_types:
+              type: integer
+        referential_integrity:
+          type: object
+          properties:
+            orphaned_embeddings:
+              type: integer
+            missing_embeddings:
+              type: integer
+
+    MigrationRequest:
+      type: object
+      properties:
+        from_version:
+          type: string
+          example: "1.0.0"
+        to_version:
+          type: string
+          example: "1.1.0"
+        migration_type:
+          type: string
+          enum: [schema_upgrade, data_migration, index_rebuild]
+        options:
+          type: object
+          properties:
+            backup_before_migration:
+              type: boolean
+              default: true
+            parallel_processing:
+              type: boolean
+              default: false
+            batch_size:
+              type: integer
+              minimum: 100
+              maximum: 10000
+              default: 1000
+
+    MigrationResponse:
+      type: object
+      properties:
+        migration_id:
+          type: string
+        status:
+          type: string
+          enum: [SUCCESS, FAILED, PARTIAL]
+        duration_ms:
+          type: integer
+        records_processed:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
+        backup_location:
+          type: string
+          description: Location of data backup if created
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+        details:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+
+tags:
+  - name: Table Management
+    description: BigQuery table creation, listing, and deletion
+  - name: Index Management  
+    description: Vector index creation and management
+  - name: Validation
+    description: Schema and data validation operations
+  - name: Migration
+    description: Schema migration and data transformation
