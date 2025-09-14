@@ -1,0 +1,33 @@
+# Preface — BigQuery Semantic Gap Detector (Vector Backend)
+
+## What
+Replace KonveyN2AI’s vector store with BigQuery VECTOR tables and ship a baseline dataset for metadata, embeddings, and analysis outputs. Keep Svami’s search interface stable.
+
+## Why
+Reproducible, judge-friendly notebook; deterministic SQL; no scope creep (static viewer later, no multi-agent sprawl).
+
+## Constraints
+- Keep `vector_index` interface stable.
+- One command: `make setup && make run`.
+- Works in BigQuery Studio & Colab.
+- LLM only for summaries later, not for core search.
+
+---
+
+## Source Issue (verbatim)
+Overview
+Create the BigQuery dataset and baseline configuration needed to store structured and vectorized metadata for our code artifacts. Replace the existing Vertex‑based vector store in KonveyN2AI with a BigQuery vector table and update configuration variables accordingly.
+
+Tasks
+Create a new BigQuery dataset (e.g., semantic_gap_detector) with tables for raw metadata (source_metadata), vector embeddings (source_embeddings), and analysis outputs (gap_metrics).
+Define schemas for each table. Metadata should include source, artifact_type, chunk_id, text_content, and key fields such as kind, api_path, record_name, etc. Embeddings table should store a 768‑dimensional vector and reference the chunk_id.
+Update src/janapada-memory/vector_index.py (or equivalent) to write and read vectors from BigQuery instead of the current vector database. Use BigQuery’s vector search capabilities (approximate_neighbors functions) and document how to run migrations.
+Add configuration parameters (project_id, dataset_id, table names, credentials) to the project’s .env and provide defaults in .env.example.
+
+## Acceptance Criteria (verbatim)
+A BigQuery dataset exists with three tables and the correct schemas.
+Environment variables are defined for BigQuery access.
+The vector index code writes and queries embeddings via BigQuery without errors.
+Running make setup creates the BigQuery tables if they do not exist.
+
+
