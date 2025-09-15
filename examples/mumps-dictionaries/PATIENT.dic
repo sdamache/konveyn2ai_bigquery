@@ -1,0 +1,70 @@
+PATIENT	FILE #2	PATIENT FILE	(VERIFICATION DATE: 11/25/2023)
+
+This file contains the records for each patient in the VistA system.
+
+CROSS-REFERENCES:
+B	Regular    Unique   Whole file (#2)    PATIENT NAME
+C	Regular    Unique   Whole file (#2)    SOCIAL SECURITY NUMBER
+D	Regular    Non-Unique Whole file (#2)  DATE OF BIRTH
+SSN	Regular    Unique   Whole file (#2)  SOCIAL SECURITY NUMBER
+
+POINTED TO BY:
+PATIENT field (#.01) of the PATIENT ALLERGIES file (#120.8)
+PATIENT NAME field (#.01) of the PATIENT file (#2)
+
+FIELDS:
+
+.01	NAME	0;1	FREE TEXT	(Required)
+	INPUT TRANSFORM:K:$L(X)>30!($L(X)<3) X I $D(X) K:X'?1.E1.30A.E X
+	HELP-PROMPT:Answer must be 3-30 characters in length and contain at least one alpha character.
+	DESCRIPTION:Enter the patient's name in LAST,FIRST MIDDLE format.
+	CROSS-REFERENCE:^DPT("B",$E(X,1,30),DA)
+
+.02	SEX	0;2	SET	(Required)
+	'M' FOR MALE;
+	'F' FOR FEMALE;
+	DESCRIPTION:Enter the patient's sex.
+
+.03	DATE OF BIRTH	0;3	DATE	(Required)
+	INPUT TRANSFORM:S %DT="EX" D ^%DT S X=Y K:Y<1 X
+	HELP-PROMPT:Enter a date before TODAY.
+	DESCRIPTION:Enter the patient's date of birth.
+	CROSS-REFERENCE:^DPT("ADOB",$E(X,1,7),DA)
+
+.09	SOCIAL SECURITY NUMBER	0;9	FREE TEXT	(Required)
+	INPUT TRANSFORM:K:$L(X)>9!($L(X)<9)!'(X'?9N) X
+	HELP-PROMPT:Social Security Number must be exactly 9 numeric digits.
+	DESCRIPTION:Enter the patient's Social Security Number.
+	CROSS-REFERENCE:^DPT("SSN",X,DA)
+	CROSS-REFERENCE:^DPT("C",X,DA)
+
+.101	STREET ADDRESS [LINE 1]	.11;1	FREE TEXT
+	INPUT TRANSFORM:K:$L(X)>35!($L(X)<1) X
+	HELP-PROMPT:Answer must be 1-35 characters in length.
+
+.102	STREET ADDRESS [LINE 2]	.11;2	FREE TEXT
+	INPUT TRANSFORM:K:$L(X)>35!($L(X)<1) X
+	HELP-PROMPT:Answer must be 1-35 characters in length.
+
+.103	STREET ADDRESS [LINE 3]	.11;3	FREE TEXT
+	INPUT TRANSFORM:K:$L(X)>35!($L(X)<1) X
+	HELP-PROMPT:Answer must be 1-35 characters in length.
+
+.104	CITY	.11;4	FREE TEXT
+	INPUT TRANSFORM:K:$L(X)>20!($L(X)<1) X
+	HELP-PROMPT:Answer must be 1-20 characters in length.
+
+.105	STATE	.11;5	POINTER TO STATE FILE (#5)
+	HELP-PROMPT:Enter a state name, two letter postal abbreviation, or '^' for a list.
+
+.106	ZIP CODE	.11;6	FREE TEXT
+	INPUT TRANSFORM:K:$L(X)>10!($L(X)<5) X
+	HELP-PROMPT:Answer must be 5-10 characters in length.
+
+.131	PHONE NUMBER [RESIDENCE]	.13;1	FREE TEXT
+	INPUT TRANSFORM:K:$L(X)>20!($L(X)<1) X
+	HELP-PROMPT:Answer must be 1-20 characters in length.
+
+.132	PHONE NUMBER [WORK]	.13;2	FREE TEXT
+	INPUT TRANSFORM:K:$L(X)>20!($L(X)<1) X
+	HELP-PROMPT:Answer must be 1-20 characters in length.

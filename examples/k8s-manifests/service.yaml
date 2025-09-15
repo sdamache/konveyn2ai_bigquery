@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-app-service
+  namespace: production
+  labels:
+    app: web-app
+spec:
+  type: ClusterIP
+  selector:
+    app: web-app
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-app-config
+  namespace: production
+data:
+  app.properties: |
+    # Application configuration
+    server.port=8080
+    logging.level=INFO
+    database.url=jdbc:postgresql://db:5432/app
+    cache.enabled=true
+  nginx.conf: |
+    server {
+        listen 80;
+        server_name localhost;
+
+        location / {
+            proxy_pass http://backend:8080;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+
+        location /health {
+            return 200 "OK";
+            add_header Content-Type text/plain;
+        }
+    }

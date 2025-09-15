@@ -4,17 +4,17 @@ Main FastAPI application for BigQuery Vector Store API.
 
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .vector_endpoints import router as vector_router
 from .schema_endpoints import router as schema_router
+from .vector_endpoints import router as vector_router
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
 )
 
 # Add CORS middleware
@@ -60,7 +60,7 @@ async def root():
         "message": "BigQuery Vector Store API",
         "version": "1.0.0",
         "docs": "/docs",
-        "health": "/health"
+        "health": "/health",
     }
 
 
@@ -70,7 +70,7 @@ async def health():
     return {
         "status": "healthy",
         "service": "bigquery-vector-store-api",
-        "version": "1.0.0"
+        "version": "1.0.0",
     }
 
 
@@ -84,17 +84,12 @@ async def global_exception_handler(request, exc):
         content={
             "error": "InternalServerError",
             "message": "An unexpected error occurred",
-            "detail": str(exc)
-        }
+            "detail": str(exc),
+        },
     )
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-        log_level="info"
-    )
+
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="info")

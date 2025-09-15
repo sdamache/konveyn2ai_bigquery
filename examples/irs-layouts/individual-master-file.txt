@@ -1,0 +1,44 @@
+IRS Individual Master File (IMF) Record Layout - Sample
+========================================================
+
+Record Type: Individual Tax Return Record
+Length: 1000 bytes
+Year: 2023
+
+Position  Length  Field Name                Description
+--------  ------  -----------------------  --------------------------------
+001-001   1       RECORD-TYPE              Record type indicator ('I')
+002-010   9       SSN                      Social Security Number
+011-030   20      TAXPAYER-NAME-LAST       Last name of primary taxpayer
+031-050   20      TAXPAYER-NAME-FIRST      First name of primary taxpayer
+051-051   1       TAXPAYER-NAME-MI         Middle initial
+052-081   30      SPOUSE-NAME-LAST         Spouse last name (if joint)
+082-101   20      SPOUSE-NAME-FIRST        Spouse first name (if joint)
+102-102   1       SPOUSE-NAME-MI           Spouse middle initial
+103-132   30      ADDRESS-LINE-1           Street address line 1
+133-162   30      ADDRESS-LINE-2           Street address line 2
+163-182   20      CITY                     City name
+183-184   2       STATE-CODE               State abbreviation
+185-189   5       ZIP-CODE                 ZIP code
+190-193   4       ZIP-EXTENSION            ZIP+4 extension
+194-194   1       FILING-STATUS            Filing status code
+                                           1=Single, 2=MFJ, 3=MFS, 4=HOH, 5=QW
+195-202   8       TAX-YEAR                 Tax year (CCYYMMDD format)
+203-215   13      ADJUSTED-GROSS-INCOME    AGI amount (NNNNNNNNNNNCC)
+216-228   13      TOTAL-TAX                Total tax amount
+229-241   13      WITHHOLDING              Total withholding
+242-254   13      ESTIMATED-PAYMENTS       Estimated tax payments
+255-267   13      REFUND-AMOUNT            Refund amount (if applicable)
+268-280   13      AMOUNT-OWED              Amount owed (if applicable)
+281-288   8       PROCESSED-DATE           Date processed (CCYYMMDD)
+289-296   8       DUE-DATE                 Return due date (CCYYMMDD)
+297-297   1       ELECTRONIC-FLAG          E-filed indicator (Y/N)
+298-298   1       AMENDED-FLAG             Amended return indicator (Y/N)
+299-299   1       EXTENSION-FLAG           Extension filed indicator (Y/N)
+300-1000  701     FILLER                   Reserved for future use
+
+Notes:
+- All numeric fields are right-justified, zero-filled
+- All character fields are left-justified, space-filled
+- Currency amounts are in cents (no decimal point)
+- Dates are in CCYYMMDD format where CC=century, YY=year, MM=month, DD=day

@@ -1,0 +1,83 @@
+IRS Individual Master File Record Layout - Performance Test {ID}
+Test Module: {ID}
+
+Record Type: Individual Return Transaction File (Type 1)
+Tax Year: {TAX_YEAR}
+Layout Version: v{VERSION}
+
+FIELD DEFINITIONS:
+================
+
+001-009 Record Type PIC X(09) ALPHANUMERIC Required Section: HEADER
+        Values: IMF{ID}000
+
+010-012 Tax Year PIC 9(04) NUMERIC Required Section: HEADER
+        Format: YYYY
+        Values: {TAX_YEAR}
+
+013-014 Record Sequence Number PIC 9(02) NUMERIC Required Section: HEADER
+        Range: 01-99
+
+015-023 SSN Primary PIC 9(09) NUMERIC Required Section: IDENTITY
+        Format: 999999999
+        Note: Encrypted in production
+
+024-073 Name Line 1 PIC X(50) ALPHANUMERIC Required Section: IDENTITY
+        Primary taxpayer name
+        Format: Last, First MI
+
+074-123 Name Line 2 PIC X(50) ALPHANUMERIC Optional Section: IDENTITY
+        Secondary taxpayer name
+        Format: Last, First MI
+
+124-173 Address Line 1 PIC X(50) ALPHANUMERIC Required Section: ADDRESS
+        Street address or PO Box
+
+174-223 Address Line 2 PIC X(50) ALPHANUMERIC Optional Section: ADDRESS
+        Apartment, suite, etc.
+
+224-273 City PIC X(50) ALPHANUMERIC Required Section: ADDRESS
+        City name
+
+274-275 State Code PIC X(02) ALPHANUMERIC Required Section: ADDRESS
+        Standard state abbreviation
+
+276-284 ZIP Code PIC 9(09) NUMERIC Required Section: ADDRESS
+        Format: 999999999 or 99999
+
+285-295 Filing Status PIC 9(01) NUMERIC Required Section: FILING
+        1=Single, 2=Married Filing Joint
+
+296-307 AGI PIC S9(12) NUMERIC Required Section: AMOUNTS
+        Adjusted Gross Income
+        Format: {AGI_AMOUNT} (implied decimal)
+
+308-319 Total Tax PIC S9(12) NUMERIC Required Section: AMOUNTS
+        Total tax liability
+        Format: {TAX_AMOUNT} (implied decimal)
+
+320-331 Federal Tax Withheld PIC S9(12) NUMERIC Required Section: AMOUNTS
+        Federal income tax withheld
+        Format: {WITHHELD_AMOUNT} (implied decimal)
+
+368-375 Processing Date PIC 9(08) NUMERIC Required Section: PROCESSING
+        Date return was processed
+        Format: {PROCESS_DATE}
+
+376-383 DLN PIC 9(08) NUMERIC Required Section: PROCESSING
+        Document Locator Number
+        Format: {DLN_NUMBER}
+
+384-391 Cycle Code PIC 9(08) NUMERIC Required Section: PROCESSING
+        Processing cycle identifier
+        Format: {CYCLE_CODE}
+
+Record Length: 1000 characters
+Record Type: Fixed-length, EBCDIC encoded
+
+MODULE SPECIFIC DATA - {ID}:
+============================
+- Test record sequence: {ID}
+- Default tax year: {TAX_YEAR}
+- Sample AGI range: ${AGI_LOW} - ${AGI_HIGH}
+- Processing cycle: {CYCLE_CODE}

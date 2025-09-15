@@ -19,9 +19,9 @@ jobs:
       (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      pull-requests: read
-      issues: read
+      contents: write  # Allow Claude to make changes to files
+      pull-requests: write  # Allow Claude to create/update PRs
+      issues: write  # Allow Claude to update issues
       id-token: write
       actions: read # Required for Claude to read CI results on PRs
     steps:
@@ -39,12 +39,31 @@ jobs:
           # This is an optional setting that allows Claude to read CI results on PRs
           additional_permissions: |
             actions: read
+          
+          # Configure Claude using claude_args (newer format)
+          claude_args: |
+            --model claude-sonnet-4-20250514
+            --max-turns 10
 
-          # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
-          # prompt: 'Update the pull request description to include a summary of changes.'
+          # Custom instructions for project-specific guidance (supplements Anthropic's system prompt)
+          custom_instructions: |
+            This is a BigQuery AI Hackathon project. Key project guidelines:
+            - Follow instructions in CLAUDE.md for project-specific protocols
+            - Prefer editing existing files over creating new ones
+            - Focus on functional implementation over mocks for demo readiness
+            - Use make commands for BigQuery operations when needed
+            - This is a Python/FastAPI backend with BigQuery integration
 
-          # Optional: Add claude_args to customize behavior and configuration
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://docs.anthropic.com/en/docs/claude-code/sdk#command-line for available options
-          # claude_args: '--model claude-opus-4-1-20250805 --allowed-tools Bash(gh pr:*)'
+          # Optional: Customize the trigger phrase (default: @claude)
+          # trigger_phrase: "/claude"
+
+          # Optional: Trigger when specific user is assigned to an issue
+          # assignee_trigger: "claude-bot"
+
+          # Allow Claude to run specific commands based on project permissions
+          allowed_tools: "Bash(make:*),Bash(pytest:*),Bash(python:*),Bash(pre-commit run:*),Bash(gh pr:*),Bash(gh issue:*),Bash(black:*),WebSearch,WebFetch(domain:github.com)"
+          
+          # Optional: Custom environment variables for Claude
+          # claude_env: |
+          #   NODE_ENV: test
 

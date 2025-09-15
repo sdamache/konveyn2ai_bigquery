@@ -36,19 +36,39 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: |
-            Please review this pull request and provide feedback on:
-            - Code quality and best practices
-            - Potential bugs or issues
-            - Performance considerations
-            - Security concerns
-            - Test coverage
-            
-            Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
+
+          # Configure Claude using claude_args (newer format)
+          claude_args: |
+            --model claude-sonnet-4-20250514
+            --max-turns 5
+            --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"
+
+          # Direct prompt for automated review (no @claude mention needed)
+          direct_prompt: |
+            Review this PR for the BigQuery AI Hackathon project following CLAUDE.md protocols:
+
+            **🔥 MANDATORY FILE EDITING POLICY:**
+            - Verify: Are existing files being enhanced rather than new files created?
+            - Check: Is this following "edit-first, create-last" principle?
+            - Flag: Any unnecessary file creation that could be consolidation
+
+            **🧪 DEMO READINESS:**
+            - Verify: Real functionality (not mocks) for core BigQuery features
+            - Check: Code works for live demo presentation
+            - Assess: Integration with BigQuery/Gemini API is functional
+
+            **🎯 ARCHITECTURE COMPLIANCE:**
+            - Tier 1: BigQuery Studio/Colab + static HTML viewer components
+            - Tier 2: Python CLI/Make targets, Svami orchestrator, Janapada memory
+            - Tier 3: BigQuery as system of record (source_metadata, source_embeddings, gap_metrics)
+
+            **🚀 CODE QUALITY:**
+            - Python/FastAPI best practices for hackathon speed
+            - BigQuery integration patterns and security
+            - Make command usage and M1 ingestion workflows
+            - Test coverage for functional (not style) requirements
+
+            Focus on functional implementation over perfect code style. Be constructive and hackathon-speed oriented.
 
             Use `gh pr comment` with your Bash tool to leave your review as a comment on the PR.
-          
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://docs.anthropic.com/en/docs/claude-code/sdk#command-line for available options
-          claude_args: '--allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
 

@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app-deployment-{ID}
+  namespace: production
+  labels:
+    app: web-app-{ID}
+    version: v1.{ID}.0
+    environment: production
+spec:
+  replicas: {REPLICAS}
+  selector:
+    matchLabels:
+      app: web-app-{ID}
+  template:
+    metadata:
+      labels:
+        app: web-app-{ID}
+        version: v1.{ID}.0
+    spec:
+      containers:
+      - name: web-app
+        image: nginx:1.21-{IMAGE_TAG}
+        ports:
+        - containerPort: {PORT}
+        env:
+        - name: ENV
+          value: "production"
+        - name: APP_ID
+          value: "app-{ID}"
+        - name: CONFIG_VERSION
+          value: "v1.{ID}.0"
+        resources:
+          requests:
+            memory: "{MEMORY_REQUEST}Mi"
+            cpu: "{CPU_REQUEST}m"
+          limits:
+            memory: "{MEMORY_LIMIT}Mi"
+            cpu: "{CPU_LIMIT}m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {PORT}
+          initialDelaySeconds: {LIVENESS_DELAY}
+          periodSeconds: {LIVENESS_PERIOD}
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: {PORT}
+          initialDelaySeconds: {READINESS_DELAY}
+          periodSeconds: {READINESS_PERIOD}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-service-{ID}
+  namespace: production
+spec:
+  selector:
+    app: web-app-{ID}
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: {PORT}
+    protocol: TCP
