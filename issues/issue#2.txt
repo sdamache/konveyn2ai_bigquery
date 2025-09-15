@@ -1,0 +1,37 @@
+# Preface — Ingestion to BigQuery (K8s, FastAPI, COBOL, IRS, MUMPS)
+
+## What
+Implement ingestion scripts that extract knowledge artifacts from the listed source types and write normalized chunks into BigQuery’s `source_metadata` table using the shared schemas from Issue #1.
+
+## Why
+Enable downstream embedding + gap detection on a unified corpus. Keep scripts idempotent and environment-driven; avoid schema drift.
+
+## Constraints
+- Always run `make setup` first (idempotent table creation).
+- Use the **shared schema files** from Issue #1; do not duplicate DDL.
+- Write ≥100 rows per source family for demo data.
+- No persona/taxonomy, no viewer work in this issue.
+
+---
+
+## Source Issue (verbatim)
+Overview
+Implement data ingestion scripts that extract knowledge artifacts from multiple source types and write them into BigQuery. 
+These parsers should chunk the data according to the strategies defined in our ingestion plan.
+
+Tasks
+Kubernetes & FastAPI (Backend AI 1):
+Use the Kubernetes Python client to fetch live *.yaml and *.json resources or clone relevant repos to read manifest files.
+For FastAPI projects, download or fetch the /openapi.json definition and inspect the src/ directory for Pydantic models and route handlers via AST parsing.
+Chunk each deployment, service, or endpoint as a separate record, capturing metadata such as kind, api_path, http_method, and model names.
+COBOL, IRS, MUMPS (Backend AI 2):
+Write parsers to read .cpy and .cbl copybooks, splitting on 01‑level data structures, capturing field names and PIC clauses.
+Parse IRS IMF copybook definitions and extract record layouts with start positions, lengths, and types.
+Traverse MUMPS globals and FileMan dictionaries; create chunks per FileMan file and per top‑level global node. Capture file numbers, field numbers, and global names.
+Normalize all extracted chunks into a common schema and upsert them into the source_metadata table with source identifiers and artifact type tags.
+
+## Acceptance Criteria (verbatim)
+Acceptance Criteria
+Parsers for Kubernetes/FastAPI and COBOL/IRS/MUMPS source types run independently and write at least 100 sample rows into BigQuery.
+Each row has the required metadata fields and a text content field.
+Ingestion scripts can be invoked via make ingest_k8s, make ingest_fastapi, make ingest_cobol, etc.
