@@ -17,6 +17,9 @@ node_modules/
 .env.staging
 .env.test
 
+# Embedding cache files (keep directory structure)
+.cache/embeddings/*.json
+
 # Editor directories and files
 .idea
 .vscode

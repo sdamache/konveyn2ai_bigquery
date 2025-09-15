@@ -25,6 +25,7 @@ help:
 	@echo ""
 	@echo "Available commands:"
 	@echo "  make setup     - Create BigQuery dataset, tables and indexes"
+	@echo "  make embeddings - Generate embeddings for BigQuery vector store"
 	@echo "  make migrate   - Migrate vectors from Vertex AI to BigQuery"
 	@echo "  make run       - Start BigQuery vector backend API server"
 	@echo "  make test      - Run all tests (contract, integration, unit)"
@@ -89,6 +90,25 @@ migrate: check-env setup
 	@echo "🔄 Starting migration from Vertex AI to BigQuery..."
 	python scripts/migrate_to_bigquery.py
 	@echo "✅ Migration completed"
+
+# Generate embeddings
+embeddings: check-env setup
+	@echo "🧠 Generating embeddings for BigQuery vector store..."
+	@if [ -z "$$GOOGLE_API_KEY" ]; then \
+		echo "❌ GOOGLE_API_KEY environment variable not set"; \
+		echo "   Run: export GOOGLE_API_KEY=your_api_key"; \
+		exit 1; \
+	fi
+	python -m pipeline.embedding \
+		--project $$GOOGLE_CLOUD_PROJECT \
+		--dataset $$BIGQUERY_DATASET_ID \
+		--batch-size $${EMBED_BATCH_SIZE:-32} \
+		--cache-dir $${EMBED_CACHE_DIR:-.cache/embeddings} \
+		$$(if [ "$$DRY_RUN" = "1" ]; then echo "--dry-run"; fi) \
+		$$(if [ -n "$$LIMIT" ]; then echo "--limit $$LIMIT"; fi) \
+		$$(if [ -n "$$WHERE" ]; then echo "--where \"$$WHERE\""; fi) \
+		--verbose
+	@echo "✅ Embedding generation completed"
 
 # Run the vector backend API
 run: check-env

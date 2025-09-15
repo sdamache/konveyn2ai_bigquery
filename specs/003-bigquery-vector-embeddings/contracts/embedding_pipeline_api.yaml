@@ -1,0 +1,354 @@
+openapi: 3.0.3
+info:
+  title: BigQuery Vector Embeddings Pipeline API
+  description: API contract for embedding generation pipeline with caching and batch processing
+  version: 1.0.0
+  contact:
+    name: KonveyN2AI Team
+    url: https://github.com/sdamache/konveyn2ai_bigquery
+
+paths:
+  /embeddings/generate:
+    post:
+      summary: Generate embeddings for text chunks
+      description: Process text chunks to generate 768-dimensional embeddings using Gemini API
+      operationId: generateEmbeddings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmbeddingGenerationRequest'
+      responses:
+        '200':
+          description: Embeddings generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingGenerationResponse'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /embeddings/status:
+    get:
+      summary: Get embedding generation status
+      description: Retrieve statistics and status of embedding generation pipeline
+      operationId: getEmbeddingStatus
+      parameters:
+        - name: project_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Google Cloud project ID
+        - name: dataset_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: BigQuery dataset ID
+      responses:
+        '200':
+          description: Status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddingStatusResponse'
+
+  /embeddings/search:
+    post:
+      summary: Search for similar embeddings
+      description: Find nearest neighbors using BigQuery vector search
+      operationId: searchSimilarEmbeddings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VectorSearchRequest'
+      responses:
+        '200':
+          description: Similar embeddings found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VectorSearchResponse'
+
+components:
+  schemas:
+    EmbeddingGenerationRequest:
+      type: object
+      required:
+        - project_id
+        - dataset_id
+        - api_key
+      properties:
+        project_id:
+          type: string
+          description: Google Cloud project ID
+          example: "konveyn2ai"
+        dataset_id:
+          type: string
+          description: BigQuery dataset ID
+          example: "semantic_gap_detector"
+        api_key:
+          type: string
+          description: Google API key for Gemini
+          format: password
+        model:
+          type: string
+          description: Embedding model name
+          default: "models/text-embedding-004"
+          example: "models/text-embedding-004"
+        batch_size:
+          type: integer
+          description: Batch size for API calls
+          default: 32
+          minimum: 1
+          maximum: 100
+        limit:
+          type: integer
+          description: Maximum number of chunks to process
+          minimum: 1
+          example: 1000
+        where_clause:
+          type: string
+          description: Additional WHERE clause for filtering
+          example: "source_type = 'k8s'"
+        dry_run:
+          type: boolean
+          description: If true, don't actually store embeddings
+          default: false
+        cache_dir:
+          type: string
+          description: Cache directory path
+          default: ".cache/embeddings"
+
+    EmbeddingGenerationResponse:
+      type: object
+      required:
+        - chunks_scanned
+        - embeddings_generated
+        - embeddings_stored
+        - processing_time_ms
+        - generator_stats
+      properties:
+        chunks_scanned:
+          type: integer
+          description: Number of chunks processed
+          example: 150
+        embeddings_generated:
+          type: integer
+          description: Number of embeddings successfully generated
+          example: 145
+        embeddings_stored:
+          type: integer
+          description: Number of embeddings stored in BigQuery
+          example: 145
+        processing_time_ms:
+          type: integer
+          description: Total processing time in milliseconds
+          example: 45000
+        generator_stats:
+          $ref: '#/components/schemas/GeneratorStats'
+
+    GeneratorStats:
+      type: object
+      required:
+        - api_calls
+        - cache_hits
+        - cache_misses
+        - failed_requests
+        - avg_latency_ms
+      properties:
+        api_calls:
+          type: integer
+          description: Total API calls made
+          example: 30
+        cache_hits:
+          type: integer
+          description: Number of cache hits
+          example: 115
+        cache_misses:
+          type: integer
+          description: Number of cache misses
+          example: 30
+        failed_requests:
+          type: integer
+          description: Number of failed API requests
+          example: 5
+        total_latency_ms:
+          type: integer
+          description: Cumulative API latency
+          example: 6000
+        avg_latency_ms:
+          type: number
+          description: Average API latency per request
+          example: 200.0
+
+    EmbeddingStatusResponse:
+      type: object
+      required:
+        - total_embeddings
+        - unique_chunks
+        - embedding_dimensions
+        - last_updated
+      properties:
+        total_embeddings:
+          type: integer
+          description: Total number of embeddings stored
+          example: 5420
+        unique_chunks:
+          type: integer
+          description: Number of unique chunks with embeddings
+          example: 5420
+        unique_models:
+          type: integer
+          description: Number of different embedding models used
+          example: 1
+        embedding_dimensions:
+          type: integer
+          description: Dimension of embedding vectors
+          example: 768
+        first_embedding:
+          type: string
+          format: date-time
+          description: Timestamp of first embedding created
+        last_updated:
+          type: string
+          format: date-time
+          description: Timestamp of most recent embedding
+
+    VectorSearchRequest:
+      type: object
+      required:
+        - query_embedding
+        - project_id
+        - dataset_id
+      properties:
+        query_embedding:
+          type: array
+          items:
+            type: number
+          description: Query vector for similarity search
+          minItems: 768
+          maxItems: 768
+        project_id:
+          type: string
+          description: Google Cloud project ID
+        dataset_id:
+          type: string
+          description: BigQuery dataset ID
+        top_k:
+          type: integer
+          description: Number of nearest neighbors to return
+          default: 5
+          minimum: 1
+          maximum: 100
+        distance_type:
+          type: string
+          description: Distance metric for similarity
+          enum: ["COSINE", "EUCLIDEAN", "DOT_PRODUCT"]
+          default: "COSINE"
+
+    VectorSearchResponse:
+      type: object
+      required:
+        - results
+        - query_time_ms
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimilarityResult'
+        query_time_ms:
+          type: integer
+          description: Query execution time in milliseconds
+          example: 120
+
+    SimilarityResult:
+      type: object
+      required:
+        - chunk_id
+        - distance
+        - similarity_score
+        - text_content
+        - source
+        - artifact_type
+      properties:
+        chunk_id:
+          type: string
+          description: Unique chunk identifier
+          example: "k8s_deployment_nginx_001"
+        distance:
+          type: number
+          description: Distance score (lower = more similar)
+          example: 0.15
+        similarity_score:
+          type: number
+          description: Similarity score (higher = more similar)
+          example: 0.85
+        text_content:
+          type: string
+          description: Truncated text content preview
+          example: "apiVersion: apps/v1\nkind: Deployment..."
+        source:
+          type: string
+          description: Source identifier
+          example: "nginx-deployment.yaml"
+        artifact_type:
+          type: string
+          description: Type of source artifact
+          example: "k8s"
+        model:
+          type: string
+          description: Embedding model used
+          example: "text-embedding-004"
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error type identifier
+          example: "RATE_LIMIT_EXCEEDED"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "API rate limit exceeded. Please retry after 60 seconds."
+        details:
+          type: object
+          description: Additional error details
+        retry_after:
+          type: integer
+          description: Seconds to wait before retrying (for rate limits)
+          example: 60
+
+  securitySchemes:
+    ApiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Google API key for Gemini access
+
+security:
+  - ApiKey: []

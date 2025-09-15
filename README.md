@@ -73,6 +73,101 @@
 
 **Command**: `make test-contract` to verify TDD foundation
 
+## 🧠 Embedding Generation Pipeline
+
+KonveyN2AI implements a production-ready embedding generation pipeline that creates 768-dimensional vectors for semantic search using Google Gemini API.
+
+### Key Features
+- **768-dimensional embeddings** using Google's `text-embedding-004` model
+- **Idempotent behavior** - skip existing embeddings automatically  
+- **Disk-based caching** with SHA256 content hashing
+- **Exponential backoff** and retry logic for API resilience
+- **Batch processing** with configurable batch sizes (default: 32)
+- **Cost optimization** through intelligent caching and deduplication
+
+### Quick Start
+```bash
+# Setup environment variables
+export GOOGLE_CLOUD_PROJECT=konveyn2ai
+export BIGQUERY_DATASET_ID=semantic_gap_detector  
+export GOOGLE_API_KEY=your_gemini_api_key
+
+# Generate embeddings for all pending chunks
+make embeddings
+
+# Dry run with limit (testing)
+LIMIT=100 DRY_RUN=1 make embeddings
+
+# Batch size and cache configuration
+EMBED_BATCH_SIZE=16 EMBED_CACHE_DIR=.cache/embeddings make embeddings
+```
+
+### Usage Examples
+
+#### Basic Embedding Generation
+```python
+from pipeline.embedding import EmbeddingPipeline
+
+# Initialize pipeline
+pipeline = EmbeddingPipeline(
+    project_id="konveyn2ai",
+    dataset_id="semantic_gap_detector", 
+    api_key="your_gemini_api_key"
+)
+
+# Generate embeddings for pending chunks
+result = pipeline.generate_embeddings(limit=1000)
+
+print(f"Generated {result['embeddings_generated']} embeddings")
+print(f"API calls: {result['generator_stats']['api_calls']}")
+print(f"Cache hits: {result['generator_stats']['cache_hits']}")
+```
+
+#### Vector Similarity Search Testing
+```python
+# Test vector search functionality
+python test_vector_search.py \
+    --project konveyn2ai \
+    --dataset semantic_gap_detector \
+    --verbose
+```
+
+### Expected Performance
+- **API Latency**: ~100-200ms per embedding request
+- **Cache Hit Rate**: 70-90% on subsequent runs
+- **Cost Estimate**: ~$0.025 per 1,000 chunks (768-dim embeddings)
+- **Processing Rate**: 100-500 chunks per minute (depending on cache hits)
+
+### BigQuery Vector Operations
+The pipeline creates and manages a `source_embeddings` table with:
+- **chunk_id**: Unique identifier linking to source_metadata  
+- **embedding**: 768-dimensional FLOAT64 array
+- **model**: Embedding model name (text-embedding-004)
+- **content_hash**: SHA256 hash for deduplication
+- **Vector search support**: Compatible with `VECTOR_SEARCH()` and `ML.APPROXIMATE_NEIGHBORS()`
+
+### Error Handling & Monitoring
+- **Exponential backoff** for rate limiting (429 errors)
+- **Automatic retries** for transient failures (5xx errors) 
+- **Comprehensive logging** with request tracing and performance metrics
+- **Graceful degradation** - continues processing other chunks if some fail
+
+### Cache Management
+```bash
+# Cache location
+ls -la .cache/embeddings/
+
+# Cache statistics
+python -c "
+from pipeline.embedding import EmbeddingCache
+cache = EmbeddingCache()
+print(f'Cache entries: {len(list(cache.cache_dir.glob(\"*.json\")))}')
+"
+
+# Clear cache (force regeneration)
+rm -rf .cache/embeddings/
+```
+
 ## 🚀 M1 Multi-Source Ingestion - Usage Examples
 
 ### Quick Start - Ingestion Pipeline
