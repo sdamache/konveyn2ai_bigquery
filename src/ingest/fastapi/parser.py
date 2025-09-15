@@ -23,29 +23,21 @@ from typing import Dict, List, Any, Optional, Tuple, Iterator, Union
 from datetime import datetime, timezone
 from pathlib import Path
 import logging
-
-# Import contract interfaces
 import sys
-import importlib.util
 
-# Load parser interfaces dynamically
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-parser_interfaces_path = os.path.join(project_root, "specs", "002-m1-parse-and", "contracts", "parser-interfaces.py")
-
-# Load the contract interfaces (required for proper contract compliance)
-spec = importlib.util.spec_from_file_location("parser_interfaces", parser_interfaces_path)
-parser_interfaces = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(parser_interfaces)
-
-BaseParser = parser_interfaces.BaseParser
-FastAPIParser = parser_interfaces.FastAPIParser
-SourceType = parser_interfaces.SourceType
-ChunkMetadata = parser_interfaces.ChunkMetadata
-ParseResult = parser_interfaces.ParseResult
-ParseError = parser_interfaces.ParseError
-ErrorClass = parser_interfaces.ErrorClass
+# Contract interfaces (standardized import)
+from src.common.parser_interfaces import (
+    BaseParser,
+    FastAPIParser,
+    SourceType,
+    ChunkMetadata,
+    ParseResult,
+    ParseError,
+    ErrorClass,
+)
 
 # Import common utilities
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 sys.path.append(os.path.join(project_root, "src"))
 from common.chunking import ContentChunker, ChunkConfig, ChunkingStrategy
 from common.ids import ArtifactIDGenerator, ContentHashGenerator
@@ -150,7 +142,7 @@ class FastAPIParserImpl(FastAPIParser):
                 collected_at=datetime.now(datetime.timezone.utc)
             ))
 
-        processing_duration = int((time.time() - start_time) * 1000)
+        processing_duration = max(1, int((time.time() - start_time) * 1000))
         return ParseResult(chunks, errors, 1, processing_duration)
 
     def parse_directory(self, directory_path: str) -> ParseResult:
@@ -199,7 +191,7 @@ class FastAPIParserImpl(FastAPIParser):
                 collected_at=datetime.now(datetime.timezone.utc)
             ))
 
-        processing_duration = int((time.time() - start_time) * 1000)
+        processing_duration = max(1, int((time.time() - start_time) * 1000))
         return ParseResult(all_chunks, all_errors, files_processed, processing_duration)
 
     def validate_content(self, content: str) -> bool:
@@ -209,6 +201,11 @@ class FastAPIParserImpl(FastAPIParser):
 
         # Check for FastAPI Python code
         if self._is_fastapi_python_content(content):
+            # Validate Python syntax to avoid accepting broken code
+            try:
+                ast.parse(content)
+            except SyntaxError:
+                return False
             return True
 
         # Check for OpenAPI specification
@@ -430,7 +427,8 @@ class FastAPIParserImpl(FastAPIParser):
         lines = source_code.split('\n')
 
         for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef):
+            # Support both regular and async functions
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 # Check if function has FastAPI route decorators
                 route_info = self._analyze_route_decorators(node)
                 if route_info:
@@ -463,7 +461,7 @@ class FastAPIParserImpl(FastAPIParser):
         lines = source_code.split('\n')
 
         for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 # Check if function is used as a dependency
                 if self._is_dependency_function(node, tree):
                     chunk = self._create_dependency_function_chunk(
@@ -473,7 +471,7 @@ class FastAPIParserImpl(FastAPIParser):
 
         return chunks
 
-    def _analyze_route_decorators(self, func_node: ast.FunctionDef) -> Optional[Dict[str, Any]]:
+    def _analyze_route_decorators(self, func_node: Union[ast.FunctionDef, ast.AsyncFunctionDef]) -> Optional[Dict[str, Any]]:
         """Analyze function decorators for FastAPI route information"""
         for decorator in func_node.decorator_list:
             if isinstance(decorator, ast.Call):
@@ -517,7 +515,7 @@ class FastAPIParserImpl(FastAPIParser):
                 return True
         return False
 
-    def _is_dependency_function(self, func_node: ast.FunctionDef, tree: ast.AST) -> bool:
+    def _is_dependency_function(self, func_node: Union[ast.FunctionDef, ast.AsyncFunctionDef], tree: ast.AST) -> bool:
         """Check if function is used as FastAPI dependency"""
         func_name = func_node.name
 
@@ -530,7 +528,7 @@ class FastAPIParserImpl(FastAPIParser):
                             return True
         return False
 
-    def _create_route_function_chunk(self, func_node: ast.FunctionDef,
+    def _create_route_function_chunk(self, func_node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
                                    route_info: Dict[str, Any],
                                    source_code: str, lines: List[str]) -> ChunkMetadata:
         """Create chunk for FastAPI route function"""
@@ -647,7 +645,7 @@ class FastAPIParserImpl(FastAPIParser):
             }
         )
 
-    def _create_dependency_function_chunk(self, func_node: ast.FunctionDef,
+    def _create_dependency_function_chunk(self, func_node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
                                         source_code: str, lines: List[str]) -> ChunkMetadata:
         """Create chunk for dependency function"""
         start_line = func_node.lineno
