@@ -127,6 +127,7 @@ class BigQueryWriter:
                 bigquery.SchemaField("source_metadata", "STRING", mode="NULLABLE"),
             ],
             "source_metadata_errors": [
+                bigquery.SchemaField("error_id", "STRING", mode="REQUIRED"),
                 bigquery.SchemaField("source_type", "STRING", mode="REQUIRED"),
                 bigquery.SchemaField("source_uri", "STRING", mode="REQUIRED"),
                 bigquery.SchemaField("error_class", "STRING", mode="REQUIRED"),
@@ -141,12 +142,15 @@ class BigQueryWriter:
                 bigquery.SchemaField("started_at", "TIMESTAMP", mode="REQUIRED"),
                 bigquery.SchemaField("completed_at", "TIMESTAMP", mode="NULLABLE"),
                 bigquery.SchemaField("status", "STRING", mode="REQUIRED"),
-                bigquery.SchemaField("files_processed", "INTEGER", mode="NULLABLE"),
-                bigquery.SchemaField("chunks_created", "INTEGER", mode="NULLABLE"),
-                bigquery.SchemaField("errors_encountered", "INTEGER", mode="NULLABLE"),
+                bigquery.SchemaField("files_processed", "INTEGER", mode="REQUIRED"),
+                bigquery.SchemaField("rows_written", "INTEGER", mode="REQUIRED"),
+                bigquery.SchemaField("rows_skipped", "INTEGER", mode="REQUIRED"),
+                bigquery.SchemaField("errors_count", "INTEGER", mode="REQUIRED"),
+                bigquery.SchemaField("bytes_written", "INTEGER", mode="REQUIRED"),
                 bigquery.SchemaField("processing_duration_ms", "INTEGER", mode="NULLABLE"),
-                bigquery.SchemaField("config_used", "STRING", mode="NULLABLE"),
-                bigquery.SchemaField("error_summary", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("avg_chunk_size_tokens", "FLOAT", mode="NULLABLE"),
+                bigquery.SchemaField("tool_version", "STRING", mode="REQUIRED"),
+                bigquery.SchemaField("config_params", "JSON", mode="NULLABLE"),
             ]
         }
 
@@ -533,7 +537,13 @@ class BigQueryWriter:
 
     def _error_to_row(self, error: ParseError) -> Dict[str, Any]:
         """Convert ParseError to BigQuery row"""
+        import hashlib
+        # Generate error_id from error content for uniqueness
+        error_content = f"{error.source_uri}:{error.error_class}:{error.error_msg}"
+        error_id = hashlib.sha256(error_content.encode()).hexdigest()[:16]
+
         return {
+            "error_id": error_id,
             "source_type": error.source_type.value if isinstance(error.source_type, SourceType) else str(error.source_type),
             "source_uri": error.source_uri,
             "error_class": error.error_class.value if isinstance(error.error_class, ErrorClass) else str(error.error_class),
@@ -545,9 +555,13 @@ class BigQueryWriter:
 
     def _run_info_to_row(self, run_info: Dict[str, Any]) -> Dict[str, Any]:
         """Convert run info to BigQuery row"""
-        # Convert config_used to JSON string for BigQuery STRING field
-        config_used_dict = run_info.get("config_used", {})
-        config_used_json = json.dumps(config_used_dict) if config_used_dict else None
+        # Convert config_params to JSON for BigQuery JSON field
+        config_params = run_info.get("config_params", run_info.get("config_used", {}))
+
+        # Calculate average chunk size in tokens if chunks data available
+        avg_chunk_tokens = None
+        if run_info.get("chunks_created") and run_info.get("total_tokens"):
+            avg_chunk_tokens = run_info.get("total_tokens") / run_info.get("chunks_created")
 
         return {
             "run_id": run_info.get("run_id"),
@@ -555,12 +569,15 @@ class BigQueryWriter:
             "started_at": run_info.get("started_at", datetime.now(timezone.utc)).isoformat(),
             "completed_at": run_info.get("completed_at").isoformat() if run_info.get("completed_at") else None,
             "status": run_info.get("status", "unknown"),
-            "files_processed": run_info.get("files_processed"),
-            "chunks_created": run_info.get("chunks_created"),
-            "errors_encountered": run_info.get("errors_encountered"),
+            "files_processed": run_info.get("files_processed", 0),
+            "rows_written": run_info.get("rows_written", run_info.get("chunks_created", 0)),
+            "rows_skipped": run_info.get("rows_skipped", 0),
+            "errors_count": run_info.get("errors_count", run_info.get("errors_encountered", 0)),
+            "bytes_written": run_info.get("bytes_written", 0),
             "processing_duration_ms": run_info.get("processing_duration_ms"),
-            "config_used": config_used_json,
-            "error_summary": run_info.get("error_summary")
+            "avg_chunk_size_tokens": avg_chunk_tokens,
+            "tool_version": run_info.get("tool_version", "1.0.0"),
+            "config_params": config_params
         }
 
     @contextmanager
@@ -580,8 +597,12 @@ class BigQueryWriter:
 
         run_stats = {
             "files_processed": 0,
-            "chunks_created": 0,
-            "errors_encountered": 0
+            "rows_written": 0,
+            "rows_skipped": 0,
+            "errors_count": 0,
+            "bytes_written": 0,
+            "total_tokens": 0,
+            "chunks_created": 0  # Keep for backward compatibility
         }
 
         try:
@@ -598,10 +619,14 @@ class BigQueryWriter:
                 "completed_at": completed_at,
                 "status": "completed",
                 "files_processed": run_stats["files_processed"],
-                "chunks_created": run_stats["chunks_created"],
-                "errors_encountered": run_stats["errors_encountered"],
+                "rows_written": run_stats.get("rows_written", run_stats.get("chunks_created", 0)),
+                "rows_skipped": run_stats.get("rows_skipped", 0),
+                "errors_count": run_stats.get("errors_count", 0),
+                "bytes_written": run_stats.get("bytes_written"),
                 "processing_duration_ms": duration_ms,
-                "config_used": config_used or {}
+                "total_tokens": run_stats.get("total_tokens"),
+                "tool_version": "1.0.0",
+                "config_params": config_used or {}
             })
 
         except Exception as e:
@@ -616,10 +641,14 @@ class BigQueryWriter:
                 "completed_at": completed_at,
                 "status": "failed",
                 "files_processed": run_stats["files_processed"],
-                "chunks_created": run_stats["chunks_created"],
-                "errors_encountered": run_stats["errors_encountered"],
+                "rows_written": run_stats.get("rows_written", run_stats.get("chunks_created", 0)),
+                "rows_skipped": run_stats.get("rows_skipped", 0),
+                "errors_count": run_stats.get("errors_count", 0) + 1,
+                "bytes_written": run_stats.get("bytes_written"),
                 "processing_duration_ms": duration_ms,
-                "config_used": config_used or {},
+                "total_tokens": run_stats.get("total_tokens"),
+                "tool_version": "1.0.0",
+                "config_params": config_used or {},
                 "error_summary": str(e)
             })
             raise
