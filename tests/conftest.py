@@ -310,6 +310,8 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "slow: Slow running tests")
     config.addinivalue_line("markers", "docker: Tests requiring Docker")
     config.addinivalue_line("markers", "external: Tests requiring external services")
+    config.addinivalue_line("markers", "bigquery: Tests requiring BigQuery integration")
+    config.addinivalue_line("markers", "contract: Contract tests for interface compliance")
 
 
 def pytest_collection_modifyitems(config, items):
