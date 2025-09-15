@@ -334,11 +334,11 @@ def main():
         results = tester.run_comprehensive_test()
         
         # Print results
-        print(f"\nVector Search Test Results:")
+        print("\nVector Search Test Results:")
         print(f"  Test Status: {results['test_status']}")
         
         stats = results['embedding_stats']
-        print(f"\nEmbedding Statistics:")
+        print("\nEmbedding Statistics:")
         print(f"  Total embeddings: {stats.get('total_embeddings', 0)}")
         print(f"  Unique chunks: {stats.get('unique_chunks', 0)}")
         print(f"  Embedding dimensions: {stats.get('embedding_dimensions', 'N/A')}")
@@ -347,7 +347,7 @@ def main():
         
         if results.get('sample_chunk'):
             chunk = results['sample_chunk']
-            print(f"\nSample Chunk:")
+            print("\nSample Chunk:")
             print(f"  Chunk ID: {chunk['chunk_id']}")
             print(f"  Source: {chunk['source']}")
             print(f"  Type: {chunk['artifact_type']}")

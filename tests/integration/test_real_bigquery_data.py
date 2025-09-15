@@ -919,7 +919,6 @@ def manhattan_distance(point_a, point_b):
         report_file = "real_bigquery_integration_test_results.json"
         with open(report_file, "w") as f:
             json.dump(self.results, f, indent=2, default=str)
-        
         logger.info(f"📋 Full report saved to: {report_file}")
         logger.info("="*60)
 

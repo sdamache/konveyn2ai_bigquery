@@ -484,14 +484,14 @@ def main():
         )
         
         # Print results
-        print(f"\nEmbedding Generation Results:")
+        print("\nEmbedding Generation Results:")
         print(f"  Chunks scanned: {result['chunks_scanned']}")
         print(f"  Embeddings generated: {result['embeddings_generated']}")
         print(f"  Embeddings stored: {result['embeddings_stored']}")
         print(f"  Processing time: {result['processing_time_ms']}ms")
         
         stats = result['generator_stats']
-        print(f"\nAPI Statistics:")
+        print("\nAPI Statistics:")
         print(f"  API calls: {stats['api_calls']}")
         print(f"  Cache hits: {stats['cache_hits']}")
         print(f"  Cache misses: {stats['cache_misses']}")

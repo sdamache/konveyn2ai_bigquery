@@ -170,7 +170,7 @@ class TestBigQueryEmbeddingSchema:
             # Just check that query can be created (table is accessible)
             assert query_job is not None, "Should be able to query source_embeddings table"
         except NotFound:
-            pytest.fail(f"source_embeddings table not accessible for vector operations")
+            pytest.fail("source_embeddings table not accessible for vector operations")
         except Exception as e:
             pytest.fail(f"Vector search setup may be incomplete: {e}")
 
