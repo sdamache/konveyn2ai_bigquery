@@ -299,3 +299,4 @@ class TestVectorStoreSearch:
         assert response_data["total_results"] == 0
         assert "query_embedding" in response_data
         assert "search_time_ms" in response_data
+

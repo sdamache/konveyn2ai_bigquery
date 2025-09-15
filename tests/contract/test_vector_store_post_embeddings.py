@@ -208,3 +208,4 @@ class TestVectorStorePostEmbeddings:
         assert isinstance(response_data["chunk_id"], str)
         assert isinstance(response_data["status"], str)
         assert isinstance(response_data["created_at"], str)
+

@@ -208,3 +208,4 @@ class TestVectorStoreGetEmbeddings:
         assert "embeddings" in response_data
         assert response_data["limit"] == 5
         assert response_data["offset"] == 0
+

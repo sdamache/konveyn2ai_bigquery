@@ -352,3 +352,4 @@ class TestSchemaManagerCreateIndexes:
 
         response_data = response.json()
         assert response_data["indexes_created"] == []
+
