@@ -623,6 +623,7 @@ class TestCOBOLParserContract:
 class TestCOBOLParserContractFailure:
     """Tests that should fail until implementation is complete (TDD verification)"""
 
+    @pytest.mark.skipif(COBOL_PARSER_AVAILABLE, reason="Implementation available")
     def test_implementation_not_available(self):
         """This test ensures we're in TDD mode - implementation should not exist yet"""
         # This test should pass initially, then fail once implementation exists
@@ -633,6 +634,7 @@ class TestCOBOLParserContractFailure:
             # This is expected in TDD mode
             pass
 
+    @pytest.mark.skipif(COBOL_PARSER_AVAILABLE, reason="Implementation available")
     def test_contract_will_fail_without_implementation(self):
         """Verify that the contract tests will fail without implementation"""
         assert not COBOL_PARSER_AVAILABLE, (

@@ -10,11 +10,22 @@ import importlib.util
 # Get project root
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 
-# Load parser interfaces module once
+"""
+Ensure a single, shared "parser_interfaces" module instance across the process.
+
+This avoids duplicate class identities that break isinstance/issubclass checks
+when different parts of the code dynamically import the contracts.
+"""
 parser_interfaces_path = os.path.join(project_root, "specs", "002-m1-parse-and", "contracts", "parser-interfaces.py")
-spec = importlib.util.spec_from_file_location("parser_interfaces", parser_interfaces_path)
-parser_interfaces = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(parser_interfaces)
+
+if "parser_interfaces" in sys.modules:
+    parser_interfaces = sys.modules["parser_interfaces"]
+else:
+    spec = importlib.util.spec_from_file_location("parser_interfaces", parser_interfaces_path)
+    parser_interfaces = importlib.util.module_from_spec(spec)
+    # Register in sys.modules before exec to make it discoverable
+    sys.modules["parser_interfaces"] = parser_interfaces
+    spec.loader.exec_module(parser_interfaces)
 
 # Export all the classes
 IRSParser = parser_interfaces.IRSParser

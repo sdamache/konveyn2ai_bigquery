@@ -19,31 +19,19 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "contract: Contract tests for interface compliance (TDD)")
     config.addinivalue_line("markers", "unit: Unit tests for individual components")
 
-# Import the parser interface contracts
+# Import the parser interface contracts via shared module
 try:
-    import sys
-    import os
-    # Add project root to Python path
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    sys.path.insert(0, project_root)
-
-    # Import using the module loading approach for hyphenated filenames
-    import importlib.util
-    parser_interfaces_path = os.path.join(project_root, "specs", "002-m1-parse-and", "contracts", "parser-interfaces.py")
-    spec = importlib.util.spec_from_file_location("parser_interfaces", parser_interfaces_path)
-    parser_interfaces = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(parser_interfaces)
-
-    BaseParser = parser_interfaces.BaseParser
-    MUMPSParser = parser_interfaces.MUMPSParser
-    SourceType = parser_interfaces.SourceType
-    ChunkMetadata = parser_interfaces.ChunkMetadata
-    ParseResult = parser_interfaces.ParseResult
-    ParseError = parser_interfaces.ParseError
-    ErrorClass = parser_interfaces.ErrorClass
-
+    from src.common.parser_interfaces import (
+        BaseParser,
+        MUMPSParser,
+        SourceType,
+        ChunkMetadata,
+        ParseResult,
+        ParseError,
+        ErrorClass,
+    )
     PARSER_INTERFACES_AVAILABLE = True
-except (ImportError, AttributeError, FileNotFoundError) as e:
+except Exception as e:
     PARSER_INTERFACES_AVAILABLE = False
     print(f"Warning: Could not import parser interfaces: {e}")
 

@@ -23,37 +23,17 @@ except ImportError:
     # Only log warning when live cluster functionality is specifically requested
     # The warning will be shown in extract_live_resources() if needed
 
-# Import parser contracts using standard importlib approach matching test setup
 import sys
-import importlib.util
 
-# Get project root
-current_dir = os.path.dirname(__file__)
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-
-# Add project root to sys.path if not already there
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
-# Import using the module loading approach for hyphenated filenames
-if "parser_interfaces" in sys.modules:
-    # Use existing module if already loaded
-    parser_interfaces = sys.modules["parser_interfaces"]
-else:
-    # Load the module
-    parser_interfaces_path = os.path.join(project_root, "specs", "002-m1-parse-and", "contracts", "parser-interfaces.py")
-    spec = importlib.util.spec_from_file_location("parser_interfaces", parser_interfaces_path)
-    parser_interfaces = importlib.util.module_from_spec(spec)
-    sys.modules["parser_interfaces"] = parser_interfaces  # Add to sys.modules for sharing
-    spec.loader.exec_module(parser_interfaces)
-
-# Import all required classes
-KubernetesParser = parser_interfaces.KubernetesParser
-ChunkMetadata = parser_interfaces.ChunkMetadata
-ParseError = parser_interfaces.ParseError
-ParseResult = parser_interfaces.ParseResult
-SourceType = parser_interfaces.SourceType
-ErrorClass = parser_interfaces.ErrorClass
+# Contract interfaces (standardized import)
+from src.common.parser_interfaces import (
+    KubernetesParser,
+    ChunkMetadata,
+    ParseError,
+    ParseResult,
+    SourceType,
+    ErrorClass,
+)
 
 # Import common utilities
 from src.common.chunking import ContentChunker, ChunkConfig, ChunkingStrategy

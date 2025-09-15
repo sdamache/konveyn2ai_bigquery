@@ -7,13 +7,20 @@ import re
 import struct
 import os
 import time
+import sys
 from typing import Dict, List, Any, Optional, Iterator
 from datetime import datetime
 from pathlib import Path
 
-# Import contract interfaces
+# Contract interfaces (standardized import)
 from src.common.parser_interfaces import (
-    IRSParser, BaseParser, SourceType, ChunkMetadata, ParseResult, ParseError, ErrorClass
+    IRSParser,
+    BaseParser,
+    SourceType,
+    ChunkMetadata,
+    ParseResult,
+    ParseError,
+    ErrorClass,
 )
 
 # Import common utilities

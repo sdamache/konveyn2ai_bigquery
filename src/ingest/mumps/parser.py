@@ -26,102 +26,16 @@ from datetime import datetime, UTC
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple, Iterator
 
-# Import contract interfaces
-import sys
-import importlib.util
-
-# Import parser interface contract
-try:
-    project_root = Path(__file__).parent.parent.parent.parent
-    specs_path = project_root / "specs" / "002-m1-parse-and" / "contracts" / "parser-interfaces.py"
-    spec = importlib.util.spec_from_file_location("parser_interfaces", specs_path)
-
-    # Check if parser_interfaces already exists in sys.modules
-    if "parser_interfaces" in sys.modules:
-        parser_interfaces = sys.modules["parser_interfaces"]
-    else:
-        parser_interfaces = importlib.util.module_from_spec(spec)
-        sys.modules["parser_interfaces"] = parser_interfaces  # Add to sys.modules
-        spec.loader.exec_module(parser_interfaces)
-
-    BaseParser = parser_interfaces.BaseParser
-    MUMPSParser = parser_interfaces.MUMPSParser
-    ChunkMetadata = parser_interfaces.ChunkMetadata
-    ParseResult = parser_interfaces.ParseResult
-    ParseError = parser_interfaces.ParseError
-    SourceType = parser_interfaces.SourceType
-    ErrorClass = parser_interfaces.ErrorClass
-    CONTRACT_IMPORTS_SUCCESS = True
-except (ImportError, FileNotFoundError) as e:
-    CONTRACT_IMPORTS_SUCCESS = False
-    # Fallback for standalone usage
-    from abc import ABC, abstractmethod
-    from dataclasses import dataclass
-    from enum import Enum
-
-    class SourceType(Enum):
-        MUMPS = "mumps"
-
-    class ErrorClass(Enum):
-        PARSING = "parsing"
-        VALIDATION = "validation"
-        INGESTION = "ingestion"
-
-    @dataclass
-    class ChunkMetadata:
-        source_type: SourceType
-        artifact_id: str
-        content_text: str
-        content_hash: str
-        source_uri: str
-        parent_id: Optional[str] = None
-        parent_type: Optional[str] = None
-        content_tokens: Optional[int] = None
-        repo_ref: Optional[str] = None
-        collected_at: Optional[datetime] = None
-        source_metadata: Dict[str, Any] = None
-
-    @dataclass
-    class ParseError:
-        source_type: SourceType
-        source_uri: str
-        error_class: ErrorClass
-        error_msg: str
-        sample_text: Optional[str] = None
-        stack_trace: Optional[str] = None
-        collected_at: Optional[datetime] = None
-
-    @dataclass
-    class ParseResult:
-        chunks: List[ChunkMetadata]
-        errors: List[ParseError]
-        files_processed: int
-        processing_duration_ms: int
-
-    class BaseParser(ABC):
-        def __init__(self, version: str = "1.0.0"):
-            self.version = version
-            self.source_type = self._get_source_type()
-
-        @abstractmethod
-        def _get_source_type(self) -> SourceType:
-            pass
-
-        def generate_artifact_id(self, source_path: str, **kwargs) -> str:
-            return f"{self.source_type.value}://{source_path}"
-
-        def generate_content_hash(self, content: str) -> str:
-            import hashlib
-            return hashlib.sha256(content.strip().encode('utf-8')).hexdigest()
-
-    class MUMPSParser(BaseParser):
-        @abstractmethod
-        def parse_fileman_dict(self, dict_content: str) -> List[ChunkMetadata]:
-            pass
-
-        @abstractmethod
-        def parse_global_definition(self, global_content: str) -> List[ChunkMetadata]:
-            pass
+# Contract interfaces (standardized import)
+from src.common.parser_interfaces import (
+    BaseParser,
+    MUMPSParser,
+    ChunkMetadata,
+    ParseResult,
+    ParseError,
+    SourceType,
+    ErrorClass,
+)
 
 # Import common utilities
 try:

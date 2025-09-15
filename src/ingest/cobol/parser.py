@@ -11,23 +11,17 @@ from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Import parser contracts using the same approach as tests
 import sys
-import importlib.util
-import os
 
-# Use dynamic loading with sys.modules caching to ensure consistent module identity
-if "parser_interfaces" in sys.modules:
-    # Use existing module if already loaded (e.g., by tests)
-    parser_interfaces = sys.modules["parser_interfaces"]
-else:
-    # Load new module and cache it
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-    parser_interfaces_path = os.path.join(project_root, "specs", "002-m1-parse-and", "contracts", "parser-interfaces.py")
-    spec = importlib.util.spec_from_file_location("parser_interfaces", parser_interfaces_path)
-    parser_interfaces = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(parser_interfaces)
-    sys.modules["parser_interfaces"] = parser_interfaces
+# Contract interfaces (standardized import)
+from src.common.parser_interfaces import (
+    COBOLParser,
+    SourceType,
+    ChunkMetadata,
+    ParseResult,
+    ParseError,
+    ErrorClass,
+)
 
 # Import common utilities
 from src.common.chunking import ContentChunker, ChunkConfig, ChunkingStrategy
@@ -36,7 +30,7 @@ from src.common.normalize import ContentNormalizer
 from src.common.bq_writer import BigQueryWriter
 
 
-class COBOLParserImpl(parser_interfaces.COBOLParser):
+class COBOLParserImpl(COBOLParser):
     """
     COBOL Copybook Parser Implementation
 
@@ -91,9 +85,9 @@ class COBOLParserImpl(parser_interfaces.COBOLParser):
 
     def _get_source_type(self):
         """Return COBOL source type"""
-        return parser_interfaces.SourceType.COBOL
+        return SourceType.COBOL
 
-    def parse_file(self, file_path: str) -> parser_interfaces.ParseResult:
+    def parse_file(self, file_path: str) -> ParseResult:
         """Parse a single COBOL copybook file"""
         start_time = time.perf_counter()
         chunks = []
@@ -102,14 +96,14 @@ class COBOLParserImpl(parser_interfaces.COBOLParser):
         try:
             # Validate file exists and is readable
             if not os.path.exists(file_path):
-                errors.append(parser_interfaces.ParseError(
+                errors.append(ParseError(
                     source_type=self.source_type,
                     source_uri=file_path,
-                    error_class=parser_interfaces.ErrorClass.PARSING,
+                    error_class=ErrorClass.PARSING,
                     error_msg=f"File not found: {file_path}",
                     collected_at=datetime.now(timezone.utc)
                 ))
-                return parser_interfaces.ParseResult(
+                return ParseResult(
                     chunks=chunks,
                     errors=errors,
                     files_processed=0,
@@ -126,14 +120,14 @@ class COBOLParserImpl(parser_interfaces.COBOLParser):
                     with open(file_path, 'r', encoding='cp1252') as f:
                         content = f.read()
                 except Exception as e:
-                    errors.append(parser_interfaces.ParseError(
+                    errors.append(ParseError(
                         source_type=self.source_type,
                         source_uri=file_path,
-                        error_class=parser_interfaces.ErrorClass.PARSING,
+                        error_class=ErrorClass.PARSING,
                         error_msg=f"Could not read file with UTF-8 or CP1252 encoding: {e}",
                         collected_at=datetime.now(timezone.utc)
                     ))
-                    return parser_interfaces.ParseResult(
+                    return ParseResult(
                         chunks=chunks,
                         errors=errors,
                         files_processed=0,
@@ -142,15 +136,15 @@ class COBOLParserImpl(parser_interfaces.COBOLParser):
 
             # Validate content
             if not self.validate_content(content):
-                errors.append(parser_interfaces.ParseError(
+                errors.append(ParseError(
                     source_type=self.source_type,
                     source_uri=file_path,
-                    error_class=parser_interfaces.ErrorClass.VALIDATION,
+                    error_class=ErrorClass.VALIDATION,
                     error_msg="Content does not appear to be a valid COBOL copybook",
                     sample_text=content[:200] if content else None,
                     collected_at=datetime.now(timezone.utc)
                 ))
-                return parser_interfaces.ParseResult(
+                return ParseResult(
                     chunks=chunks,
                     errors=errors,
                     files_processed=0,
@@ -166,10 +160,10 @@ class COBOLParserImpl(parser_interfaces.COBOLParser):
                 chunks.extend(file_chunks)
 
             except Exception as e:
-                errors.append(parser_interfaces.ParseError(
+                errors.append(ParseError(
                     source_type=self.source_type,
                     source_uri=file_path,
-                    error_class=parser_interfaces.ErrorClass.PARSING,
+                    error_class=ErrorClass.PARSING,
                     error_msg=f"Error parsing copybook: {e}",
                     sample_text=content[:500] if content else None,
                     stack_trace=traceback.format_exc(),
@@ -177,23 +171,23 @@ class COBOLParserImpl(parser_interfaces.COBOLParser):
                 ))
 
         except Exception as e:
-            errors.append(parser_interfaces.ParseError(
+            errors.append(ParseError(
                 source_type=self.source_type,
                 source_uri=file_path,
-                error_class=parser_interfaces.ErrorClass.PARSING,
+                error_class=ErrorClass.PARSING,
                 error_msg=f"Unexpected error processing file: {e}",
                 stack_trace=traceback.format_exc(),
                 collected_at=datetime.utcnow()
             ))
 
-        return parser_interfaces.ParseResult(
+        return ParseResult(
             chunks=chunks,
             errors=errors,
             files_processed=1,
             processing_duration_ms=max(1, int((time.perf_counter() - start_time) * 1000))
         )
 
-    def parse_directory(self, directory_path: str) -> parser_interfaces.ParseResult:
+    def parse_directory(self, directory_path: str) -> ParseResult:
         """Parse all COBOL copybook files in a directory"""
         start_time = time.perf_counter()
         all_chunks = []
@@ -206,14 +200,14 @@ class COBOLParserImpl(parser_interfaces.COBOLParser):
 
             directory = Path(directory_path)
             if not directory.exists():
-                all_errors.append(parser_interfaces.ParseError(
+                all_errors.append(ParseError(
                     source_type=self.source_type,
                     source_uri=directory_path,
-                    error_class=parser_interfaces.ErrorClass.PARSING,
+                    error_class=ErrorClass.PARSING,
                     error_msg=f"Directory not found: {directory_path}",
                     collected_at=datetime.now(timezone.utc)
                 ))
-                return parser_interfaces.ParseResult(
+                return ParseResult(
                     chunks=all_chunks,
                     errors=all_errors,
                     files_processed=0,
@@ -234,26 +228,26 @@ class COBOLParserImpl(parser_interfaces.COBOLParser):
                     all_errors.extend(result.errors)
                     files_processed += result.files_processed
                 except Exception as e:
-                    all_errors.append(parser_interfaces.ParseError(
+                    all_errors.append(ParseError(
                         source_type=self.source_type,
                         source_uri=str(file_path),
-                        error_class=parser_interfaces.ErrorClass.PARSING,
+                        error_class=ErrorClass.PARSING,
                         error_msg=f"Error processing file {file_path}: {e}",
                         stack_trace=traceback.format_exc(),
                         collected_at=datetime.now(timezone.utc)
                     ))
 
         except Exception as e:
-            all_errors.append(parser_interfaces.ParseError(
+            all_errors.append(ParseError(
                 source_type=self.source_type,
                 source_uri=directory_path,
-                error_class=parser_interfaces.ErrorClass.PARSING,
+                error_class=ErrorClass.PARSING,
                 error_msg=f"Error scanning directory: {e}",
                 stack_trace=traceback.format_exc(),
                 collected_at=datetime.utcnow()
             ))
 
-        return parser_interfaces.ParseResult(
+        return ParseResult(
             chunks=all_chunks,
             errors=all_errors,
             files_processed=files_processed,
@@ -278,7 +272,7 @@ class COBOLParserImpl(parser_interfaces.COBOLParser):
         # At least one indicator should be present
         return any(indicators)
 
-    def parse_copybook(self, copybook_content: str) -> List[parser_interfaces.ChunkMetadata]:
+    def parse_copybook(self, copybook_content: str) -> List[ChunkMetadata]:
         """Parse COBOL copybook with level structures"""
         chunks = []
 
@@ -423,7 +417,7 @@ class COBOLParserImpl(parser_interfaces.COBOLParser):
         return structures
 
     def _parse_single_structure(self, structure_name: str, structure_content: str,
-                              full_content: str, start_line: int) -> parser_interfaces.ChunkMetadata:
+                              full_content: str, start_line: int) -> ChunkMetadata:
         """Parse a single 01-level structure"""
 
         # Extract all fields and their metadata
@@ -458,7 +452,7 @@ class COBOLParserImpl(parser_interfaces.COBOLParser):
         content_text = chunk_results[0].content if chunk_results else structure_content
         content_tokens = chunk_results[0].token_count if chunk_results else None
 
-        return parser_interfaces.ChunkMetadata(
+        return ChunkMetadata(
             source_type=self.source_type,
             artifact_id=artifact_id,
             content_text=content_text,

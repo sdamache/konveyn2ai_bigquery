@@ -20,37 +20,19 @@ from datetime import datetime
 from typing import Dict, List, Any
 from unittest.mock import patch, MagicMock
 
-# Import the parser interface contracts
+# Import the parser interface contracts via shared module
 try:
-    import sys
-    import os
-    # Add project root to Python path
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-    sys.path.insert(0, project_root)
-
-    # Import using the module loading approach for hyphenated filenames
-    import importlib.util
-    if "parser_interfaces" in sys.modules:
-        # Use existing module if already loaded
-        parser_interfaces = sys.modules["parser_interfaces"]
-    else:
-        # Load the module
-        parser_interfaces_path = os.path.join(project_root, "specs", "002-m1-parse-and", "contracts", "parser-interfaces.py")
-        spec = importlib.util.spec_from_file_location("parser_interfaces", parser_interfaces_path)
-        parser_interfaces = importlib.util.module_from_spec(spec)
-        sys.modules["parser_interfaces"] = parser_interfaces  # Add to sys.modules for sharing
-        spec.loader.exec_module(parser_interfaces)
-
-    BaseParser = parser_interfaces.BaseParser
-    KubernetesParser = parser_interfaces.KubernetesParser
-    SourceType = parser_interfaces.SourceType
-    ChunkMetadata = parser_interfaces.ChunkMetadata
-    ParseResult = parser_interfaces.ParseResult
-    ParseError = parser_interfaces.ParseError
-    ErrorClass = parser_interfaces.ErrorClass
-
+    from src.common.parser_interfaces import (
+        BaseParser,
+        KubernetesParser,
+        SourceType,
+        ChunkMetadata,
+        ParseResult,
+        ParseError,
+        ErrorClass,
+    )
     PARSER_INTERFACES_AVAILABLE = True
-except (ImportError, AttributeError, FileNotFoundError) as e:
+except Exception as e:
     PARSER_INTERFACES_AVAILABLE = False
     print(f"Warning: Could not import parser interfaces: {e}")
 
@@ -576,6 +558,7 @@ class TestKubernetesParserContract:
 class TestKubernetesParserContractFailure:
     """Tests that should fail until implementation is complete (TDD verification)"""
 
+    @pytest.mark.skipif(KUBERNETES_PARSER_AVAILABLE, reason="Implementation available")
     def test_implementation_not_available(self):
         """This test ensures we're in TDD mode - implementation should not exist yet"""
         # This test should pass initially, then fail once implementation exists
@@ -586,6 +569,7 @@ class TestKubernetesParserContractFailure:
             # This is expected in TDD mode
             pass
 
+    @pytest.mark.skipif(KUBERNETES_PARSER_AVAILABLE, reason="Implementation available")
     def test_contract_will_fail_without_implementation(self):
         """Verify that the contract tests will fail without implementation"""
         assert not KUBERNETES_PARSER_AVAILABLE, (
