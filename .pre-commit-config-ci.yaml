@@ -18,6 +18,7 @@ repos:
       - id: black
         language_version: python3
         args: [--check, --diff]  # CI validation only - no modifications
+        exclude: ^examples/performance_templates/.*\.py$
 
   # Ruff linting - CHECK ONLY MODE
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -25,6 +26,7 @@ repos:
     hooks:
       - id: ruff
         args: []  # Default behavior is check-only, no --fix needed
+        exclude: ^examples/performance_templates/.*\.py$
 
   # Local tools using versions from requirements.txt - CHECK ONLY MODE
   - repo: local
@@ -48,3 +50,11 @@ repos:
       #   args: [--check-untyped-defs, --ignore-missing-imports, --namespace-packages]
       #   files: ^src/.*\.py$
       #   exclude: ^src/.*/test_.*\.py$
+
+# Exclude non-source directories so CI validation matches local behavior
+exclude: |
+  (?x)
+  (
+    (^|/)(venv|\.venv|env|site-packages|\.tox|\.nox|build|dist|\.eggs)(/|$)
+    | ^examples/performance_templates/
+  )
