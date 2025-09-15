@@ -10,7 +10,7 @@ import uvicorn
 app = FastAPI(
     title="Sample API",
     description="A sample FastAPI application for testing M1 ingestion",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 class User(BaseModel):
@@ -39,7 +39,7 @@ async def health_check():
 @app.get("/users", response_model=List[User])
 async def get_users(skip: int = 0, limit: int = 10):
     """Get all users with pagination"""
-    return users_db[skip:skip + limit]
+    return users_db[skip : skip + limit]
 
 @app.get("/users/{user_id}", response_model=User)
 async def get_user(user_id: int):
@@ -56,7 +56,7 @@ async def create_user(user: UserCreate):
         "id": len(users_db) + 1,
         "name": user.name,
         "email": user.email,
-        "active": True
+        "active": True,
     }
     users_db.append(new_user)
     return new_user
@@ -70,7 +70,7 @@ async def update_user(user_id: int, user: UserCreate):
                 "id": user_id,
                 "name": user.name,
                 "email": user.email,
-                "active": existing_user["active"]
+                "active": existing_user["active"],
             }
             users_db[i] = updated_user
             return updated_user

@@ -20,6 +20,7 @@ try:
 except ImportError:
     # Fallback: define minimal types
     from enum import Enum
+
     class SourceType(Enum):
         KUBERNETES = "kubernetes"
         FASTAPI = "fastapi"
@@ -59,7 +60,7 @@ class DataQualityValidator:
 
     def validate_table_existence(self) -> Dict[str, bool]:
         """Validate that all required tables exist"""
-        required_tables = ['source_metadata', 'source_metadata_errors', 'ingestion_log']
+        required_tables = ["source_metadata", "source_metadata_errors", "ingestion_log"]
         results = {}
 
         self.logger.info("Validating table existence...")
@@ -107,12 +108,12 @@ class DataQualityValidator:
             for row in query_job:
                 source_type = row.source_type
                 results[source_type] = {
-                    'total_rows': row.total_rows,
-                    'unique_artifacts': row.unique_artifacts,
+                    "total_rows": row.total_rows,
+                    "unique_artifacts": row.unique_artifacts,
                     'unique_parents': row.unique_parents,
                     'avg_tokens_per_chunk': round(row.avg_tokens_per_chunk, 2) if row.avg_tokens_per_chunk else 0,
                     'earliest_ingestion': row.earliest_ingestion,
-                    'latest_ingestion': row.latest_ingestion
+                    "latest_ingestion": row.latest_ingestion
                 }
 
             return results
@@ -180,7 +181,7 @@ class DataQualityValidator:
                 'avg_processing_time_ms': round(row.avg_processing_time_ms, 2) if row.avg_processing_time_ms else 0,
                 'first_run': row.first_run,
                 'last_run': row.last_run,
-                'success_rate': round(row.success_rate, 4) if row.success_rate else 0
+                "success_rate": round(row.success_rate, 4) if row.success_rate else 0
             }
 
         except Exception as e:
@@ -192,65 +193,65 @@ class DataQualityValidator:
         self.logger.info("Starting comprehensive data quality validation...")
 
         validation_results = {
-            'timestamp': datetime.utcnow().isoformat(),
-            'table_existence': self.validate_table_existence(),
-            'source_counts': self.get_source_metadata_counts(),
-            'error_stats': self.get_error_statistics(),
-            'ingestion_stats': self.get_ingestion_statistics(),
-            'quality_checks': {}
+            "timestamp": datetime.utcnow().isoformat(),
+            "table_existence": self.validate_table_existence(),
+            "source_counts": self.get_source_metadata_counts(),
+            "error_stats": self.get_error_statistics(),
+            "ingestion_stats": self.get_ingestion_statistics(),
+            "quality_checks": {},
         }
 
         # Perform quality checks
-        source_counts = validation_results['source_counts']
-        quality_checks = validation_results['quality_checks']
+        source_counts = validation_results["source_counts"]
+        quality_checks = validation_results["quality_checks"]
 
         # Check 1: Minimum rows per source type (T038 requirement)
-        quality_checks['min_rows_per_source'] = {}
+        quality_checks["min_rows_per_source"] = {}
         for source_type in self.expected_sources:
             if source_type in source_counts:
-                row_count = source_counts[source_type]['total_rows']
+                row_count = source_counts[source_type]["total_rows"]
                 meets_threshold = row_count >= self.MIN_ROWS_PER_SOURCE
-                quality_checks['min_rows_per_source'][source_type] = {
-                    'row_count': row_count,
-                    'threshold': self.MIN_ROWS_PER_SOURCE,
-                    'meets_threshold': meets_threshold
+                quality_checks["min_rows_per_source"][source_type] = {
+                    "row_count": row_count,
+                    "threshold": self.MIN_ROWS_PER_SOURCE,
+                    "meets_threshold": meets_threshold
                 }
             else:
-                quality_checks['min_rows_per_source'][source_type] = {
-                    'row_count': 0,
-                    'threshold': self.MIN_ROWS_PER_SOURCE,
-                    'meets_threshold': False
+                quality_checks["min_rows_per_source"][source_type] = {
+                    "row_count": 0,
+                    "threshold": self.MIN_ROWS_PER_SOURCE,
+                    "meets_threshold": False
                 }
 
         # Check 2: Data diversity (unique artifacts vs total rows)
-        quality_checks['data_diversity'] = {}
+        quality_checks["data_diversity"] = {}
         for source_type, stats in source_counts.items():
-            total_rows = stats['total_rows']
-            unique_artifacts = stats['unique_artifacts']
+            total_rows = stats["total_rows"]
+            unique_artifacts = stats["unique_artifacts"]
             diversity_ratio = unique_artifacts / total_rows if total_rows > 0 else 0
 
-            quality_checks['data_diversity'][source_type] = {
-                'total_rows': total_rows,
-                'unique_artifacts': unique_artifacts,
-                'diversity_ratio': round(diversity_ratio, 4),
-                'healthy_diversity': diversity_ratio > 0.1  # At least 10% unique artifacts
+            quality_checks["data_diversity"][source_type] = {
+                "total_rows": total_rows,
+                "unique_artifacts": unique_artifacts,
+                "diversity_ratio": round(diversity_ratio, 4),
+                "healthy_diversity": diversity_ratio > 0.1  # At least 10% unique artifacts
             }
 
         # Check 3: Error rate analysis
         ingestion_stats = validation_results['ingestion_stats']
         if ingestion_stats:
-            success_rate = ingestion_stats.get('success_rate', 0)
-            quality_checks['error_rate'] = {
-                'success_rate': success_rate,
-                'meets_threshold': success_rate >= self.MIN_SUCCESS_RATE,
-                'threshold': self.MIN_SUCCESS_RATE
+            success_rate = ingestion_stats.get("success_rate", 0)
+            quality_checks["error_rate"] = {
+                "success_rate": success_rate,
+                "meets_threshold": success_rate >= self.MIN_SUCCESS_RATE,
+                "threshold": self.MIN_SUCCESS_RATE
             }
 
         # Check 4: Recent activity (data freshness)
-        quality_checks['data_freshness'] = {}
+        quality_checks["data_freshness"] = {}
         current_time = datetime.utcnow()
         for source_type, stats in source_counts.items():
-            latest_ingestion = stats.get('latest_ingestion')
+            latest_ingestion = stats.get("latest_ingestion")
             if latest_ingestion:
                 # Handle timezone differences
                 if latest_ingestion.tzinfo is None:
@@ -261,14 +262,14 @@ class DataQualityValidator:
                     latest_ingestion_utc = latest_ingestion.replace(tzinfo=None)
 
                 hours_since_last = (current_time - latest_ingestion_utc).total_seconds() / 3600
-                quality_checks['data_freshness'][source_type] = {
-                    'latest_ingestion': latest_ingestion.isoformat() if hasattr(latest_ingestion, 'isoformat') else str(latest_ingestion),
-                    'hours_since_last': round(hours_since_last, 2),
-                    'is_recent': hours_since_last < 24  # Within last 24 hours
+                quality_checks["data_freshness"][source_type] = {
+                    "latest_ingestion": latest_ingestion.isoformat() if hasattr(latest_ingestion, 'isoformat') else str(latest_ingestion),
+                    "hours_since_last": round(hours_since_last, 2),
+                    "is_recent": hours_since_last < 24  # Within last 24 hours
                 }
 
         # Overall quality assessment
-        quality_checks['overall_assessment'] = self._assess_overall_quality(quality_checks)
+        quality_checks["overall_assessment"] = self._assess_overall_quality(quality_checks)
 
         return validation_results
 
@@ -277,37 +278,37 @@ class DataQualityValidator:
 
         # Count passing checks
         source_threshold_passes = sum(
-            1 for check in quality_checks.get('min_rows_per_source', {}).values()
-            if check['meets_threshold']
+            1 for check in quality_checks.get("min_rows_per_source", {}).values()
+            if check["meets_threshold"]
         )
         total_sources = len(self.expected_sources)
 
         diversity_passes = sum(
-            1 for check in quality_checks.get('data_diversity', {}).values()
-            if check['healthy_diversity']
+            1 for check in quality_checks.get("data_diversity", {}).values()
+            if check["healthy_diversity"]
         )
 
-        error_rate_pass = quality_checks.get('error_rate', {}).get('meets_threshold', False)
+        error_rate_pass = quality_checks.get("error_rate", {}).get("meets_threshold", False)
 
         # Calculate overall score
         source_score = (source_threshold_passes / total_sources) * 40  # 40% weight
-        diversity_score = (diversity_passes / max(1, len(quality_checks.get('data_diversity', {})))) * 30  # 30% weight
+        diversity_score = (diversity_passes / max(1, len(quality_checks.get("data_diversity", {})))) * 30  # 30% weight
         error_score = 20 if error_rate_pass else 0  # 20% weight
         freshness_score = 10 if any(
-            check.get('is_recent', False)
-            for check in quality_checks.get('data_freshness', {}).values()
+            check.get("is_recent", False)
+            for check in quality_checks.get("data_freshness", {}).values()
         ) else 0  # 10% weight
 
         overall_score = source_score + diversity_score + error_score + freshness_score
 
         return {
-            'overall_score': round(overall_score, 2),
-            'max_score': 100,
-            'source_threshold_passes': f"{source_threshold_passes}/{total_sources}",
-            'diversity_passes': f"{diversity_passes}/{len(quality_checks.get('data_diversity', {}))}",
-            'error_rate_acceptable': error_rate_pass,
-            'data_is_fresh': freshness_score > 0,
-            'quality_grade': self._get_quality_grade(overall_score)
+            "overall_score": round(overall_score, 2),
+            "max_score": 100,
+            "source_threshold_passes": f"{source_threshold_passes}/{total_sources}",
+            "diversity_passes": f"{diversity_passes}/{len(quality_checks.get('data_diversity', {}))}",
+            "error_rate_acceptable": error_rate_pass,
+            "data_is_fresh": freshness_score > 0,
+            "quality_grade": self._get_quality_grade(overall_score),
         }
 
     def _get_quality_grade(self, score: float) -> str:
@@ -348,15 +349,15 @@ class DataQualityValidator:
         for source_type in self.expected_sources:
             if source_type in source_counts:
                 stats = source_counts[source_type]
-                threshold_check = quality_checks['min_rows_per_source'].get(source_type, {})
+                threshold_check = quality_checks["min_rows_per_source"].get(source_type, {})
 
-                status = "✅ PASS" if threshold_check.get('meets_threshold', False) else "❌ FAIL"
+                status = "✅ PASS" if threshold_check.get("meets_threshold", False) else "❌ FAIL"
                 print(f"  {source_type.upper()}:")
-                print(f"    Rows: {stats['total_rows']:,} (threshold: {self.MIN_ROWS_PER_SOURCE}) {status}")
-                print(f"    Unique artifacts: {stats['unique_artifacts']:,}")
+                print(f"    Rows: {stats["total_rows"]:,} (threshold: {self.MIN_ROWS_PER_SOURCE}) {status}")
+                print(f"    Unique artifacts: {stats["unique_artifacts"]:,}")
                 print(f"    Avg tokens/chunk: {stats['avg_tokens_per_chunk']}")
-                if stats['latest_ingestion']:
-                    print(f"    Latest ingestion: {stats['latest_ingestion']}")
+                if stats["latest_ingestion"]:
+                    print(f"    Latest ingestion: {stats["latest_ingestion"]}")
             else:
                 print(f"  {source_type.upper()}: ❌ NO DATA FOUND")
             print()
@@ -380,7 +381,7 @@ class DataQualityValidator:
             print(f"  Total runs: {ingestion_stats['total_runs']:,}")
             print(f"  Files processed: {ingestion_stats['total_files_processed']:,}")
             print(f"  Chunks created: {ingestion_stats['total_chunks_created']:,}")
-            print(f"  Success rate: {ingestion_stats['success_rate']:.2%}")
+            print(f"  Success rate: {ingestion_stats["success_rate"]:.2%}")
             print(f"  Avg processing time: {ingestion_stats['avg_processing_time_ms']:.2f}ms")
             if ingestion_stats['first_run']:
                 print(f"  First run: {ingestion_stats['first_run']}")
@@ -389,7 +390,7 @@ class DataQualityValidator:
             print()
 
         # Overall assessment
-        overall = quality_checks.get('overall_assessment', {})
+        overall = quality_checks.get("overall_assessment", {})
         if overall:
             print("🎯 OVERALL QUALITY ASSESSMENT:")
             print("-" * 40)
@@ -402,9 +403,9 @@ class DataQualityValidator:
             print()
 
         # T038 specific validation result
-        min_rows_checks = quality_checks.get('min_rows_per_source', {})
+        min_rows_checks = quality_checks.get("min_rows_per_source", {})
         all_sources_pass = all(
-            check.get('meets_threshold', False)
+            check.get("meets_threshold", False)
             for check in min_rows_checks.values()
         )
 
@@ -417,7 +418,7 @@ class DataQualityValidator:
             print("❌ FAILED: Some source types have <100 rows in BigQuery")
             failing_sources = [
                 source for source, check in min_rows_checks.items()
-                if not check.get('meets_threshold', False)
+                if not check.get("meets_threshold", False)
             ]
             print(f"   Failing sources: {', '.join(failing_sources)}")
 
@@ -446,9 +447,9 @@ def main():
         validator.print_validation_report(results)
 
         # Determine exit code based on T038 requirement
-        min_rows_checks = results.get('quality_checks', {}).get('min_rows_per_source', {})
+        min_rows_checks = results.get('quality_checks', {}).get("min_rows_per_source", {})
         all_sources_pass = all(
-            check.get('meets_threshold', False)
+            check.get("meets_threshold", False)
             for check in min_rows_checks.values()
         )
 
