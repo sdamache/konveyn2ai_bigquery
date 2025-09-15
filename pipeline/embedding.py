@@ -28,7 +28,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import google.generativeai as genai
 from google.cloud import bigquery
-from google.generativeai.types import EmbedContentResponse
+# EmbedContentResponse import not needed - using embed_content directly
 
 from src.janapada_memory.bigquery_connection import BigQueryConnection
 from src.janapada_memory.schema_manager import SchemaManager
@@ -503,6 +503,31 @@ def main():
     except Exception as e:
         logger.error(f"Embedding generation failed: {e}")
         return 1
+
+
+# Data Models for API compatibility
+class EmbeddingRequest:
+    """Request model for embedding generation."""
+    def __init__(self, text: str, model: str = "text-embedding-004"):
+        self.text = text
+        self.model = model
+
+class EmbeddingResponse:
+    """Response model for embedding generation."""
+    def __init__(self, embedding: List[float], model: str, content_hash: str):
+        self.embedding = embedding
+        self.model = model
+        self.content_hash = content_hash
+
+class ProcessingStats:
+    """Statistics for embedding processing."""
+    def __init__(self, api_calls: int = 0, cache_hits: int = 0, cache_misses: int = 0, 
+                 failed_requests: int = 0, avg_latency_ms: float = 0.0):
+        self.api_calls = api_calls
+        self.cache_hits = cache_hits
+        self.cache_misses = cache_misses
+        self.failed_requests = failed_requests
+        self.avg_latency_ms = avg_latency_ms
 
 
 if __name__ == "__main__":
