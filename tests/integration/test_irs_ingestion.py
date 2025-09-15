@@ -9,6 +9,7 @@ IRS parser implementation doesn't exist yet (RED phase).
 """
 
 import os
+import sys
 import tempfile
 import uuid
 from datetime import datetime
@@ -19,8 +20,6 @@ from google.cloud import bigquery
 from google.cloud.exceptions import NotFound
 
 # Import contracts - use the common parser interfaces
-import sys
-import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 try:
@@ -47,6 +46,7 @@ except ImportError:
         chunks: List[Dict[str, Any]]
         errors: List[Dict[str, Any]]
         metadata: Optional[Dict[str, Any]] = None
+
 
 # Sample IRS IMF layout content for testing
 SAMPLE_IMF_LAYOUT_BASIC = """
