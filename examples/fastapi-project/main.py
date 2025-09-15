@@ -5,6 +5,7 @@ Sample FastAPI application for testing M1 ingestion
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from typing import List
 
 app = FastAPI(
     title="Sample API",
@@ -40,10 +41,12 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "version": "1.0.0"}
 
+
 @app.get("/users", response_model=List[User])
 async def get_users(skip: int = 0, limit: int = 10):
     """Get all users with pagination"""
     return users_db[skip : skip + limit]
+
 
 @app.get("/users/{user_id}", response_model=User)
 async def get_user(user_id: int):

@@ -20,6 +20,7 @@ try:
 except ImportError:
     # Fallback: define minimal types
     from enum import Enum
+
     class SourceType(Enum):
         KUBERNETES = "kubernetes"
         FASTAPI = "fastapi"
