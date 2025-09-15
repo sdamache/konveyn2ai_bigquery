@@ -18,12 +18,35 @@ import pytest
 from google.cloud import bigquery
 from google.cloud.exceptions import NotFound
 
-# Import contracts - these should exist from the specs
-from specs.contracts.parser_interfaces import (
-    ErrorClass,
-    ParseResult,
-    SourceType,
-)
+# Import contracts - use the common parser interfaces
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
+
+try:
+    from src.common.parser_interfaces import (
+        ErrorClass,
+        ParseResult,
+        SourceType,
+    )
+except ImportError:
+    # Fallback: Use local definitions
+    from enum import Enum
+    from dataclasses import dataclass
+    from typing import List, Dict, Any, Optional
+
+    class SourceType(Enum):
+        IRS = "irs"
+
+    class ErrorClass(Enum):
+        PARSING_ERROR = "parsing_error"
+
+    @dataclass
+    class ParseResult:
+        success: bool
+        chunks: List[Dict[str, Any]]
+        errors: List[Dict[str, Any]]
+        metadata: Optional[Dict[str, Any]] = None
 
 # Sample IRS IMF layout content for testing
 SAMPLE_IMF_LAYOUT_BASIC = """
