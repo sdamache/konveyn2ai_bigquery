@@ -291,7 +291,7 @@ class SchemaManager:
                 num_lists = options["num_lists"]
                 if not (1 <= num_lists <= 5000):
                     raise ValueError(f"num_lists must be between 1 and 5000, got {num_lists}")
-                option_parts.append(f"ivf_options=JSON'{{{\"num_lists\": {num_lists}}}'")
+                option_parts.append(f'ivf_options=JSON\"{{\"num_lists\": {num_lists}}}\""')
             
             if "fraction_lists_to_search" in options:
                 fraction = options["fraction_lists_to_search"]
