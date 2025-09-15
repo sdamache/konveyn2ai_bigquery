@@ -378,4 +378,3 @@ if __name__ == "__main__":
     # Run basic directory structure test
     test_cache_directory_structure()
     print("✅ Cache directory structure test passed")
-

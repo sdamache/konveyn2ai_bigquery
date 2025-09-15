@@ -225,4 +225,3 @@ class TestVectorStoreGetById:
         # Then try to get it
         get_response = client.get(f"/vector-store/embeddings/{chunk_id}")
         assert get_response.status_code == 404
-

@@ -356,4 +356,3 @@ def test_source_metadata_field_modes(bigquery_client, dataset_id):
             assert (
                 field_modes[field_name] == "NULLABLE"
             ), f"Field '{field_name}' should be NULLABLE, got '{field_modes[field_name]}'"
-

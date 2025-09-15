@@ -476,4 +476,3 @@ class TestMUMPSParserEdgeCases:
 
         except ImportError:
             pytest.fail("MUMPSParser implementation not found")
-

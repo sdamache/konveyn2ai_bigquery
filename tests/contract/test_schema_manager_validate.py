@@ -333,4 +333,3 @@ class TestSchemaManagerValidate:
         response_data = response.json()
         # Indexes section might be empty or contain placeholder data
         assert "indexes" in response_data
-

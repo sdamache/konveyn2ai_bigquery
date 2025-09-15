@@ -291,4 +291,3 @@ class TestSchemaManagerCreateTables:
         response_data = response.json()
         # Should create all tables by default
         assert len(response_data["tables_created"]) == 3  # All 3 tables
-

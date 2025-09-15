@@ -325,4 +325,3 @@ if __name__ == "__main__":
     # Run prerequisite check
     test_vector_search_prerequisites()
     print("✅ Vector search prerequisites check passed")
-

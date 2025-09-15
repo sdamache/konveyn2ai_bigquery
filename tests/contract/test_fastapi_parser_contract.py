@@ -1012,4 +1012,3 @@ class TestFastAPIParserContractFailure:
 if __name__ == "__main__":
     # Run the contract tests
     pytest.main([__file__, "-v"])
-

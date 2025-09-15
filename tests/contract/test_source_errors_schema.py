@@ -219,4 +219,3 @@ def test_source_metadata_errors_field_descriptions(bigquery_client, dataset_id):
             assert (
                 len(description) > 10
             ), f"Field '{field_name}' description too short: '{description}'"
-

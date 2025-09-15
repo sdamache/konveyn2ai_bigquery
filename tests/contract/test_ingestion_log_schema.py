@@ -285,4 +285,3 @@ def test_ingestion_log_config_params_json(bigquery_client, dataset_id):
     assert config_field is not None, "config_params field missing from ingestion log"
     assert config_field.field_type == "JSON", "config_params field should be JSON type"
     assert config_field.mode == "NULLABLE", "config_params field should be NULLABLE"
-
