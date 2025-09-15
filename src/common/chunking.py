@@ -4,14 +4,14 @@ T019: Implements intelligent chunking for different source types with overlap an
 """
 
 import re
-import math
-from typing import List, Dict, Any, Optional, Tuple
-from enum import Enum
 from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Optional
 
 
 class ChunkingStrategy(Enum):
     """Different chunking strategies based on source type"""
+
     TOKEN_BASED = "token_based"  # Simple token counting
     SEMANTIC_BLOCKS = "semantic_blocks"  # Code/config blocks
     FIXED_WIDTH = "fixed_width"  # IRS/COBOL fixed-width records
@@ -22,6 +22,7 @@ class ChunkingStrategy(Enum):
 @dataclass
 class ChunkConfig:
     """Configuration for chunking behavior"""
+
     max_tokens: int = 1000
     overlap_pct: float = 0.15  # 15% overlap between chunks
     min_chunk_size: int = 50
@@ -32,11 +33,12 @@ class ChunkConfig:
 @dataclass
 class ChunkResult:
     """Result of chunking operation"""
+
     content: str
     start_position: int
     end_position: int
     token_count: int
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
 
 class ContentChunker:
@@ -51,23 +53,25 @@ class ContentChunker:
         # Semantic boundary patterns for different source types
         self.boundary_patterns = {
             ChunkingStrategy.SEMANTIC_BLOCKS: [
-                r'^---\s*$',  # YAML separators
-                r'^\s*[\{\}]\s*$',  # JSON/JS braces
-                r'^\s*(?:def|class|function|async def)\s+',  # Python/JS functions
-                r'^\s*(?:@[A-Za-z]+\.(?:get|post|put|delete))',  # FastAPI decorators
-                r'^\s*(?:apiVersion|kind):\s*',  # K8s manifest starts
+                r"^---\s*$",  # YAML separators
+                r"^\s*[\{\}]\s*$",  # JSON/JS braces
+                r"^\s*(?:def|class|function|async def)\s+",  # Python/JS functions
+                r"^\s*(?:@[A-Za-z]+\.(?:get|post|put|delete))",  # FastAPI decorators
+                r"^\s*(?:apiVersion|kind):\s*",  # K8s manifest starts
             ],
             ChunkingStrategy.FIXED_WIDTH: [
-                r'^\d{3}-\d{3}\s+',  # IRS field positions (001-009)
-                r'^\s*\d{2}\s+[A-Z0-9_-]+\s+',  # COBOL level numbers
+                r"^\d{3}-\d{3}\s+",  # IRS field positions (001-009)
+                r"^\s*\d{2}\s+[A-Z0-9_-]+\s+",  # COBOL level numbers
             ],
             ChunkingStrategy.HIERARCHICAL: [
-                r'^\^[A-Z0-9_]+\(',  # MUMPS global references
-                r'^\s*\d+\s+[A-Z_]+\s*;',  # FileMan field definitions
-            ]
+                r"^\^[A-Z0-9_]+\(",  # MUMPS global references
+                r"^\s*\d+\s+[A-Z_]+\s*;",  # FileMan field definitions
+            ],
         }
 
-    def chunk_content(self, content: str, source_type: str = "generic") -> List[ChunkResult]:
+    def chunk_content(
+        self, content: str, source_type: str = "generic"
+    ) -> list[ChunkResult]:
         """
         Chunk content based on source type with appropriate strategy
 
@@ -87,7 +91,7 @@ class ContentChunker:
             overlap_pct=self.config.overlap_pct,
             min_chunk_size=self.config.min_chunk_size,
             preserve_boundaries=self.config.preserve_boundaries,
-            strategy=strategy
+            strategy=strategy,
         )
 
         if strategy == ChunkingStrategy.SEMANTIC_BLOCKS:
@@ -115,13 +119,15 @@ class ContentChunker:
     def _estimate_tokens(self, text: str) -> int:
         """Estimate token count for text"""
         # Simple estimation: remove extra whitespace, count characters
-        normalized = re.sub(r'\s+', ' ', text.strip())
+        normalized = re.sub(r"\s+", " ", text.strip())
         return max(1, len(normalized) // self.chars_per_token)
 
-    def _chunk_by_semantic_blocks(self, content: str, config: ChunkConfig, source_type: str) -> List[ChunkResult]:
+    def _chunk_by_semantic_blocks(
+        self, content: str, config: ChunkConfig, source_type: str
+    ) -> list[ChunkResult]:
         """Chunk content by semantic blocks (YAML docs, functions, etc.)"""
         chunks = []
-        lines = content.split('\n')
+        lines = content.split("\n")
 
         current_chunk = []
         current_start = 0
@@ -134,28 +140,33 @@ class ContentChunker:
             is_boundary = self._is_semantic_boundary(line, config.strategy)
 
             # If adding this line would exceed limit, or we hit a boundary, finalize current chunk
-            if ((current_tokens + line_tokens > config.max_tokens and current_chunk) or
-                (is_boundary and current_chunk and config.preserve_boundaries)):
+            if (current_tokens + line_tokens > config.max_tokens and current_chunk) or (
+                is_boundary and current_chunk and config.preserve_boundaries
+            ):
 
                 # Create chunk from current content
-                chunk_content = '\n'.join(current_chunk)
+                chunk_content = "\n".join(current_chunk)
                 if self._estimate_tokens(chunk_content) >= config.min_chunk_size:
-                    chunks.append(ChunkResult(
-                        content=chunk_content,
-                        start_position=current_start,
-                        end_position=current_start + len(chunk_content),
-                        token_count=current_tokens,
-                        metadata={
-                            "strategy": config.strategy.value,
-                            "source_type": source_type,
-                            "line_start": current_start,
-                            "line_end": i,
-                            "semantic_block": True
-                        }
-                    ))
+                    chunks.append(
+                        ChunkResult(
+                            content=chunk_content,
+                            start_position=current_start,
+                            end_position=current_start + len(chunk_content),
+                            token_count=current_tokens,
+                            metadata={
+                                "strategy": config.strategy.value,
+                                "source_type": source_type,
+                                "line_start": current_start,
+                                "line_end": i,
+                                "semantic_block": True,
+                            },
+                        )
+                    )
 
                 # Start new chunk with overlap
-                overlap_lines = self._calculate_overlap_lines(current_chunk, config.overlap_pct)
+                overlap_lines = self._calculate_overlap_lines(
+                    current_chunk, config.overlap_pct
+                )
                 current_chunk = overlap_lines + [line]
                 current_start = i - len(overlap_lines)
                 current_tokens = sum(self._estimate_tokens(l) for l in current_chunk)
@@ -165,28 +176,32 @@ class ContentChunker:
 
         # Handle final chunk
         if current_chunk:
-            chunk_content = '\n'.join(current_chunk)
+            chunk_content = "\n".join(current_chunk)
             if self._estimate_tokens(chunk_content) >= config.min_chunk_size:
-                chunks.append(ChunkResult(
-                    content=chunk_content,
-                    start_position=current_start,
-                    end_position=current_start + len(chunk_content),
-                    token_count=current_tokens,
-                    metadata={
-                        "strategy": config.strategy.value,
-                        "source_type": source_type,
-                        "line_start": current_start,
-                        "line_end": len(lines),
-                        "semantic_block": True
-                    }
-                ))
+                chunks.append(
+                    ChunkResult(
+                        content=chunk_content,
+                        start_position=current_start,
+                        end_position=current_start + len(chunk_content),
+                        token_count=current_tokens,
+                        metadata={
+                            "strategy": config.strategy.value,
+                            "source_type": source_type,
+                            "line_start": current_start,
+                            "line_end": len(lines),
+                            "semantic_block": True,
+                        },
+                    )
+                )
 
         return chunks
 
-    def _chunk_by_fixed_width(self, content: str, config: ChunkConfig, source_type: str) -> List[ChunkResult]:
+    def _chunk_by_fixed_width(
+        self, content: str, config: ChunkConfig, source_type: str
+    ) -> list[ChunkResult]:
         """Chunk fixed-width content (COBOL/IRS) by record boundaries"""
         chunks = []
-        lines = content.split('\n')
+        lines = content.split("\n")
 
         current_chunk = []
         current_start = 0
@@ -203,19 +218,21 @@ class ContentChunker:
             # For fixed-width, chunk by record count or token limit
             if current_tokens + line_tokens > config.max_tokens and current_chunk:
                 # Create chunk
-                chunk_content = '\n'.join(current_chunk)
-                chunks.append(ChunkResult(
-                    content=chunk_content,
-                    start_position=current_start,
-                    end_position=current_start + len(chunk_content),
-                    token_count=current_tokens,
-                    metadata={
-                        "strategy": config.strategy.value,
-                        "source_type": source_type,
-                        "record_count": record_count,
-                        "fixed_width": True
-                    }
-                ))
+                chunk_content = "\n".join(current_chunk)
+                chunks.append(
+                    ChunkResult(
+                        content=chunk_content,
+                        start_position=current_start,
+                        end_position=current_start + len(chunk_content),
+                        token_count=current_tokens,
+                        metadata={
+                            "strategy": config.strategy.value,
+                            "source_type": source_type,
+                            "record_count": record_count,
+                            "fixed_width": True,
+                        },
+                    )
+                )
 
                 # Start new chunk with minimal overlap (preserve record structure)
                 current_chunk = [line]
@@ -229,26 +246,30 @@ class ContentChunker:
 
         # Handle final chunk
         if current_chunk:
-            chunk_content = '\n'.join(current_chunk)
-            chunks.append(ChunkResult(
-                content=chunk_content,
-                start_position=current_start,
-                end_position=current_start + len(chunk_content),
-                token_count=current_tokens,
-                metadata={
-                    "strategy": config.strategy.value,
-                    "source_type": source_type,
-                    "record_count": record_count,
-                    "fixed_width": True
-                }
-            ))
+            chunk_content = "\n".join(current_chunk)
+            chunks.append(
+                ChunkResult(
+                    content=chunk_content,
+                    start_position=current_start,
+                    end_position=current_start + len(chunk_content),
+                    token_count=current_tokens,
+                    metadata={
+                        "strategy": config.strategy.value,
+                        "source_type": source_type,
+                        "record_count": record_count,
+                        "fixed_width": True,
+                    },
+                )
+            )
 
         return chunks
 
-    def _chunk_by_hierarchy(self, content: str, config: ChunkConfig, source_type: str) -> List[ChunkResult]:
+    def _chunk_by_hierarchy(
+        self, content: str, config: ChunkConfig, source_type: str
+    ) -> list[ChunkResult]:
         """Chunk hierarchical content (MUMPS) by node structures"""
         chunks = []
-        lines = content.split('\n')
+        lines = content.split("\n")
 
         current_chunk = []
         current_start = 0
@@ -262,22 +283,27 @@ class ContentChunker:
             new_level = self._detect_hierarchy_level(line, source_type)
 
             # If we're starting a new major section, finalize current chunk
-            if (new_level < hierarchy_level and current_chunk and
-                current_tokens + line_tokens > config.max_tokens):
+            if (
+                new_level < hierarchy_level
+                and current_chunk
+                and current_tokens + line_tokens > config.max_tokens
+            ):
 
-                chunk_content = '\n'.join(current_chunk)
-                chunks.append(ChunkResult(
-                    content=chunk_content,
-                    start_position=current_start,
-                    end_position=current_start + len(chunk_content),
-                    token_count=current_tokens,
-                    metadata={
-                        "strategy": config.strategy.value,
-                        "source_type": source_type,
-                        "hierarchy_level": hierarchy_level,
-                        "hierarchical": True
-                    }
-                ))
+                chunk_content = "\n".join(current_chunk)
+                chunks.append(
+                    ChunkResult(
+                        content=chunk_content,
+                        start_position=current_start,
+                        end_position=current_start + len(chunk_content),
+                        token_count=current_tokens,
+                        metadata={
+                            "strategy": config.strategy.value,
+                            "source_type": source_type,
+                            "hierarchy_level": hierarchy_level,
+                            "hierarchical": True,
+                        },
+                    )
+                )
 
                 # Start new chunk
                 current_chunk = [line]
@@ -291,27 +317,33 @@ class ContentChunker:
 
         # Handle final chunk
         if current_chunk:
-            chunk_content = '\n'.join(current_chunk)
-            chunks.append(ChunkResult(
-                content=chunk_content,
-                start_position=current_start,
-                end_position=current_start + len(chunk_content),
-                token_count=current_tokens,
-                metadata={
-                    "strategy": config.strategy.value,
-                    "source_type": source_type,
-                    "hierarchy_level": hierarchy_level,
-                    "hierarchical": True
-                }
-            ))
+            chunk_content = "\n".join(current_chunk)
+            chunks.append(
+                ChunkResult(
+                    content=chunk_content,
+                    start_position=current_start,
+                    end_position=current_start + len(chunk_content),
+                    token_count=current_tokens,
+                    metadata={
+                        "strategy": config.strategy.value,
+                        "source_type": source_type,
+                        "hierarchy_level": hierarchy_level,
+                        "hierarchical": True,
+                    },
+                )
+            )
 
         return chunks
 
-    def _chunk_by_lines(self, content: str, config: ChunkConfig, source_type: str) -> List[ChunkResult]:
+    def _chunk_by_lines(
+        self, content: str, config: ChunkConfig, source_type: str
+    ) -> list[ChunkResult]:
         """Chunk content by lines with token limits"""
         return self._chunk_by_tokens(content, config, source_type)
 
-    def _chunk_by_tokens(self, content: str, config: ChunkConfig, source_type: str) -> List[ChunkResult]:
+    def _chunk_by_tokens(
+        self, content: str, config: ChunkConfig, source_type: str
+    ) -> list[ChunkResult]:
         """Basic token-based chunking with overlap"""
         chunks = []
 
@@ -329,21 +361,23 @@ class ContentChunker:
         while start < len(words):
             end = min(start + chunk_size, len(words))
             chunk_words = words[start:end]
-            chunk_content = ' '.join(chunk_words)
+            chunk_content = " ".join(chunk_words)
 
-            chunks.append(ChunkResult(
-                content=chunk_content,
-                start_position=position,
-                end_position=position + len(chunk_content),
-                token_count=len(chunk_words),
-                metadata={
-                    "strategy": config.strategy.value,
-                    "source_type": source_type,
-                    "word_start": start,
-                    "word_end": end,
-                    "token_based": True
-                }
-            ))
+            chunks.append(
+                ChunkResult(
+                    content=chunk_content,
+                    start_position=position,
+                    end_position=position + len(chunk_content),
+                    token_count=len(chunk_words),
+                    metadata={
+                        "strategy": config.strategy.value,
+                        "source_type": source_type,
+                        "word_start": start,
+                        "word_end": end,
+                        "token_based": True,
+                    },
+                )
+            )
 
             position += len(chunk_content) + 1  # +1 for space
 
@@ -361,7 +395,9 @@ class ContentChunker:
         patterns = self.boundary_patterns[strategy]
         return any(re.match(pattern, line, re.MULTILINE) for pattern in patterns)
 
-    def _calculate_overlap_lines(self, lines: List[str], overlap_pct: float) -> List[str]:
+    def _calculate_overlap_lines(
+        self, lines: list[str], overlap_pct: float
+    ) -> list[str]:
         """Calculate overlap lines based on percentage"""
         if not lines:
             return []
@@ -373,18 +409,18 @@ class ContentChunker:
         """Detect hierarchy level for MUMPS/hierarchical content"""
         if source_type.lower() == "mumps":
             # MUMPS hierarchy: ^GLOBAL(subscript,subscript)
-            if re.match(r'^\^[A-Z0-9_]+\(', line):
+            if re.match(r"^\^[A-Z0-9_]+\(", line):
                 # Count parentheses depth
-                return line.count('(') - line.count(')')
+                return line.count("(") - line.count(")")
             # FileMan field numbers (level indicators)
-            field_match = re.match(r'^\s*(\d+)\s+', line)
+            field_match = re.match(r"^\s*(\d+)\s+", line)
             if field_match:
                 return len(field_match.group(1))  # Higher numbers = deeper nesting
 
         # Default: indentation-based hierarchy
         return len(line) - len(line.lstrip())
 
-    def get_chunking_stats(self, chunks: List[ChunkResult]) -> Dict[str, Any]:
+    def get_chunking_stats(self, chunks: list[ChunkResult]) -> dict[str, Any]:
         """Get statistics about chunking results"""
         if not chunks:
             return {"total_chunks": 0}
@@ -397,23 +433,29 @@ class ContentChunker:
             "min_tokens": min(token_counts),
             "max_tokens": max(token_counts),
             "total_tokens": sum(token_counts),
-            "strategies_used": list(set(chunk.metadata.get("strategy", "unknown") for chunk in chunks))
+            "strategies_used": list(
+                set(chunk.metadata.get("strategy", "unknown") for chunk in chunks)
+            ),
         }
 
 
 # Factory function for easy instantiation
-def create_chunker(source_type: str, max_tokens: int = 1000, overlap_pct: float = 0.15) -> ContentChunker:
+def create_chunker(
+    source_type: str, max_tokens: int = 1000, overlap_pct: float = 0.15
+) -> ContentChunker:
     """Create a content chunker optimized for specific source type"""
     config = ChunkConfig(
         max_tokens=max_tokens,
         overlap_pct=overlap_pct,
-        strategy=ContentChunker._get_strategy_for_source(None, source_type)
+        strategy=ContentChunker._get_strategy_for_source(None, source_type),
     )
     return ContentChunker(config)
 
 
 # Helper function for testing and validation
-def validate_chunks(chunks: List[ChunkResult], original_content: str) -> Dict[str, bool]:
+def validate_chunks(
+    chunks: list[ChunkResult], original_content: str
+) -> dict[str, bool]:
     """Validate that chunks properly cover original content"""
     return {
         "has_chunks": len(chunks) > 0,
@@ -422,5 +464,5 @@ def validate_chunks(chunks: List[ChunkResult], original_content: str) -> Dict[st
         "proper_positions": all(
             chunk.start_position <= chunk.end_position for chunk in chunks
         ),
-        "content_preserved": len(''.join(chunk.content for chunk in chunks)) > 0
+        "content_preserved": len("".join(chunk.content for chunk in chunks)) > 0,
     }

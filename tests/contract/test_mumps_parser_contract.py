@@ -5,31 +5,31 @@ These tests MUST FAIL initially (TDD requirement) until the MUMPS parser is impl
 Tests the contract defined in specs/002-m1-parse-and/contracts/parser-interfaces.py
 """
 
-import pytest
-import json
 from datetime import datetime
-from typing import Dict, List, Any
-from unittest.mock import patch, MagicMock
+
+import pytest
 
 # Register custom markers to avoid warnings
 pytest_plugins = []
 
+
 def pytest_configure(config):
     """Configure pytest markers"""
-    config.addinivalue_line("markers", "contract: Contract tests for interface compliance (TDD)")
+    config.addinivalue_line(
+        "markers", "contract: Contract tests for interface compliance (TDD)"
+    )
     config.addinivalue_line("markers", "unit: Unit tests for individual components")
+
 
 # Import the parser interface contracts via shared module
 try:
     from src.common.parser_interfaces import (
         BaseParser,
-        MUMPSParser,
-        SourceType,
         ChunkMetadata,
         ParseResult,
-        ParseError,
-        ErrorClass,
+        SourceType,
     )
+
     PARSER_INTERFACES_AVAILABLE = True
 except Exception as e:
     PARSER_INTERFACES_AVAILABLE = False
@@ -37,14 +37,16 @@ except Exception as e:
 
 
 # Skip all tests if parser interfaces are not available
-@pytest.mark.skipif(not PARSER_INTERFACES_AVAILABLE, reason="Parser interfaces not available")
+@pytest.mark.skipif(
+    not PARSER_INTERFACES_AVAILABLE, reason="Parser interfaces not available"
+)
 class TestMUMPSParserContract:
     """Contract tests for MUMPS Parser implementation"""
 
     @pytest.fixture
     def sample_fileman_dict(self):
         """Sample FileMan data dictionary content"""
-        return '''
+        return """
 ^DD(200,0)="NAME^RF^^0;1^K:$L(X)>200!($L(X)<3)!'(X'?1P.E) X"
 ^DD(200,0,"NM","NEW PERSON")=
 ^DD(200,0,"UP")=
@@ -55,30 +57,30 @@ class TestMUMPSParserContract:
 ^DD(200,.01,1,1,2)="K ^VA(200,\\"B\\",$E(X,1,30),DA)"
 ^DD(200,.01,3)="Type a Name, between 3 and 200 characters in length."
 ^DD(200,.01,"DT")=2921204
-        '''
+        """
 
     @pytest.fixture
     def sample_global_definition(self):
         """Sample MUMPS global variable definition"""
-        return '''
+        return """
 ^VA(200,0)="NEW PERSON^200P^23^23"
 ^VA(200,1,0)="PROGRAMMER,ONE^201^1^2901101.12^2901101^PROGRAMMER^1^0^0"
 ^VA(200,1,1)="123 MAIN ST"
 ^VA(200,1,2)="ANYTOWN^ST^12345"
 ^VA(200,1,200)="P"
 ^VA(200,2,0)="USER,ANOTHER^202^2^2901101.13^2901101^USER^1^0^0"
-        '''
+        """
 
     @pytest.fixture
     def expected_mumps_fields(self):
         """Expected MUMPS-specific fields in source_metadata"""
         return {
-            'global_name': str,
-            'node_path': str,
-            'file_no': str,
-            'field_no': str,
-            'xrefs': dict,
-            'input_transform': str
+            "global_name": str,
+            "node_path": str,
+            "file_no": str,
+            "field_no": str,
+            "xrefs": dict,
+            "input_transform": str,
         }
 
     @pytest.mark.contract
@@ -88,34 +90,38 @@ class TestMUMPSParserContract:
         try:
             # Try to import an actual implementation
             from src.parsers.mumps_parser import MUMPSParser as ActualMUMPSParser
+
             parser = ActualMUMPSParser()
             assert isinstance(parser, BaseParser)
             assert parser.source_type == SourceType.MUMPS
         except ImportError:
-            pytest.fail("MUMPSParser implementation not found in src.parsers.mumps_parser")
+            pytest.fail(
+                "MUMPSParser implementation not found in src.parsers.mumps_parser"
+            )
 
     @pytest.mark.contract
     def test_mumps_parser_abstract_methods_implemented(self):
         """MUST FAIL: Test that all abstract methods are implemented"""
         try:
             from src.parsers.mumps_parser import MUMPSParser as ActualMUMPSParser
+
             parser = ActualMUMPSParser()
 
             # Test that required abstract methods exist and are callable
-            assert hasattr(parser, 'parse_fileman_dict')
-            assert callable(getattr(parser, 'parse_fileman_dict'))
+            assert hasattr(parser, "parse_fileman_dict")
+            assert callable(parser.parse_fileman_dict)
 
-            assert hasattr(parser, 'parse_global_definition')
-            assert callable(getattr(parser, 'parse_global_definition'))
+            assert hasattr(parser, "parse_global_definition")
+            assert callable(parser.parse_global_definition)
 
-            assert hasattr(parser, 'parse_file')
-            assert callable(getattr(parser, 'parse_file'))
+            assert hasattr(parser, "parse_file")
+            assert callable(parser.parse_file)
 
-            assert hasattr(parser, 'parse_directory')
-            assert callable(getattr(parser, 'parse_directory'))
+            assert hasattr(parser, "parse_directory")
+            assert callable(parser.parse_directory)
 
-            assert hasattr(parser, 'validate_content')
-            assert callable(getattr(parser, 'validate_content'))
+            assert hasattr(parser, "validate_content")
+            assert callable(parser.validate_content)
 
         except ImportError:
             pytest.fail("MUMPSParser implementation not found")
@@ -125,6 +131,7 @@ class TestMUMPSParserContract:
         """MUST FAIL: Test parse_fileman_dict method signature and return type"""
         try:
             from src.parsers.mumps_parser import MUMPSParser as ActualMUMPSParser
+
             parser = ActualMUMPSParser()
 
             # Test method exists and returns correct type
@@ -142,6 +149,7 @@ class TestMUMPSParserContract:
         """MUST FAIL: Test parse_global_definition method signature and return type"""
         try:
             from src.parsers.mumps_parser import MUMPSParser as ActualMUMPSParser
+
             parser = ActualMUMPSParser()
 
             # Test method exists and returns correct type
@@ -159,6 +167,7 @@ class TestMUMPSParserContract:
         """MUST FAIL: Test that artifact IDs follow mumps://{global_name}/{node_path} format"""
         try:
             from src.parsers.mumps_parser import MUMPSParser as ActualMUMPSParser
+
             parser = ActualMUMPSParser()
 
             chunks = parser.parse_fileman_dict(sample_fileman_dict)
@@ -167,7 +176,9 @@ class TestMUMPSParserContract:
                 assert chunk.artifact_id.startswith("mumps://")
                 # Should follow pattern: mumps://{global_name}/{node_path}
                 parts = chunk.artifact_id.replace("mumps://", "").split("/")
-                assert len(parts) >= 2, f"Invalid artifact_id format: {chunk.artifact_id}"
+                assert (
+                    len(parts) >= 2
+                ), f"Invalid artifact_id format: {chunk.artifact_id}"
 
         except ImportError:
             pytest.fail("MUMPSParser implementation not found")
@@ -175,10 +186,13 @@ class TestMUMPSParserContract:
             pytest.fail(f"Artifact ID format validation failed: {e}")
 
     @pytest.mark.contract
-    def test_mumps_specific_metadata_fields(self, sample_fileman_dict, expected_mumps_fields):
+    def test_mumps_specific_metadata_fields(
+        self, sample_fileman_dict, expected_mumps_fields
+    ):
         """MUST FAIL: Test that MUMPS-specific fields are present in source_metadata"""
         try:
             from src.parsers.mumps_parser import MUMPSParser as ActualMUMPSParser
+
             parser = ActualMUMPSParser()
 
             chunks = parser.parse_fileman_dict(sample_fileman_dict)
@@ -189,10 +203,13 @@ class TestMUMPSParserContract:
 
                 # Verify required MUMPS fields are present
                 for field_name, field_type in expected_mumps_fields.items():
-                    assert field_name in chunk.source_metadata, f"Missing field: {field_name}"
+                    assert (
+                        field_name in chunk.source_metadata
+                    ), f"Missing field: {field_name}"
                     if chunk.source_metadata[field_name] is not None:
-                        assert isinstance(chunk.source_metadata[field_name], field_type), \
-                            f"Field {field_name} should be {field_type}, got {type(chunk.source_metadata[field_name])}"
+                        assert isinstance(
+                            chunk.source_metadata[field_name], field_type
+                        ), f"Field {field_name} should be {field_type}, got {type(chunk.source_metadata[field_name])}"
 
         except ImportError:
             pytest.fail("MUMPSParser implementation not found")
@@ -204,17 +221,24 @@ class TestMUMPSParserContract:
         """MUST FAIL: Test that FileMan dictionary parsing produces meaningful chunks"""
         try:
             from src.parsers.mumps_parser import MUMPSParser as ActualMUMPSParser
+
             parser = ActualMUMPSParser()
 
             chunks = parser.parse_fileman_dict(sample_fileman_dict)
 
-            assert len(chunks) > 0, "Should produce at least one chunk from FileMan dictionary"
+            assert (
+                len(chunks) > 0
+            ), "Should produce at least one chunk from FileMan dictionary"
 
             for chunk in chunks:
                 assert len(chunk.content_text) > 0, "Chunk content should not be empty"
                 assert chunk.content_hash, "Content hash should be generated"
-                assert chunk.source_metadata.get('global_name'), "global_name should be extracted"
-                assert chunk.source_metadata.get('file_no'), "file_no should be extracted"
+                assert chunk.source_metadata.get(
+                    "global_name"
+                ), "global_name should be extracted"
+                assert chunk.source_metadata.get(
+                    "file_no"
+                ), "file_no should be extracted"
 
         except ImportError:
             pytest.fail("MUMPSParser implementation not found")
@@ -226,17 +250,24 @@ class TestMUMPSParserContract:
         """MUST FAIL: Test that global definition parsing produces meaningful chunks"""
         try:
             from src.parsers.mumps_parser import MUMPSParser as ActualMUMPSParser
+
             parser = ActualMUMPSParser()
 
             chunks = parser.parse_global_definition(sample_global_definition)
 
-            assert len(chunks) > 0, "Should produce at least one chunk from global definition"
+            assert (
+                len(chunks) > 0
+            ), "Should produce at least one chunk from global definition"
 
             for chunk in chunks:
                 assert len(chunk.content_text) > 0, "Chunk content should not be empty"
                 assert chunk.content_hash, "Content hash should be generated"
-                assert chunk.source_metadata.get('global_name'), "global_name should be extracted"
-                assert chunk.source_metadata.get('node_path'), "node_path should be extracted"
+                assert chunk.source_metadata.get(
+                    "global_name"
+                ), "global_name should be extracted"
+                assert chunk.source_metadata.get(
+                    "node_path"
+                ), "node_path should be extracted"
 
         except ImportError:
             pytest.fail("MUMPSParser implementation not found")
@@ -244,10 +275,13 @@ class TestMUMPSParserContract:
             pytest.fail(f"Global definition parsing failed: {e}")
 
     @pytest.mark.contract
-    def test_validate_content_method(self, sample_fileman_dict, sample_global_definition):
+    def test_validate_content_method(
+        self, sample_fileman_dict, sample_global_definition
+    ):
         """MUST FAIL: Test that validate_content correctly identifies MUMPS content"""
         try:
             from src.parsers.mumps_parser import MUMPSParser as ActualMUMPSParser
+
             parser = ActualMUMPSParser()
 
             # Should validate MUMPS content as true
@@ -269,14 +303,17 @@ class TestMUMPSParserContract:
         """MUST FAIL: Test that parse_file method works with actual files"""
         try:
             from src.parsers.mumps_parser import MUMPSParser as ActualMUMPSParser
+
             parser = ActualMUMPSParser()
 
             # Create a test MUMPS file
             test_file = tmp_path / "test_mumps.m"
-            test_file.write_text('''
+            test_file.write_text(
+                """
 ^DD(200,0)="NAME^RF^^0;1^K:$L(X)>200!($L(X)<3)!'(X'?1P.E) X"
 ^DD(200,.01,0)="NAME^RF^^0;1^K:$L(X)>200!($L(X)<3)!'(X'?1P.E) X"
-''')
+"""
+            )
 
             result = parser.parse_file(str(test_file))
 
@@ -295,6 +332,7 @@ class TestMUMPSParserContract:
         """MUST FAIL: Test that parse_directory method works with directories"""
         try:
             from src.parsers.mumps_parser import MUMPSParser as ActualMUMPSParser
+
             parser = ActualMUMPSParser()
 
             # Create test directory with MUMPS files
@@ -318,6 +356,7 @@ class TestMUMPSParserContract:
         """MUST FAIL: Test that parser handles invalid MUMPS content gracefully"""
         try:
             from src.parsers.mumps_parser import MUMPSParser as ActualMUMPSParser
+
             parser = ActualMUMPSParser()
 
             invalid_content = "This is definitely not valid MUMPS content!"
@@ -338,6 +377,7 @@ class TestMUMPSParserContract:
         """MUST FAIL: Test that all required ChunkMetadata fields are populated"""
         try:
             from src.parsers.mumps_parser import MUMPSParser as ActualMUMPSParser
+
             parser = ActualMUMPSParser()
 
             chunks = parser.parse_fileman_dict(sample_fileman_dict)
@@ -362,7 +402,9 @@ class TestMUMPSParserContract:
 
 
 # Additional tests for edge cases and comprehensive coverage
-@pytest.mark.skipif(not PARSER_INTERFACES_AVAILABLE, reason="Parser interfaces not available")
+@pytest.mark.skipif(
+    not PARSER_INTERFACES_AVAILABLE, reason="Parser interfaces not available"
+)
 class TestMUMPSParserEdgeCases:
     """Edge case tests for MUMPS Parser contract compliance"""
 
@@ -371,6 +413,7 @@ class TestMUMPSParserEdgeCases:
         """MUST FAIL: Test handling of empty or whitespace-only content"""
         try:
             from src.parsers.mumps_parser import MUMPSParser as ActualMUMPSParser
+
             parser = ActualMUMPSParser()
 
             # Test empty string
@@ -389,19 +432,24 @@ class TestMUMPSParserEdgeCases:
         """MUST FAIL: Test that large MUMPS content is properly chunked"""
         try:
             from src.parsers.mumps_parser import MUMPSParser as ActualMUMPSParser
+
             parser = ActualMUMPSParser()
 
             # Create large content that should be chunked
-            large_content = "\n".join([
-                f'^DD(200,{i},0)="FIELD{i}^RF^^0;{i}^K:$L(X)>200!($L(X)<3)!\'(X\'?1P.E) X"'
-                for i in range(100)
-            ])
+            large_content = "\n".join(
+                [
+                    f"^DD(200,{i},0)=\"FIELD{i}^RF^^0;{i}^K:$L(X)>200!($L(X)<3)!'(X'?1P.E) X\""
+                    for i in range(100)
+                ]
+            )
 
             chunks = parser.parse_fileman_dict(large_content)
 
             # Should produce multiple chunks for large content
             if len(large_content) > 2000:  # Assuming reasonable chunk size
-                assert len(chunks) > 1, "Large content should be split into multiple chunks"
+                assert (
+                    len(chunks) > 1
+                ), "Large content should be split into multiple chunks"
 
         except ImportError:
             pytest.fail("MUMPSParser implementation not found")
@@ -411,12 +459,13 @@ class TestMUMPSParserEdgeCases:
         """MUST FAIL: Test handling of Unicode characters in MUMPS content"""
         try:
             from src.parsers.mumps_parser import MUMPSParser as ActualMUMPSParser
+
             parser = ActualMUMPSParser()
 
-            unicode_content = '''
+            unicode_content = """
 ^DD(200,0)="NATÉ^RF^^0;1^K:$L(X)>200!($L(X)<3)!'(X'?1P.E) X"
 ^DD(200,.01,0)="ÑÁmÉ^RF^^0;1^Unicode test content"
-'''
+"""
 
             chunks = parser.parse_fileman_dict(unicode_content)
             assert isinstance(chunks, list)

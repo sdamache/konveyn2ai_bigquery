@@ -6,9 +6,9 @@ T020: Implements consistent, reproducible artifact and content IDs for idempoten
 import hashlib
 import os
 import re
-from typing import Dict, Any, Optional, List
-from urllib.parse import quote
 from datetime import datetime
+from typing import Any
+
 import ulid
 
 
@@ -21,13 +21,13 @@ class ArtifactIDGenerator:
         "fastapi": "py://{src_path}#{start_line}-{end_line}",
         "cobol": "cobol://{file}/01-{structure_name}",
         "irs": "irs://{record_type}/{layout_version}/{section}",
-        "mumps": "mumps://{global_name}/{node_path}"
+        "mumps": "mumps://{global_name}/{node_path}",
     }
 
     def __init__(self, source_type: str):
         self.source_type = source_type.lower()
 
-    def generate_artifact_id(self, source_path: str, metadata: Dict[str, Any]) -> str:
+    def generate_artifact_id(self, source_path: str, metadata: dict[str, Any]) -> str:
         """
         Generate deterministic artifact ID based on source type and metadata
 
@@ -51,7 +51,7 @@ class ArtifactIDGenerator:
         else:
             return self._generate_generic_id(source_path, metadata)
 
-    def _generate_k8s_id(self, source_path: str, metadata: Dict[str, Any]) -> str:
+    def _generate_k8s_id(self, source_path: str, metadata: dict[str, Any]) -> str:
         """Generate Kubernetes artifact ID: k8s://{namespace}/{kind}/{name}"""
         namespace = metadata.get("namespace", "default")
         kind = metadata.get("kind", "unknown")  # Keep original capitalization
@@ -64,7 +64,7 @@ class ArtifactIDGenerator:
 
         return f"k8s://{namespace}/{kind}/{name}"
 
-    def _generate_fastapi_id(self, source_path: str, metadata: Dict[str, Any]) -> str:
+    def _generate_fastapi_id(self, source_path: str, metadata: dict[str, Any]) -> str:
         """Generate FastAPI artifact ID: py://{src_path}#{start_line}-{end_line}"""
         # Normalize source path
         normalized_path = self._normalize_file_path(source_path)
@@ -74,10 +74,12 @@ class ArtifactIDGenerator:
 
         return f"py://{normalized_path}#{start_line}-{end_line}"
 
-    def _generate_cobol_id(self, source_path: str, metadata: Dict[str, Any]) -> str:
+    def _generate_cobol_id(self, source_path: str, metadata: dict[str, Any]) -> str:
         """Generate COBOL artifact ID: cobol://{file}/01-{structure_name}"""
         file_name = self._extract_filename(source_path)
-        structure_name = metadata.get("structure_name", metadata.get("record_name", "main"))
+        structure_name = metadata.get(
+            "structure_name", metadata.get("record_name", "main")
+        )
 
         # Sanitize components
         file_name = self._sanitize_path_component(file_name)
@@ -85,7 +87,7 @@ class ArtifactIDGenerator:
 
         return f"cobol://{file_name}/01-{structure_name}"
 
-    def _generate_irs_id(self, source_path: str, metadata: Dict[str, Any]) -> str:
+    def _generate_irs_id(self, source_path: str, metadata: dict[str, Any]) -> str:
         """Generate IRS artifact ID: irs://{record_type}/{layout_version}/{section}"""
         record_type = metadata.get("record_type", "IMF")
         layout_version = metadata.get("layout_version", "2024")
@@ -98,7 +100,7 @@ class ArtifactIDGenerator:
 
         return f"irs://{record_type}/{layout_version}/{section}"
 
-    def _generate_mumps_id(self, source_path: str, metadata: Dict[str, Any]) -> str:
+    def _generate_mumps_id(self, source_path: str, metadata: dict[str, Any]) -> str:
         """Generate MUMPS artifact ID: mumps://{global_name}/{node_path}"""
         global_name = metadata.get("global_name", metadata.get("file_name", "UNKNOWN"))
         node_path = metadata.get("node_path", metadata.get("field_path", "ROOT"))
@@ -109,7 +111,7 @@ class ArtifactIDGenerator:
 
         return f"mumps://{global_name}/{node_path}"
 
-    def _generate_generic_id(self, source_path: str, metadata: Dict[str, Any]) -> str:
+    def _generate_generic_id(self, source_path: str, metadata: dict[str, Any]) -> str:
         """Generate generic artifact ID for unknown source types"""
         normalized_path = self._normalize_file_path(source_path)
         section = metadata.get("section", metadata.get("name", "main"))
@@ -125,13 +127,13 @@ class ArtifactIDGenerator:
     def _normalize_file_path(self, path: str) -> str:
         """Normalize file path for consistent IDs"""
         # Convert to forward slashes and remove redundant path components
-        normalized = os.path.normpath(path).replace('\\', '/')
+        normalized = os.path.normpath(path).replace("\\", "/")
 
         # Remove leading paths that might vary between environments
-        if '/src/' in normalized:
-            normalized = normalized.split('/src/', 1)[1]
-        elif '/app/' in normalized:
-            normalized = normalized.split('/app/', 1)[1]
+        if "/src/" in normalized:
+            normalized = normalized.split("/src/", 1)[1]
+        elif "/app/" in normalized:
+            normalized = normalized.split("/app/", 1)[1]
 
         return normalized
 
@@ -141,13 +143,13 @@ class ArtifactIDGenerator:
             return "unknown"
 
         # Replace problematic characters with safe alternatives
-        sanitized = re.sub(r'[^\w\-\.]', '_', str(component))
+        sanitized = re.sub(r"[^\w\-\.]", "_", str(component))
 
         # Remove consecutive underscores
-        sanitized = re.sub(r'_+', '_', sanitized)
+        sanitized = re.sub(r"_+", "_", sanitized)
 
         # Remove leading/trailing underscores
-        sanitized = sanitized.strip('_')
+        sanitized = sanitized.strip("_")
 
         return sanitized or "unknown"
 
@@ -155,7 +157,9 @@ class ArtifactIDGenerator:
 class ContentHashGenerator:
     """Generates deterministic content hashes for idempotent ingestion"""
 
-    def __init__(self, normalize_whitespace: bool = True, ignore_comments: bool = False):
+    def __init__(
+        self, normalize_whitespace: bool = True, ignore_comments: bool = False
+    ):
         self.normalize_whitespace = normalize_whitespace
         self.ignore_comments = ignore_comments
 
@@ -171,7 +175,7 @@ class ContentHashGenerator:
             Hex-encoded SHA256 hash
         """
         normalized = self._normalize_content(content, source_type)
-        return hashlib.sha256(normalized.encode('utf-8')).hexdigest()
+        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
     def _normalize_content(self, content: str, source_type: str) -> str:
         """Normalize content for consistent hashing"""
@@ -200,7 +204,7 @@ class ContentHashGenerator:
 
     def _normalize_yaml_content(self, content: str) -> str:
         """Normalize YAML content for consistent hashing"""
-        lines = content.split('\n')
+        lines = content.split("\n")
         normalized_lines = []
 
         for line in lines:
@@ -211,11 +215,11 @@ class ContentHashGenerator:
             if line.strip():
                 normalized_lines.append(line)
 
-        return '\n'.join(normalized_lines)
+        return "\n".join(normalized_lines)
 
     def _normalize_python_content(self, content: str) -> str:
         """Normalize Python content for consistent hashing"""
-        lines = content.split('\n')
+        lines = content.split("\n")
         normalized_lines = []
 
         for line in lines:
@@ -223,15 +227,17 @@ class ContentHashGenerator:
             line = line.rstrip()
 
             # Skip empty lines and comments if configured
-            if line.strip() and not (self.ignore_comments and line.strip().startswith('#')):
+            if line.strip() and not (
+                self.ignore_comments and line.strip().startswith("#")
+            ):
                 normalized_lines.append(line)
 
-        return '\n'.join(normalized_lines)
+        return "\n".join(normalized_lines)
 
     def _normalize_cobol_content(self, content: str) -> str:
         """Normalize COBOL content for consistent hashing"""
         # COBOL is position-sensitive, so minimal normalization
-        lines = content.split('\n')
+        lines = content.split("\n")
         normalized_lines = []
 
         for line in lines:
@@ -240,7 +246,7 @@ class ContentHashGenerator:
             if line:  # Keep structure intact
                 normalized_lines.append(line)
 
-        return '\n'.join(normalized_lines)
+        return "\n".join(normalized_lines)
 
     def _normalize_irs_content(self, content: str) -> str:
         """Normalize IRS content for consistent hashing"""
@@ -249,7 +255,7 @@ class ContentHashGenerator:
 
     def _normalize_mumps_content(self, content: str) -> str:
         """Normalize MUMPS content for consistent hashing"""
-        lines = content.split('\n')
+        lines = content.split("\n")
         normalized_lines = []
 
         for line in lines:
@@ -258,15 +264,15 @@ class ContentHashGenerator:
             if line.strip():
                 normalized_lines.append(line)
 
-        return '\n'.join(normalized_lines)
+        return "\n".join(normalized_lines)
 
     def _normalize_whitespace_general(self, content: str) -> str:
         """General whitespace normalization"""
         # Normalize line endings
-        content = content.replace('\r\n', '\n').replace('\r', '\n')
+        content = content.replace("\r\n", "\n").replace("\r", "\n")
 
         # Remove trailing whitespace from lines
-        lines = [line.rstrip() for line in content.split('\n')]
+        lines = [line.rstrip() for line in content.split("\n")]
 
         # Remove consecutive empty lines
         normalized_lines = []
@@ -278,39 +284,39 @@ class ContentHashGenerator:
                 normalized_lines.append(line)
             prev_empty = is_empty
 
-        return '\n'.join(normalized_lines)
+        return "\n".join(normalized_lines)
 
     def _remove_comments(self, content: str, source_type: str) -> str:
         """Remove comments based on source type"""
         if source_type.lower() in ["python", "fastapi"]:
             # Remove Python comments
-            lines = content.split('\n')
+            lines = content.split("\n")
             non_comment_lines = []
 
             for line in lines:
                 # Simple comment removal (doesn't handle strings with #)
-                comment_idx = line.find('#')
+                comment_idx = line.find("#")
                 if comment_idx >= 0:
                     line = line[:comment_idx].rstrip()
                 if line or not line.strip():  # Keep empty lines for structure
                     non_comment_lines.append(line)
 
-            return '\n'.join(non_comment_lines)
+            return "\n".join(non_comment_lines)
 
         elif source_type.lower() in ["yaml", "kubernetes"]:
             # Remove YAML comments
-            lines = content.split('\n')
+            lines = content.split("\n")
             non_comment_lines = []
 
             for line in lines:
                 # Simple YAML comment removal
-                comment_idx = line.find('#')
+                comment_idx = line.find("#")
                 if comment_idx >= 0:
                     line = line[:comment_idx].rstrip()
                 if line or not line.strip():
                     non_comment_lines.append(line)
 
-            return '\n'.join(non_comment_lines)
+            return "\n".join(non_comment_lines)
 
         return content
 
@@ -341,8 +347,9 @@ def create_artifact_id_generator(source_type: str) -> ArtifactIDGenerator:
     return ArtifactIDGenerator(source_type)
 
 
-def create_content_hash_generator(normalize_whitespace: bool = True,
-                                ignore_comments: bool = False) -> ContentHashGenerator:
+def create_content_hash_generator(
+    normalize_whitespace: bool = True, ignore_comments: bool = False
+) -> ContentHashGenerator:
     """Create content hash generator with specific options"""
     return ContentHashGenerator(normalize_whitespace, ignore_comments)
 
@@ -353,7 +360,7 @@ def generate_run_id() -> str:
 
 
 # Validation and testing utilities
-def validate_artifact_id(artifact_id: str, source_type: str) -> Dict[str, bool]:
+def validate_artifact_id(artifact_id: str, source_type: str) -> dict[str, bool]:
     """Validate artifact ID format for source type"""
     expected_prefix = f"{source_type.lower()}://"
 
@@ -361,20 +368,22 @@ def validate_artifact_id(artifact_id: str, source_type: str) -> Dict[str, bool]:
         "has_correct_prefix": artifact_id.startswith(expected_prefix),
         "has_valid_format": len(artifact_id) > len(expected_prefix),
         "no_invalid_chars": not re.search(r'[<>:"|?*]', artifact_id),
-        "reasonable_length": 10 <= len(artifact_id) <= 500
+        "reasonable_length": 10 <= len(artifact_id) <= 500,
     }
 
 
-def validate_content_hash(content_hash: str) -> Dict[str, bool]:
+def validate_content_hash(content_hash: str) -> dict[str, bool]:
     """Validate content hash format"""
     return {
-        "is_hex": re.match(r'^[a-f0-9]+$', content_hash) is not None,
+        "is_hex": re.match(r"^[a-f0-9]+$", content_hash) is not None,
         "correct_length": len(content_hash) == 64,  # SHA256 = 64 hex chars
-        "not_empty": len(content_hash) > 0
+        "not_empty": len(content_hash) > 0,
     }
 
 
-def test_determinism(content: str, source_type: str, iterations: int = 5) -> Dict[str, Any]:
+def test_determinism(
+    content: str, source_type: str, iterations: int = 5
+) -> dict[str, Any]:
     """Test that ID and hash generation is deterministic"""
     generator = create_content_hash_generator()
 
@@ -386,5 +395,5 @@ def test_determinism(content: str, source_type: str, iterations: int = 5) -> Dic
     return {
         "all_hashes_identical": len(set(hashes)) == 1,
         "sample_hash": hashes[0] if hashes else None,
-        "iterations_tested": iterations
+        "iterations_tested": iterations,
     }

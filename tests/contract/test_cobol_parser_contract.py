@@ -10,27 +10,35 @@ import pytest
 # Register custom markers to avoid warnings
 pytest_plugins = []
 
+
 def pytest_configure(config):
     """Configure pytest markers"""
-    config.addinivalue_line("markers", "contract: Contract tests for interface compliance (TDD)")
+    config.addinivalue_line(
+        "markers", "contract: Contract tests for interface compliance (TDD)"
+    )
     config.addinivalue_line("markers", "unit: Unit tests for individual components")
 
+
 from datetime import datetime
-from typing import Dict, List, Any
-from unittest.mock import patch, MagicMock
 
 # Import the parser interface contracts
 try:
-    import sys
     import os
+    import sys
+
     # Add project root to Python path
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     sys.path.insert(0, project_root)
 
     # Import using the module loading approach for hyphenated filenames
     import importlib.util
-    parser_interfaces_path = os.path.join(project_root, "specs", "002-m1-parse-and", "contracts", "parser-interfaces.py")
-    spec = importlib.util.spec_from_file_location("parser_interfaces", parser_interfaces_path)
+
+    parser_interfaces_path = os.path.join(
+        project_root, "specs", "002-m1-parse-and", "contracts", "parser-interfaces.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "parser_interfaces", parser_interfaces_path
+    )
     parser_interfaces = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(parser_interfaces)
     # Register in sys.modules for consistency with implementation imports
@@ -52,6 +60,7 @@ except (ImportError, AttributeError, FileNotFoundError) as e:
 # Try to import the actual implementation (expected to fail initially)
 try:
     from src.ingest.cobol.parser import COBOLParserImpl
+
     COBOL_PARSER_AVAILABLE = True
 except ImportError:
     COBOL_PARSER_AVAILABLE = False
@@ -169,47 +178,59 @@ class TestCOBOLParserContract:
 
     def test_parser_interfaces_available(self):
         """Test that parser interface contracts are available"""
-        assert PARSER_INTERFACES_AVAILABLE, "Parser interface contracts should be available"
+        assert (
+            PARSER_INTERFACES_AVAILABLE
+        ), "Parser interface contracts should be available"
 
-    @pytest.mark.skipif(not PARSER_INTERFACES_AVAILABLE, reason="Parser interfaces not available")
+    @pytest.mark.skipif(
+        not PARSER_INTERFACES_AVAILABLE, reason="Parser interfaces not available"
+    )
     def test_cobol_parser_interface_exists(self):
         """Test that COBOLParser abstract class exists with required methods"""
         # Verify COBOLParser exists and inherits from BaseParser
         assert issubclass(COBOLParser, BaseParser)
 
         # Verify required abstract methods exist
-        abstract_methods = getattr(COBOLParser, '__abstractmethods__', set())
+        abstract_methods = getattr(COBOLParser, "__abstractmethods__", set())
         required_methods = {
-            'parse_file',
-            'parse_directory',
-            'validate_content',
-            'parse_copybook',
-            'extract_pic_clauses'
+            "parse_file",
+            "parse_directory",
+            "validate_content",
+            "parse_copybook",
+            "extract_pic_clauses",
         }
 
         # Check that all required methods are declared as abstract
         for method in required_methods:
             assert hasattr(COBOLParser, method), f"Method {method} should exist"
 
-    @pytest.mark.skipif(COBOL_PARSER_AVAILABLE, reason="Skip when implementation exists")
+    @pytest.mark.skipif(
+        COBOL_PARSER_AVAILABLE, reason="Skip when implementation exists"
+    )
     def test_cobol_parser_not_implemented_yet(self):
         """Test that the actual implementation doesn't exist yet (TDD requirement)"""
         assert not COBOL_PARSER_AVAILABLE, "COBOLParserImpl should not exist yet (TDD)"
 
-    @pytest.mark.skipif(not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_cobol_parser_inheritance(self):
         """Test that COBOLParserImpl properly inherits from COBOLParser"""
         assert issubclass(COBOLParserImpl, COBOLParser)
         assert issubclass(COBOLParserImpl, BaseParser)
 
-    @pytest.mark.skipif(not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_cobol_parser_source_type(self):
         """Test that parser returns correct source type"""
         parser = COBOLParserImpl()
         assert parser.source_type == SourceType.COBOL
         assert parser._get_source_type() == SourceType.COBOL
 
-    @pytest.mark.skipif(not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_valid_employee_copybook(self):
         """Test parsing a valid Employee copybook"""
         parser = COBOLParserImpl()
@@ -225,37 +246,41 @@ class TestCOBOLParserContract:
 
         # Verify artifact_id format: cobol://{file}/01-{structure_name}
         expected_artifact_id = "cobol://01-EMPLOYEE-RECORD"
-        assert chunk.artifact_id == expected_artifact_id or chunk.artifact_id.endswith("/01-EMPLOYEE-RECORD")
+        assert chunk.artifact_id == expected_artifact_id or chunk.artifact_id.endswith(
+            "/01-EMPLOYEE-RECORD"
+        )
 
         # Verify COBOL-specific metadata
         cobol_metadata = chunk.source_metadata
-        assert cobol_metadata['structure_level'] == '01'
-        assert 'field_names' in cobol_metadata
-        assert 'pic_clauses' in cobol_metadata
-        assert 'occurs_count' in cobol_metadata
-        assert 'redefines' in cobol_metadata
-        assert 'usage' in cobol_metadata
+        assert cobol_metadata["structure_level"] == "01"
+        assert "field_names" in cobol_metadata
+        assert "pic_clauses" in cobol_metadata
+        assert "occurs_count" in cobol_metadata
+        assert "redefines" in cobol_metadata
+        assert "usage" in cobol_metadata
 
         # Verify specific field details
-        field_names = cobol_metadata['field_names']
-        assert 'EMP-ID' in field_names
-        assert 'FIRST-NAME' in field_names
-        assert 'LAST-NAME' in field_names
-        assert 'EMP-SALARY' in field_names
+        field_names = cobol_metadata["field_names"]
+        assert "EMP-ID" in field_names
+        assert "FIRST-NAME" in field_names
+        assert "LAST-NAME" in field_names
+        assert "EMP-SALARY" in field_names
 
         # Verify PIC clauses are extracted
-        pic_clauses = cobol_metadata['pic_clauses']
-        assert 'EMP-ID' in pic_clauses
-        assert pic_clauses['EMP-ID'] == '9(6)'
-        assert pic_clauses['FIRST-NAME'] == 'X(20)'
-        assert pic_clauses['EMP-SALARY'] == '9(7)V99'
+        pic_clauses = cobol_metadata["pic_clauses"]
+        assert "EMP-ID" in pic_clauses
+        assert pic_clauses["EMP-ID"] == "9(6)"
+        assert pic_clauses["FIRST-NAME"] == "X(20)"
+        assert pic_clauses["EMP-SALARY"] == "9(7)V99"
 
         # Verify content fields
         assert chunk.content_text.strip() != ""
         assert chunk.content_hash != ""
         assert isinstance(chunk.collected_at, datetime)
 
-    @pytest.mark.skipif(not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_transaction_copybook(self):
         """Test parsing a valid Transaction copybook"""
         parser = COBOLParserImpl()
@@ -266,24 +291,28 @@ class TestCOBOLParserContract:
 
         # Verify artifact_id format
         expected_artifact_id = "cobol://01-TRANSACTION-RECORD"
-        assert chunk.artifact_id == expected_artifact_id or chunk.artifact_id.endswith("/01-TRANSACTION-RECORD")
+        assert chunk.artifact_id == expected_artifact_id or chunk.artifact_id.endswith(
+            "/01-TRANSACTION-RECORD"
+        )
 
         # Verify COBOL-specific metadata
         cobol_metadata = chunk.source_metadata
-        assert cobol_metadata['structure_level'] == '01'
+        assert cobol_metadata["structure_level"] == "01"
 
         # Check specific fields
-        field_names = cobol_metadata['field_names']
-        assert 'TXN-ID' in field_names
-        assert 'TXN-AMOUNT' in field_names
-        assert 'ACCOUNT-NUMBER' in field_names
+        field_names = cobol_metadata["field_names"]
+        assert "TXN-ID" in field_names
+        assert "TXN-AMOUNT" in field_names
+        assert "ACCOUNT-NUMBER" in field_names
 
         # Check PIC clauses with special COBOL features
-        pic_clauses = cobol_metadata['pic_clauses']
-        assert pic_clauses['TXN-AMOUNT'] == 'S9(9)V99'  # Signed numeric
-        assert pic_clauses['TXN-TYPE'] == 'X(1)'
+        pic_clauses = cobol_metadata["pic_clauses"]
+        assert pic_clauses["TXN-AMOUNT"] == "S9(9)V99"  # Signed numeric
+        assert pic_clauses["TXN-TYPE"] == "X(1)"
 
-    @pytest.mark.skipif(not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_copybook_with_occurs(self):
         """Test parsing copybook with OCCURS clauses"""
         parser = COBOLParserImpl()
@@ -293,20 +322,22 @@ class TestCOBOLParserContract:
         chunk = chunks[0]
 
         cobol_metadata = chunk.source_metadata
-        occurs_count = cobol_metadata['occurs_count']
+        occurs_count = cobol_metadata["occurs_count"]
 
         # Verify OCCURS clauses are captured
-        assert 'CUST-ADDRESSES' in occurs_count
-        assert occurs_count['CUST-ADDRESSES'] == 3
-        assert 'PHONE-NUMBERS' in occurs_count
-        assert occurs_count['PHONE-NUMBERS'] == 5
+        assert "CUST-ADDRESSES" in occurs_count
+        assert occurs_count["CUST-ADDRESSES"] == 3
+        assert "PHONE-NUMBERS" in occurs_count
+        assert occurs_count["PHONE-NUMBERS"] == 5
 
         # Verify nested field names are captured
-        field_names = cobol_metadata['field_names']
-        assert 'ADDR-TYPE' in field_names
-        assert 'PHONE-TYPE' in field_names
+        field_names = cobol_metadata["field_names"]
+        assert "ADDR-TYPE" in field_names
+        assert "PHONE-TYPE" in field_names
 
-    @pytest.mark.skipif(not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_copybook_with_redefines(self):
         """Test parsing copybook with REDEFINES clauses"""
         parser = COBOLParserImpl()
@@ -316,20 +347,22 @@ class TestCOBOLParserContract:
         chunk = chunks[0]
 
         cobol_metadata = chunk.source_metadata
-        redefines = cobol_metadata['redefines']
+        redefines = cobol_metadata["redefines"]
 
         # Verify REDEFINES clauses are captured
-        assert 'CUSTOMER-DATA-DETAIL' in redefines
-        assert redefines['CUSTOMER-DATA-DETAIL'] == 'RECORD-DATA'
-        assert 'TRANSACTION-DATA-DETAIL' in redefines
-        assert redefines['TRANSACTION-DATA-DETAIL'] == 'RECORD-DATA'
+        assert "CUSTOMER-DATA-DETAIL" in redefines
+        assert redefines["CUSTOMER-DATA-DETAIL"] == "RECORD-DATA"
+        assert "TRANSACTION-DATA-DETAIL" in redefines
+        assert redefines["TRANSACTION-DATA-DETAIL"] == "RECORD-DATA"
 
         # Verify redefined field names are captured
-        field_names = cobol_metadata['field_names']
-        assert 'CUST-ID' in field_names
-        assert 'TXN-ID' in field_names
+        field_names = cobol_metadata["field_names"]
+        assert "CUST-ID" in field_names
+        assert "TXN-ID" in field_names
 
-    @pytest.mark.skipif(not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_copybook_with_usage_clauses(self):
         """Test parsing copybook with USAGE clauses"""
         parser = COBOLParserImpl()
@@ -339,41 +372,45 @@ class TestCOBOLParserContract:
         chunk = chunks[0]
 
         cobol_metadata = chunk.source_metadata
-        usage = cobol_metadata['usage']
+        usage = cobol_metadata["usage"]
 
         # Verify USAGE clauses are captured
-        assert 'RECORD-ID' in usage
-        assert usage['RECORD-ID'] == 'COMP'
-        assert 'PRINCIPAL' in usage
-        assert usage['PRINCIPAL'] == 'COMP-3'
-        assert 'STATUS-FLAG' in usage
-        assert usage['STATUS-FLAG'] == 'COMP'
+        assert "RECORD-ID" in usage
+        assert usage["RECORD-ID"] == "COMP"
+        assert "PRINCIPAL" in usage
+        assert usage["PRINCIPAL"] == "COMP-3"
+        assert "STATUS-FLAG" in usage
+        assert usage["STATUS-FLAG"] == "COMP"
 
-    @pytest.mark.skipif(not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_extract_pic_clauses_method(self):
         """Test the extract_pic_clauses method"""
         parser = COBOLParserImpl()
 
         # Create a mock structure representing parsed COBOL
         mock_structure = {
-            'fields': {
-                'EMP-ID': {'pic': '9(6)', 'level': '05'},
-                'EMP-NAME': {'pic': 'X(50)', 'level': '05'},
-                'EMP-SALARY': {'pic': '9(7)V99', 'level': '05'},
-                'EMP-HIRE-DATE': {'pic': '9(8)', 'level': '05'}
+            "fields": {
+                "EMP-ID": {"pic": "9(6)", "level": "05"},
+                "EMP-NAME": {"pic": "X(50)", "level": "05"},
+                "EMP-SALARY": {"pic": "9(7)V99", "level": "05"},
+                "EMP-HIRE-DATE": {"pic": "9(8)", "level": "05"},
             }
         }
 
         pic_clauses = parser.extract_pic_clauses(mock_structure)
 
         assert isinstance(pic_clauses, dict)
-        assert 'EMP-ID' in pic_clauses
-        assert pic_clauses['EMP-ID'] == '9(6)'
-        assert pic_clauses['EMP-NAME'] == 'X(50)'
-        assert pic_clauses['EMP-SALARY'] == '9(7)V99'
-        assert pic_clauses['EMP-HIRE-DATE'] == '9(8)'
+        assert "EMP-ID" in pic_clauses
+        assert pic_clauses["EMP-ID"] == "9(6)"
+        assert pic_clauses["EMP-NAME"] == "X(50)"
+        assert pic_clauses["EMP-SALARY"] == "9(7)V99"
+        assert pic_clauses["EMP-HIRE-DATE"] == "9(8)"
 
-    @pytest.mark.skipif(not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_multi_structure_copybook(self):
         """Test parsing copybook with multiple 01-level structures"""
         parser = COBOLParserImpl()
@@ -393,11 +430,13 @@ class TestCOBOLParserContract:
             else:
                 structure_names.append(artifact_id.split("01-")[-1])
 
-        assert 'EMPLOYEE-RECORD' in structure_names
-        assert 'DEPARTMENT-RECORD' in structure_names
-        assert 'TRANSACTION-RECORD' in structure_names
+        assert "EMPLOYEE-RECORD" in structure_names
+        assert "DEPARTMENT-RECORD" in structure_names
+        assert "TRANSACTION-RECORD" in structure_names
 
-    @pytest.mark.skipif(not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_invalid_copybook_syntax(self):
         """Test error handling for invalid COBOL syntax"""
         parser = COBOLParserImpl()
@@ -405,7 +444,9 @@ class TestCOBOLParserContract:
         with pytest.raises((ValueError, SyntaxError)):
             parser.parse_copybook(INVALID_COPYBOOK_SYNTAX_ERROR)
 
-    @pytest.mark.skipif(not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_malformed_copybook(self):
         """Test error handling for completely malformed content"""
         parser = COBOLParserImpl()
@@ -413,7 +454,9 @@ class TestCOBOLParserContract:
         with pytest.raises((ValueError, SyntaxError)):
             parser.parse_copybook(MALFORMED_COPYBOOK)
 
-    @pytest.mark.skipif(not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_validate_content_valid_cobol(self):
         """Test content validation for valid COBOL copybooks"""
         parser = COBOLParserImpl()
@@ -422,7 +465,9 @@ class TestCOBOLParserContract:
         assert parser.validate_content(VALID_TRANSACTION_COPYBOOK) is True
         assert parser.validate_content(COMPLEX_COPYBOOK_WITH_OCCURS) is True
 
-    @pytest.mark.skipif(not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_validate_content_invalid(self):
         """Test content validation for invalid content"""
         parser = COBOLParserImpl()
@@ -431,7 +476,9 @@ class TestCOBOLParserContract:
         assert parser.validate_content("") is False
         assert parser.validate_content("not cobol content") is False
 
-    @pytest.mark.skipif(not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_file_single_copybook(self, tmp_path):
         """Test parsing a single copybook file"""
         parser = COBOLParserImpl()
@@ -452,7 +499,9 @@ class TestCOBOLParserContract:
         chunk = result.chunks[0]
         assert chunk.source_uri == str(copybook_file)
 
-    @pytest.mark.skipif(not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_directory_multiple_copybooks(self, tmp_path):
         """Test parsing a directory with multiple copybook files"""
         parser = COBOLParserImpl()
@@ -477,30 +526,41 @@ class TestCOBOLParserContract:
             else:
                 structure_names.append(chunk.artifact_id.split("01-")[-1])
 
-        assert 'EMPLOYEE-RECORD' in structure_names
-        assert 'TRANSACTION-RECORD' in structure_names
-        assert 'CUSTOMER-RECORD' in structure_names
+        assert "EMPLOYEE-RECORD" in structure_names
+        assert "TRANSACTION-RECORD" in structure_names
+        assert "CUSTOMER-RECORD" in structure_names
 
-    @pytest.mark.skipif(not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_artifact_id_generation(self):
         """Test artifact ID generation for COBOL copybooks"""
         parser = COBOLParserImpl()
 
         # Test with different file paths and structure names
         test_cases = [
-            ("employee.cpy", "EMPLOYEE-RECORD", "cobol://employee.cpy/01-EMPLOYEE-RECORD"),
+            (
+                "employee.cpy",
+                "EMPLOYEE-RECORD",
+                "cobol://employee.cpy/01-EMPLOYEE-RECORD",
+            ),
             ("payroll/emp.cob", "EMP-MASTER", "cobol://payroll/emp.cob/01-EMP-MASTER"),
-            ("/full/path/to/txn.copybook", "TXN-DETAIL", "cobol:///full/path/to/txn.copybook/01-TXN-DETAIL"),
+            (
+                "/full/path/to/txn.copybook",
+                "TXN-DETAIL",
+                "cobol:///full/path/to/txn.copybook/01-TXN-DETAIL",
+            ),
         ]
 
         for file_path, structure_name, expected in test_cases:
             artifact_id = parser.generate_artifact_id(
-                file_path,
-                structure_name=structure_name
+                file_path, structure_name=structure_name
             )
             assert artifact_id == expected
 
-    @pytest.mark.skipif(not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_chunk_content_large_copybook(self):
         """Test chunking behavior for large copybooks"""
         parser = COBOLParserImpl()
@@ -518,10 +578,12 @@ class TestCOBOLParserContract:
         # Verify all chunks have content and proper metadata
         for chunk in chunks:
             assert chunk.content_text.strip() != ""
-            assert chunk.source_metadata['structure_level'] == '01'
+            assert chunk.source_metadata["structure_level"] == "01"
             assert chunk.artifact_id.endswith("/01-LARGE-RECORD")
 
-    @pytest.mark.skipif(not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_error_handling_missing_required_fields(self):
         """Test error handling when required COBOL fields are missing"""
         parser = COBOLParserImpl()
@@ -543,7 +605,9 @@ class TestCOBOLParserContract:
             with pytest.raises((ValueError, SyntaxError)):
                 parser.parse_copybook(invalid_copybook)
 
-    @pytest.mark.skipif(not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_content_hash_generation(self):
         """Test that content hash is generated correctly"""
         parser = COBOLParserImpl()
@@ -558,7 +622,9 @@ class TestCOBOLParserContract:
         chunks2 = parser.parse_copybook(VALID_EMPLOYEE_COPYBOOK)
         assert chunks[0].content_hash == chunks2[0].content_hash
 
-    @pytest.mark.skipif(not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_result_structure(self):
         """Test that ParseResult has the correct structure"""
         parser = COBOLParserImpl()
@@ -571,20 +637,31 @@ class TestCOBOLParserContract:
         chunk = chunks[0]
 
         # Required ChunkMetadata fields
-        assert hasattr(chunk, 'source_type')
-        assert hasattr(chunk, 'artifact_id')
-        assert hasattr(chunk, 'content_text')
-        assert hasattr(chunk, 'content_hash')
-        assert hasattr(chunk, 'source_metadata')
-        assert hasattr(chunk, 'collected_at')
+        assert hasattr(chunk, "source_type")
+        assert hasattr(chunk, "artifact_id")
+        assert hasattr(chunk, "content_text")
+        assert hasattr(chunk, "content_hash")
+        assert hasattr(chunk, "source_metadata")
+        assert hasattr(chunk, "collected_at")
 
         # COBOL-specific metadata fields
         cobol_metadata = chunk.source_metadata
-        required_cobol_fields = ['structure_level', 'field_names', 'pic_clauses', 'occurs_count', 'redefines', 'usage']
+        required_cobol_fields = [
+            "structure_level",
+            "field_names",
+            "pic_clauses",
+            "occurs_count",
+            "redefines",
+            "usage",
+        ]
         for field in required_cobol_fields:
-            assert field in cobol_metadata, f"Missing required COBOL metadata field: {field}"
+            assert (
+                field in cobol_metadata
+            ), f"Missing required COBOL metadata field: {field}"
 
-    @pytest.mark.skipif(not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not COBOL_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_level_number_handling_edge_cases(self):
         """Test level number handling for edge cases"""
         parser = COBOLParserImpl()
@@ -608,14 +685,14 @@ class TestCOBOLParserContract:
         chunk = chunks[0]
         cobol_metadata = chunk.source_metadata
 
-        field_names = cobol_metadata['field_names']
-        assert 'LEVEL-02-FIELD' in field_names
-        assert 'LEVEL-03-FIELD' in field_names
-        assert 'LEVEL-05-FIELD' in field_names
-        assert 'LEVEL-10-FIELD' in field_names
-        assert 'LEVEL-15-FIELD' in field_names
-        assert 'LEVEL-49-FIELD' in field_names
-        assert 'INDEPENDENT-FIELD' in field_names
+        field_names = cobol_metadata["field_names"]
+        assert "LEVEL-02-FIELD" in field_names
+        assert "LEVEL-03-FIELD" in field_names
+        assert "LEVEL-05-FIELD" in field_names
+        assert "LEVEL-10-FIELD" in field_names
+        assert "LEVEL-15-FIELD" in field_names
+        assert "LEVEL-49-FIELD" in field_names
+        assert "INDEPENDENT-FIELD" in field_names
 
 
 @pytest.mark.contract
@@ -629,7 +706,10 @@ class TestCOBOLParserContractFailure:
         # This test should pass initially, then fail once implementation exists
         try:
             from src.ingest.cobol.parser import COBOLParserImpl
-            pytest.fail("COBOLParserImpl should not be implemented yet (TDD requirement)")
+
+            pytest.fail(
+                "COBOLParserImpl should not be implemented yet (TDD requirement)"
+            )
         except ImportError:
             # This is expected in TDD mode
             pass

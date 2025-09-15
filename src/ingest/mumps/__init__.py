@@ -20,10 +20,6 @@ Usage:
 
 from .parser import MUMPSParserImpl, create_mumps_parser, validate_mumps_parser
 
-__all__ = [
-    'MUMPSParserImpl',
-    'create_mumps_parser',
-    'validate_mumps_parser'
-]
+__all__ = ["MUMPSParserImpl", "create_mumps_parser", "validate_mumps_parser"]
 
 __version__ = "1.0.0"

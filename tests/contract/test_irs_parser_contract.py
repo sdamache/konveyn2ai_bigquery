@@ -10,28 +10,35 @@ import pytest
 # Register custom markers to avoid warnings
 pytest_plugins = []
 
+
 def pytest_configure(config):
     """Configure pytest markers"""
-    config.addinivalue_line("markers", "contract: Contract tests for interface compliance (TDD)")
+    config.addinivalue_line(
+        "markers", "contract: Contract tests for interface compliance (TDD)"
+    )
     config.addinivalue_line("markers", "unit: Unit tests for individual components")
 
-import re
-import json
+
 from datetime import datetime
-from typing import Dict, List, Any
-from unittest.mock import patch, MagicMock
 
 # Import the parser interface contracts
 try:
-    import sys
     import os
+    import sys
+
     # Add project root to Python path
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     sys.path.insert(0, project_root)
 
     # Import using shared module
     from src.common.parser_interfaces import (
-        BaseParser, IRSParser, SourceType, ChunkMetadata, ParseResult, ParseError, ErrorClass
+        BaseParser,
+        ChunkMetadata,
+        ErrorClass,
+        IRSParser,
+        ParseError,
+        ParseResult,
+        SourceType,
     )
 
     PARSER_INTERFACES_AVAILABLE = True
@@ -42,6 +49,7 @@ except (ImportError, AttributeError, FileNotFoundError) as e:
 # Try to import the actual implementation (expected to fail initially)
 try:
     from src.ingest.irs.parser import IRSParserImpl
+
     IRS_PARSER_AVAILABLE = True
 except ImportError:
     IRS_PARSER_AVAILABLE = False
@@ -152,22 +160,26 @@ class TestIRSParserContract:
 
     def test_parser_interfaces_available(self):
         """Test that parser interface contracts are available"""
-        assert PARSER_INTERFACES_AVAILABLE, "Parser interface contracts should be available"
+        assert (
+            PARSER_INTERFACES_AVAILABLE
+        ), "Parser interface contracts should be available"
 
-    @pytest.mark.skipif(not PARSER_INTERFACES_AVAILABLE, reason="Parser interfaces not available")
+    @pytest.mark.skipif(
+        not PARSER_INTERFACES_AVAILABLE, reason="Parser interfaces not available"
+    )
     def test_irs_parser_interface_exists(self):
         """Test that IRSParser abstract class exists with required methods"""
         # Verify IRSParser exists and inherits from BaseParser
         assert issubclass(IRSParser, BaseParser)
 
         # Verify required abstract methods exist
-        abstract_methods = getattr(IRSParser, '__abstractmethods__', set())
+        abstract_methods = getattr(IRSParser, "__abstractmethods__", set())
         required_methods = {
-            'parse_file',
-            'parse_directory',
-            'validate_content',
-            'parse_imf_layout',
-            'extract_field_positions'
+            "parse_file",
+            "parse_directory",
+            "validate_content",
+            "parse_imf_layout",
+            "extract_field_positions",
         }
 
         # Check that all required methods are declared as abstract
@@ -179,20 +191,26 @@ class TestIRSParserContract:
         """Test that the actual implementation doesn't exist yet (TDD requirement)"""
         assert not IRS_PARSER_AVAILABLE, "IRSParserImpl should not exist yet (TDD)"
 
-    @pytest.mark.skipif(not IRS_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not IRS_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_irs_parser_inheritance(self):
         """Test that IRSParserImpl properly inherits from IRSParser"""
         assert issubclass(IRSParserImpl, IRSParser)
         assert issubclass(IRSParserImpl, BaseParser)
 
-    @pytest.mark.skipif(not IRS_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not IRS_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_irs_parser_source_type(self):
         """Test that parser returns correct source type"""
         parser = IRSParserImpl()
         assert parser.source_type == SourceType.IRS
         assert parser._get_source_type() == SourceType.IRS
 
-    @pytest.mark.skipif(not IRS_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not IRS_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_imf_layout_primary_individual(self):
         """Test parsing a valid primary individual IMF layout"""
         parser = IRSParserImpl()
@@ -212,19 +230,21 @@ class TestIRSParserContract:
 
         # Verify IRS-specific metadata
         irs_metadata = chunk.source_metadata
-        assert irs_metadata['record_type'] == '01'
-        assert irs_metadata['layout_version'] == '2023.1'
-        assert irs_metadata['section'] == 'IDENTITY'
-        assert 'start_position' in irs_metadata
-        assert 'field_length' in irs_metadata
-        assert 'data_type' in irs_metadata
+        assert irs_metadata["record_type"] == "01"
+        assert irs_metadata["layout_version"] == "2023.1"
+        assert irs_metadata["section"] == "IDENTITY"
+        assert "start_position" in irs_metadata
+        assert "field_length" in irs_metadata
+        assert "data_type" in irs_metadata
 
         # Verify content fields
         assert chunk.content_text.strip() != ""
         assert chunk.content_hash != ""
         assert isinstance(chunk.collected_at, datetime)
 
-    @pytest.mark.skipif(not IRS_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not IRS_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_imf_layout_business_schedule(self):
         """Test parsing a valid business schedule IMF layout"""
         parser = IRSParserImpl()
@@ -239,10 +259,12 @@ class TestIRSParserContract:
 
         # Verify IRS-specific metadata
         irs_metadata = chunk.source_metadata
-        assert irs_metadata['record_type'] == '02'
-        assert irs_metadata['layout_version'] == '2023.1'
+        assert irs_metadata["record_type"] == "02"
+        assert irs_metadata["layout_version"] == "2023.1"
 
-    @pytest.mark.skipif(not IRS_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not IRS_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_imf_layout_extension_record(self):
         """Test parsing extension/amendment record layout"""
         parser = IRSParserImpl()
@@ -256,10 +278,12 @@ class TestIRSParserContract:
         assert chunk.artifact_id == expected_artifact_id
 
         irs_metadata = chunk.source_metadata
-        assert irs_metadata['record_type'] == '03'
-        assert irs_metadata['layout_version'] == '2023.1'
+        assert irs_metadata["record_type"] == "03"
+        assert irs_metadata["layout_version"] == "2023.1"
 
-    @pytest.mark.skipif(not IRS_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not IRS_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_imf_layout_multiple_sections(self):
         """Test parsing IMF layout with multiple sections"""
         parser = IRSParserImpl()
@@ -269,17 +293,19 @@ class TestIRSParserContract:
         assert len(chunks) >= 5  # IDENTITY, TAX_INFO, STATUS, PROCESSING, RESERVED
 
         # Verify we got all expected sections
-        sections = [chunk.source_metadata['section'] for chunk in chunks]
-        expected_sections = ['IDENTITY', 'TAX_INFO', 'STATUS', 'PROCESSING', 'RESERVED']
+        sections = [chunk.source_metadata["section"] for chunk in chunks]
+        expected_sections = ["IDENTITY", "TAX_INFO", "STATUS", "PROCESSING", "RESERVED"]
         for section in expected_sections:
             assert section in sections
 
         # Verify all chunks have same record_type and layout_version
         for chunk in chunks:
-            assert chunk.source_metadata['record_type'] == '01'
-            assert chunk.source_metadata['layout_version'] == '2023.2'
+            assert chunk.source_metadata["record_type"] == "01"
+            assert chunk.source_metadata["layout_version"] == "2023.2"
 
-    @pytest.mark.skipif(not IRS_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not IRS_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_extract_field_positions_basic_layout(self):
         """Test extracting field positions from a basic layout"""
         parser = IRSParserImpl()
@@ -288,7 +314,7 @@ class TestIRSParserContract:
         chunks = parser.parse_imf_layout(VALID_IMF_LAYOUT_TAX_YEAR_2023)
 
         # Extract field positions - assuming this takes layout dict/object
-        layout_data = {'layout_content': VALID_IMF_LAYOUT_TAX_YEAR_2023}
+        layout_data = {"layout_content": VALID_IMF_LAYOUT_TAX_YEAR_2023}
         field_positions = parser.extract_field_positions(layout_data)
 
         assert isinstance(field_positions, list)
@@ -296,36 +322,51 @@ class TestIRSParserContract:
 
         # Verify field position structure
         field = field_positions[0]
-        required_fields = ['start_position', 'field_length', 'field_name', 'data_type', 'section']
+        required_fields = [
+            "start_position",
+            "field_length",
+            "field_name",
+            "data_type",
+            "section",
+        ]
         for req_field in required_fields:
             assert req_field in field, f"Missing required field: {req_field}"
 
         # Test specific field values
-        ssn_field = next((f for f in field_positions if f['field_name'] == 'Social Security Number'), None)
+        ssn_field = next(
+            (f for f in field_positions if f["field_name"] == "Social Security Number"),
+            None,
+        )
         assert ssn_field is not None
-        assert ssn_field['start_position'] == 1
-        assert ssn_field['field_length'] == 9
-        assert ssn_field['data_type'] == 'NUMERIC'
-        assert ssn_field['section'] == 'IDENTITY'
+        assert ssn_field["start_position"] == 1
+        assert ssn_field["field_length"] == 9
+        assert ssn_field["data_type"] == "NUMERIC"
+        assert ssn_field["section"] == "IDENTITY"
 
-    @pytest.mark.skipif(not IRS_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not IRS_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_extract_field_positions_with_pic_clauses(self):
         """Test extracting field positions with PIC clause parsing"""
         parser = IRSParserImpl()
 
-        layout_data = {'layout_content': VALID_IMF_LAYOUT_BUSINESS_2023}
+        layout_data = {"layout_content": VALID_IMF_LAYOUT_BUSINESS_2023}
         field_positions = parser.extract_field_positions(layout_data)
 
         # Find a field with a complex PIC clause
-        gross_receipts = next((f for f in field_positions if f['field_name'] == 'Gross Receipts'), None)
+        gross_receipts = next(
+            (f for f in field_positions if f["field_name"] == "Gross Receipts"), None
+        )
         assert gross_receipts is not None
-        assert gross_receipts['start_position'] == 55
-        assert gross_receipts['field_length'] == 12  # S9(10)V99 = 12 positions
-        assert gross_receipts['data_type'] == 'NUMERIC'
-        assert 'pic_clause' in gross_receipts
-        assert gross_receipts['pic_clause'] == 'S9(10)V99'
+        assert gross_receipts["start_position"] == 55
+        assert gross_receipts["field_length"] == 12  # S9(10)V99 = 12 positions
+        assert gross_receipts["data_type"] == "NUMERIC"
+        assert "pic_clause" in gross_receipts
+        assert gross_receipts["pic_clause"] == "S9(10)V99"
 
-    @pytest.mark.skipif(not IRS_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not IRS_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_invalid_imf_layout_malformed(self):
         """Test error handling for malformed IMF layout"""
         parser = IRSParserImpl()
@@ -333,7 +374,9 @@ class TestIRSParserContract:
         with pytest.raises(ValueError):
             parser.parse_imf_layout(INVALID_IMF_LAYOUT_MALFORMED)
 
-    @pytest.mark.skipif(not IRS_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not IRS_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_invalid_imf_layout_missing_fields(self):
         """Test error handling for layout missing required sections"""
         parser = IRSParserImpl()
@@ -341,7 +384,9 @@ class TestIRSParserContract:
         with pytest.raises(ValueError):
             parser.parse_imf_layout(INVALID_IMF_LAYOUT_MISSING_FIELDS)
 
-    @pytest.mark.skipif(not IRS_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not IRS_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_validate_content_valid_imf_layout(self):
         """Test content validation for valid IRS IMF layouts"""
         parser = IRSParserImpl()
@@ -351,7 +396,9 @@ class TestIRSParserContract:
         assert parser.validate_content(VALID_IMF_LAYOUT_EXTENSION_2023) is True
         assert parser.validate_content(COMPLEX_IMF_LAYOUT_MULTI_SECTION) is True
 
-    @pytest.mark.skipif(not IRS_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not IRS_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_validate_content_invalid(self):
         """Test content validation for invalid content"""
         parser = IRSParserImpl()
@@ -361,7 +408,9 @@ class TestIRSParserContract:
         assert parser.validate_content("") is False
         assert parser.validate_content("not an IRS layout") is False
 
-    @pytest.mark.skipif(not IRS_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not IRS_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_file_single_layout(self, tmp_path):
         """Test parsing a single IMF layout file"""
         parser = IRSParserImpl()
@@ -382,7 +431,9 @@ class TestIRSParserContract:
         chunk = result.chunks[0]
         assert chunk.source_uri == str(layout_file)
 
-    @pytest.mark.skipif(not IRS_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not IRS_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_directory_multiple_layouts(self, tmp_path):
         """Test parsing a directory with multiple IMF layout files"""
         parser = IRSParserImpl()
@@ -390,7 +441,9 @@ class TestIRSParserContract:
         # Create multiple layout files
         (tmp_path / "imf_primary_2023.txt").write_text(VALID_IMF_LAYOUT_TAX_YEAR_2023)
         (tmp_path / "imf_business_2023.txt").write_text(VALID_IMF_LAYOUT_BUSINESS_2023)
-        (tmp_path / "imf_extension_2023.txt").write_text(VALID_IMF_LAYOUT_EXTENSION_2023)
+        (tmp_path / "imf_extension_2023.txt").write_text(
+            VALID_IMF_LAYOUT_EXTENSION_2023
+        )
         (tmp_path / "not-a-layout.txt").write_text("This is not an IRS layout")
 
         result = parser.parse_directory(str(tmp_path))
@@ -400,12 +453,14 @@ class TestIRSParserContract:
         assert result.files_processed >= 3
 
         # Verify we got the expected record types
-        record_types = [chunk.source_metadata['record_type'] for chunk in result.chunks]
-        assert '01' in record_types  # Primary individual
-        assert '02' in record_types  # Business schedule
-        assert '03' in record_types  # Extension
+        record_types = [chunk.source_metadata["record_type"] for chunk in result.chunks]
+        assert "01" in record_types  # Primary individual
+        assert "02" in record_types  # Business schedule
+        assert "03" in record_types  # Extension
 
-    @pytest.mark.skipif(not IRS_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not IRS_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_artifact_id_generation(self):
         """Test artifact ID generation for various IRS record types and sections"""
         parser = IRSParserImpl()
@@ -424,11 +479,13 @@ class TestIRSParserContract:
                 "",  # source_path not used for IRS
                 record_type=record_type,
                 layout_version=layout_version,
-                section=section
+                section=section,
             )
             assert artifact_id == expected
 
-    @pytest.mark.skipif(not IRS_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not IRS_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_chunk_content_large_layout(self):
         """Test chunking behavior for large IMF layouts"""
         parser = IRSParserImpl()
@@ -442,11 +499,13 @@ class TestIRSParserContract:
         # Verify all chunks have content and proper metadata
         for chunk in chunks:
             assert chunk.content_text.strip() != ""
-            assert chunk.source_metadata['record_type'] == '01'
-            assert chunk.source_metadata['layout_version'] == '2023.2'
+            assert chunk.source_metadata["record_type"] == "01"
+            assert chunk.source_metadata["layout_version"] == "2023.2"
             assert chunk.artifact_id.startswith("irs://01/2023.2/")
 
-    @pytest.mark.skipif(not IRS_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not IRS_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_field_position_parsing_edge_cases(self):
         """Test field position parsing for edge cases"""
         parser = IRSParserImpl()
@@ -468,28 +527,30 @@ Field Positions and Definitions:
 069-100  Filler Space                PIC X(32)   FILLER      Optional  Section: EDGE_CASES
 """
 
-        layout_data = {'layout_content': edge_case_layout}
+        layout_data = {"layout_content": edge_case_layout}
         field_positions = parser.extract_field_positions(layout_data)
 
         # Verify various field types are parsed correctly
-        fields_by_name = {f['field_name']: f for f in field_positions}
+        fields_by_name = {f["field_name"]: f for f in field_positions}
 
         # Test single character field
-        single_char = fields_by_name['Single Character Field']
-        assert single_char['start_position'] == 1
-        assert single_char['field_length'] == 1
+        single_char = fields_by_name["Single Character Field"]
+        assert single_char["start_position"] == 1
+        assert single_char["field_length"] == 1
 
         # Test signed decimal
-        signed_decimal = fields_by_name['Signed Decimal']
-        assert signed_decimal['start_position'] == 12
-        assert signed_decimal['field_length'] == 12  # S9(10)V99
+        signed_decimal = fields_by_name["Signed Decimal"]
+        assert signed_decimal["start_position"] == 12
+        assert signed_decimal["field_length"] == 12  # S9(10)V99
 
         # Test long alpha field
-        long_alpha = fields_by_name['Long Alpha Field']
-        assert long_alpha['start_position'] == 29
-        assert long_alpha['field_length'] == 30
+        long_alpha = fields_by_name["Long Alpha Field"]
+        assert long_alpha["start_position"] == 29
+        assert long_alpha["field_length"] == 30
 
-    @pytest.mark.skipif(not IRS_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not IRS_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_error_handling_missing_required_metadata(self):
         """Test error handling when required IRS metadata is missing"""
         parser = IRSParserImpl()
@@ -512,11 +573,16 @@ Field Positions and Definitions:
 001-009  Social Security Number  PIC 9(09)   NUMERIC  Required  Section: IDENTITY
 """
 
-        for invalid_layout in [invalid_layout_no_record_type, invalid_layout_no_version]:
+        for invalid_layout in [
+            invalid_layout_no_record_type,
+            invalid_layout_no_version,
+        ]:
             with pytest.raises((ValueError, KeyError)):
                 parser.parse_imf_layout(invalid_layout)
 
-    @pytest.mark.skipif(not IRS_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not IRS_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_content_hash_generation(self):
         """Test that content hash is generated correctly"""
         parser = IRSParserImpl()
@@ -531,7 +597,9 @@ Field Positions and Definitions:
         chunks2 = parser.parse_imf_layout(VALID_IMF_LAYOUT_TAX_YEAR_2023)
         assert chunks[0].content_hash == chunks2[0].content_hash
 
-    @pytest.mark.skipif(not IRS_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not IRS_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_result_structure(self):
         """Test that ParseResult has the correct structure"""
         parser = IRSParserImpl()
@@ -544,20 +612,31 @@ Field Positions and Definitions:
         chunk = chunks[0]
 
         # Required ChunkMetadata fields
-        assert hasattr(chunk, 'source_type')
-        assert hasattr(chunk, 'artifact_id')
-        assert hasattr(chunk, 'content_text')
-        assert hasattr(chunk, 'content_hash')
-        assert hasattr(chunk, 'source_metadata')
-        assert hasattr(chunk, 'collected_at')
+        assert hasattr(chunk, "source_type")
+        assert hasattr(chunk, "artifact_id")
+        assert hasattr(chunk, "content_text")
+        assert hasattr(chunk, "content_hash")
+        assert hasattr(chunk, "source_metadata")
+        assert hasattr(chunk, "collected_at")
 
         # IRS-specific metadata fields
         irs_metadata = chunk.source_metadata
-        required_irs_fields = ['record_type', 'layout_version', 'start_position', 'field_length', 'data_type', 'section']
+        required_irs_fields = [
+            "record_type",
+            "layout_version",
+            "start_position",
+            "field_length",
+            "data_type",
+            "section",
+        ]
         for field in required_irs_fields:
-            assert field in irs_metadata, f"Missing required IRS metadata field: {field}"
+            assert (
+                field in irs_metadata
+            ), f"Missing required IRS metadata field: {field}"
 
-    @pytest.mark.skipif(not IRS_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not IRS_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_section_handling_edge_cases(self):
         """Test section handling for edge cases"""
         parser = IRSParserImpl()
@@ -579,15 +658,19 @@ Field Positions and Definitions:
         assert len(chunks) > 0
 
         # Verify section names are preserved correctly
-        sections = [chunk.source_metadata['section'] for chunk in chunks]
-        expected_sections = ['SPECIAL_SECTION_NAME', 'CUSTOM_123', 'SECTION_WITH_UNDERSCORE']
+        sections = [chunk.source_metadata["section"] for chunk in chunks]
+        expected_sections = [
+            "SPECIAL_SECTION_NAME",
+            "CUSTOM_123",
+            "SECTION_WITH_UNDERSCORE",
+        ]
         for section in expected_sections:
             assert section in sections
 
         # Verify artifact IDs are generated correctly
         for chunk in chunks:
             assert chunk.artifact_id.startswith("irs://05/2023.1/")
-            assert chunk.source_metadata['section'] in chunk.artifact_id
+            assert chunk.source_metadata["section"] in chunk.artifact_id
 
 
 @pytest.mark.contract

@@ -15,21 +15,21 @@ Requirements:
 - Uses pytest markers: @pytest.mark.integration, @pytest.mark.bigquery
 """
 
-import os
 import json
-import yaml
-import tempfile
+import os
 import shutil
-import pytest
+import tempfile
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Dict, List, Any, Optional
-from unittest.mock import patch, MagicMock
+from typing import Any
+
+import pytest
+import yaml
 
 # Import BigQuery client
 try:
     from google.cloud import bigquery
     from google.cloud.exceptions import NotFound
+
     BIGQUERY_AVAILABLE = True
 except ImportError:
     BIGQUERY_AVAILABLE = False
@@ -37,12 +37,18 @@ except ImportError:
 # Import parser interface contracts
 try:
     import sys
+
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     sys.path.insert(0, project_root)
 
     import importlib.util
-    parser_interfaces_path = os.path.join(project_root, "specs", "002-m1-parse-and", "contracts", "parser-interfaces.py")
-    spec = importlib.util.spec_from_file_location("parser_interfaces", parser_interfaces_path)
+
+    parser_interfaces_path = os.path.join(
+        project_root, "specs", "002-m1-parse-and", "contracts", "parser-interfaces.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "parser_interfaces", parser_interfaces_path
+    )
     parser_interfaces = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(parser_interfaces)
 
@@ -62,6 +68,7 @@ except (ImportError, AttributeError, FileNotFoundError) as e:
 # Try to import the actual implementation (expected to fail initially)
 try:
     from src.parsers.kubernetes_parser import KubernetesParserImpl
+
     K8S_PARSER_AVAILABLE = True
 except ImportError:
     K8S_PARSER_AVAILABLE = False
@@ -69,6 +76,7 @@ except ImportError:
 # Try to import BigQuery writer implementation (expected to fail initially)
 try:
     from src.ingestion.bigquery_writer import BigQueryWriterImpl
+
     BIGQUERY_WRITER_AVAILABLE = True
 except ImportError:
     BIGQUERY_WRITER_AVAILABLE = False
@@ -76,6 +84,7 @@ except ImportError:
 # Try to import ingestion orchestrator (expected to fail initially)
 try:
     from src.ingestion.k8s_ingestion import KubernetesIngestionOrchestrator
+
     INGESTION_ORCHESTRATOR_AVAILABLE = True
 except ImportError:
     INGESTION_ORCHESTRATOR_AVAILABLE = False
@@ -310,7 +319,9 @@ def temp_dataset(bigquery_client):
 
     # Cleanup: Delete the dataset
     try:
-        bigquery_client.delete_dataset(dataset_id, delete_contents=True, not_found_ok=True)
+        bigquery_client.delete_dataset(
+            dataset_id, delete_contents=True, not_found_ok=True
+        )
     except Exception as e:
         print(f"Warning: Failed to cleanup test dataset {dataset_id}: {e}")
 
@@ -330,19 +341,19 @@ def temp_manifest_dir():
             "multi-resource.yaml": MULTI_DOCUMENT_MANIFEST,
             "invalid.yaml": INVALID_YAML_MANIFEST,
             "not-a-manifest.txt": "This is not a Kubernetes manifest file",
-            "README.md": "# Sample K8s manifests for testing"
+            "README.md": "# Sample K8s manifests for testing",
         }
 
         for filename, content in manifest_files.items():
             file_path = os.path.join(temp_dir, filename)
-            with open(file_path, 'w') as f:
+            with open(file_path, "w") as f:
                 f.write(content)
 
         # Create subdirectory with more manifests
         sub_dir = os.path.join(temp_dir, "overlays", "production")
         os.makedirs(sub_dir, exist_ok=True)
 
-        with open(os.path.join(sub_dir, "production-overrides.yaml"), 'w') as f:
+        with open(os.path.join(sub_dir, "production-overrides.yaml"), "w") as f:
             f.write(SAMPLE_DEPLOYMENT_MANIFEST.replace("replicas: 5", "replicas: 10"))
 
         yield temp_dir
@@ -359,7 +370,9 @@ class TestKubernetesIngestionEndToEnd:
 
     def test_parser_interfaces_available(self):
         """Test that parser interface contracts are available"""
-        assert PARSER_INTERFACES_AVAILABLE, "Parser interface contracts should be available"
+        assert (
+            PARSER_INTERFACES_AVAILABLE
+        ), "Parser interface contracts should be available"
 
     def test_bigquery_client_available(self, bigquery_client):
         """Test that BigQuery client is properly configured"""
@@ -372,36 +385,47 @@ class TestKubernetesIngestionEndToEnd:
         assert temp_dataset.dataset_id.startswith(TEST_DATASET_PREFIX)
         assert temp_dataset.project == TEST_PROJECT_ID
 
-    @pytest.mark.skipif(not K8S_PARSER_AVAILABLE, reason="Kubernetes parser not implemented yet")
+    @pytest.mark.skipif(
+        not K8S_PARSER_AVAILABLE, reason="Kubernetes parser not implemented yet"
+    )
     def test_kubernetes_parser_available(self):
         """Test that Kubernetes parser implementation is available"""
         parser = KubernetesParserImpl()
         assert parser.source_type == SourceType.KUBERNETES
 
-    @pytest.mark.skipif(not BIGQUERY_WRITER_AVAILABLE, reason="BigQuery writer not implemented yet")
+    @pytest.mark.skipif(
+        not BIGQUERY_WRITER_AVAILABLE, reason="BigQuery writer not implemented yet"
+    )
     def test_bigquery_writer_available(self):
         """Test that BigQuery writer implementation is available"""
         writer = BigQueryWriterImpl(project_id=TEST_PROJECT_ID)
         assert isinstance(writer, BigQueryWriter)
 
-    @pytest.mark.skipif(not INGESTION_ORCHESTRATOR_AVAILABLE, reason="Ingestion orchestrator not implemented yet")
+    @pytest.mark.skipif(
+        not INGESTION_ORCHESTRATOR_AVAILABLE,
+        reason="Ingestion orchestrator not implemented yet",
+    )
     def test_ingestion_orchestrator_available(self):
         """Test that ingestion orchestrator is available"""
         orchestrator = KubernetesIngestionOrchestrator(
-            project_id=TEST_PROJECT_ID,
-            dataset_id="test_dataset"
+            project_id=TEST_PROJECT_ID, dataset_id="test_dataset"
         )
         assert orchestrator is not None
 
     @pytest.mark.skipif(
-        not all([K8S_PARSER_AVAILABLE, BIGQUERY_WRITER_AVAILABLE, INGESTION_ORCHESTRATOR_AVAILABLE]),
-        reason="Required components not implemented yet"
+        not all(
+            [
+                K8S_PARSER_AVAILABLE,
+                BIGQUERY_WRITER_AVAILABLE,
+                INGESTION_ORCHESTRATOR_AVAILABLE,
+            ]
+        ),
+        reason="Required components not implemented yet",
     )
     def test_single_manifest_file_ingestion(self, temp_dataset, temp_manifest_dir):
         """Test ingesting a single Kubernetes manifest file to BigQuery"""
         orchestrator = KubernetesIngestionOrchestrator(
-            project_id=TEST_PROJECT_ID,
-            dataset_id=temp_dataset.dataset_id
+            project_id=TEST_PROJECT_ID, dataset_id=temp_dataset.dataset_id
         )
 
         # Ingest single deployment manifest
@@ -426,25 +450,32 @@ class TestKubernetesIngestionEndToEnd:
 
         # Verify K8s-specific metadata
         k8s_metadata = chunk.source_metadata
-        assert k8s_metadata['kind'] == 'Deployment'
-        assert k8s_metadata['api_version'] == 'apps/v1'
-        assert k8s_metadata['namespace'] == 'production'
-        assert k8s_metadata['resource_name'] == 'web-app'
-        assert k8s_metadata['labels']['app'] == 'web-app'
-        assert k8s_metadata['labels']['version'] == '2.1.0'
+        assert k8s_metadata["kind"] == "Deployment"
+        assert k8s_metadata["api_version"] == "apps/v1"
+        assert k8s_metadata["namespace"] == "production"
+        assert k8s_metadata["resource_name"] == "web-app"
+        assert k8s_metadata["labels"]["app"] == "web-app"
+        assert k8s_metadata["labels"]["version"] == "2.1.0"
 
         # Verify data was written to BigQuery
-        self._verify_bigquery_data(temp_dataset.dataset_id, result.chunks, expected_count=len(result.chunks))
+        self._verify_bigquery_data(
+            temp_dataset.dataset_id, result.chunks, expected_count=len(result.chunks)
+        )
 
     @pytest.mark.skipif(
-        not all([K8S_PARSER_AVAILABLE, BIGQUERY_WRITER_AVAILABLE, INGESTION_ORCHESTRATOR_AVAILABLE]),
-        reason="Required components not implemented yet"
+        not all(
+            [
+                K8S_PARSER_AVAILABLE,
+                BIGQUERY_WRITER_AVAILABLE,
+                INGESTION_ORCHESTRATOR_AVAILABLE,
+            ]
+        ),
+        reason="Required components not implemented yet",
     )
     def test_multi_document_manifest_ingestion(self, temp_dataset, temp_manifest_dir):
         """Test ingesting multi-document YAML manifest to BigQuery"""
         orchestrator = KubernetesIngestionOrchestrator(
-            project_id=TEST_PROJECT_ID,
-            dataset_id=temp_dataset.dataset_id
+            project_id=TEST_PROJECT_ID, dataset_id=temp_dataset.dataset_id
         )
 
         # Ingest multi-document manifest
@@ -453,40 +484,57 @@ class TestKubernetesIngestionEndToEnd:
 
         # Should process multiple resources from single file
         assert result.files_processed == 1
-        assert len(result.chunks) >= 4  # At least 4 resources (Deployment, Service, ConfigMap, Secret)
+        assert (
+            len(result.chunks) >= 4
+        )  # At least 4 resources (Deployment, Service, ConfigMap, Secret)
 
         # Verify we got all expected resource types
-        kinds = [chunk.source_metadata['kind'] for chunk in result.chunks]
-        expected_kinds = ['Deployment', 'Service', 'ConfigMap', 'Secret']
+        kinds = [chunk.source_metadata["kind"] for chunk in result.chunks]
+        expected_kinds = ["Deployment", "Service", "ConfigMap", "Secret"]
         for expected_kind in expected_kinds:
-            assert expected_kind in kinds, f"Missing expected resource kind: {expected_kind}"
+            assert (
+                expected_kind in kinds
+            ), f"Missing expected resource kind: {expected_kind}"
 
         # Verify artifact IDs are unique and correctly formatted
         artifact_ids = [chunk.artifact_id for chunk in result.chunks]
-        assert len(set(artifact_ids)) == len(artifact_ids), "Artifact IDs should be unique"
+        assert len(set(artifact_ids)) == len(
+            artifact_ids
+        ), "Artifact IDs should be unique"
 
         expected_artifact_patterns = [
             "k8s://production/Deployment/web-app",
             "k8s://production/Service/web-app-service",
             "k8s://production/ConfigMap/app-config",
-            "k8s://production/Secret/db-secret"
+            "k8s://production/Secret/db-secret",
         ]
 
         for pattern in expected_artifact_patterns:
-            assert any(pattern in artifact_id for artifact_id in artifact_ids), f"Missing expected artifact ID pattern: {pattern}"
+            assert any(
+                pattern in artifact_id for artifact_id in artifact_ids
+            ), f"Missing expected artifact ID pattern: {pattern}"
 
         # Verify BigQuery ingestion
-        self._verify_bigquery_data(temp_dataset.dataset_id, result.chunks, expected_count=len(result.chunks))
+        self._verify_bigquery_data(
+            temp_dataset.dataset_id, result.chunks, expected_count=len(result.chunks)
+        )
 
     @pytest.mark.skipif(
-        not all([K8S_PARSER_AVAILABLE, BIGQUERY_WRITER_AVAILABLE, INGESTION_ORCHESTRATOR_AVAILABLE]),
-        reason="Required components not implemented yet"
+        not all(
+            [
+                K8S_PARSER_AVAILABLE,
+                BIGQUERY_WRITER_AVAILABLE,
+                INGESTION_ORCHESTRATOR_AVAILABLE,
+            ]
+        ),
+        reason="Required components not implemented yet",
     )
-    def test_directory_ingestion_with_mixed_files(self, temp_dataset, temp_manifest_dir):
+    def test_directory_ingestion_with_mixed_files(
+        self, temp_dataset, temp_manifest_dir
+    ):
         """Test ingesting entire directory with mixed K8s and non-K8s files"""
         orchestrator = KubernetesIngestionOrchestrator(
-            project_id=TEST_PROJECT_ID,
-            dataset_id=temp_dataset.dataset_id
+            project_id=TEST_PROJECT_ID, dataset_id=temp_dataset.dataset_id
         )
 
         # Ingest entire directory
@@ -509,20 +557,29 @@ class TestKubernetesIngestionEndToEnd:
         ]
 
         for expected_file in expected_files:
-            assert any(expected_file in uri for uri in source_uris), f"Missing chunks from file: {expected_file}"
+            assert any(
+                expected_file in uri for uri in source_uris
+            ), f"Missing chunks from file: {expected_file}"
 
         # Verify BigQuery ingestion
-        self._verify_bigquery_data(temp_dataset.dataset_id, result.chunks, expected_count=len(result.chunks))
+        self._verify_bigquery_data(
+            temp_dataset.dataset_id, result.chunks, expected_count=len(result.chunks)
+        )
 
     @pytest.mark.skipif(
-        not all([K8S_PARSER_AVAILABLE, BIGQUERY_WRITER_AVAILABLE, INGESTION_ORCHESTRATOR_AVAILABLE]),
-        reason="Required components not implemented yet"
+        not all(
+            [
+                K8S_PARSER_AVAILABLE,
+                BIGQUERY_WRITER_AVAILABLE,
+                INGESTION_ORCHESTRATOR_AVAILABLE,
+            ]
+        ),
+        reason="Required components not implemented yet",
     )
     def test_recursive_directory_ingestion(self, temp_dataset, temp_manifest_dir):
         """Test recursive directory ingestion including subdirectories"""
         orchestrator = KubernetesIngestionOrchestrator(
-            project_id=TEST_PROJECT_ID,
-            dataset_id=temp_dataset.dataset_id
+            project_id=TEST_PROJECT_ID, dataset_id=temp_dataset.dataset_id
         )
 
         # Ingest directory recursively
@@ -530,22 +587,33 @@ class TestKubernetesIngestionEndToEnd:
 
         # Should find files in subdirectories too
         source_uris = [chunk.source_uri for chunk in result.chunks]
-        subdirectory_file = os.path.join(temp_manifest_dir, "overlays", "production", "production-overrides.yaml")
+        subdirectory_file = os.path.join(
+            temp_manifest_dir, "overlays", "production", "production-overrides.yaml"
+        )
 
-        assert any(subdirectory_file in uri for uri in source_uris), "Should find files in subdirectories"
+        assert any(
+            subdirectory_file in uri for uri in source_uris
+        ), "Should find files in subdirectories"
 
         # Verify BigQuery ingestion
-        self._verify_bigquery_data(temp_dataset.dataset_id, result.chunks, expected_count=len(result.chunks))
+        self._verify_bigquery_data(
+            temp_dataset.dataset_id, result.chunks, expected_count=len(result.chunks)
+        )
 
     @pytest.mark.skipif(
-        not all([K8S_PARSER_AVAILABLE, BIGQUERY_WRITER_AVAILABLE, INGESTION_ORCHESTRATOR_AVAILABLE]),
-        reason="Required components not implemented yet"
+        not all(
+            [
+                K8S_PARSER_AVAILABLE,
+                BIGQUERY_WRITER_AVAILABLE,
+                INGESTION_ORCHESTRATOR_AVAILABLE,
+            ]
+        ),
+        reason="Required components not implemented yet",
     )
     def test_error_handling_and_logging(self, temp_dataset, temp_manifest_dir):
         """Test error handling for invalid manifests and BigQuery error logging"""
         orchestrator = KubernetesIngestionOrchestrator(
-            project_id=TEST_PROJECT_ID,
-            dataset_id=temp_dataset.dataset_id
+            project_id=TEST_PROJECT_ID, dataset_id=temp_dataset.dataset_id
         )
 
         # Ingest file with invalid YAML
@@ -567,14 +635,19 @@ class TestKubernetesIngestionEndToEnd:
         self._verify_bigquery_errors(temp_dataset.dataset_id, result.errors)
 
     @pytest.mark.skipif(
-        not all([K8S_PARSER_AVAILABLE, BIGQUERY_WRITER_AVAILABLE, INGESTION_ORCHESTRATOR_AVAILABLE]),
-        reason="Required components not implemented yet"
+        not all(
+            [
+                K8S_PARSER_AVAILABLE,
+                BIGQUERY_WRITER_AVAILABLE,
+                INGESTION_ORCHESTRATOR_AVAILABLE,
+            ]
+        ),
+        reason="Required components not implemented yet",
     )
     def test_content_hashing_and_deduplication(self, temp_dataset, temp_manifest_dir):
         """Test content hashing and deduplication behavior"""
         orchestrator = KubernetesIngestionOrchestrator(
-            project_id=TEST_PROJECT_ID,
-            dataset_id=temp_dataset.dataset_id
+            project_id=TEST_PROJECT_ID, dataset_id=temp_dataset.dataset_id
         )
 
         # Ingest same file twice
@@ -591,17 +664,24 @@ class TestKubernetesIngestionEndToEnd:
         # Artifact IDs should be identical
         artifact_id1 = result1.chunks[0].artifact_id
         artifact_id2 = result2.chunks[0].artifact_id
-        assert artifact_id1 == artifact_id2, "Same resource should produce same artifact ID"
+        assert (
+            artifact_id1 == artifact_id2
+        ), "Same resource should produce same artifact ID"
 
     @pytest.mark.skipif(
-        not all([K8S_PARSER_AVAILABLE, BIGQUERY_WRITER_AVAILABLE, INGESTION_ORCHESTRATOR_AVAILABLE]),
-        reason="Required components not implemented yet"
+        not all(
+            [
+                K8S_PARSER_AVAILABLE,
+                BIGQUERY_WRITER_AVAILABLE,
+                INGESTION_ORCHESTRATOR_AVAILABLE,
+            ]
+        ),
+        reason="Required components not implemented yet",
     )
     def test_large_manifest_chunking(self, temp_dataset):
         """Test chunking behavior for very large Kubernetes manifests"""
         orchestrator = KubernetesIngestionOrchestrator(
-            project_id=TEST_PROJECT_ID,
-            dataset_id=temp_dataset.dataset_id
+            project_id=TEST_PROJECT_ID, dataset_id=temp_dataset.dataset_id
         )
 
         # Create a very large ConfigMap with lots of data
@@ -615,15 +695,15 @@ class TestKubernetesIngestionEndToEnd:
             "metadata": {
                 "name": "large-config",
                 "namespace": "default",
-                "labels": {"size": "large"}
+                "labels": {"size": "large"},
             },
-            "data": large_data
+            "data": large_data,
         }
 
         large_manifest = yaml.dump(large_configmap)
 
         # Write to temporary file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write(large_manifest)
             temp_file = f.name
 
@@ -631,31 +711,44 @@ class TestKubernetesIngestionEndToEnd:
             result = orchestrator.ingest_file(temp_file)
 
             # Should generate multiple chunks for large content
-            assert len(result.chunks) > 1, "Large manifest should be split into multiple chunks"
+            assert (
+                len(result.chunks) > 1
+            ), "Large manifest should be split into multiple chunks"
 
             # All chunks should have same artifact_id but different content
             artifact_ids = [chunk.artifact_id for chunk in result.chunks]
-            assert all(aid == "k8s://default/ConfigMap/large-config" for aid in artifact_ids), "All chunks should have same artifact ID"
+            assert all(
+                aid == "k8s://default/ConfigMap/large-config" for aid in artifact_ids
+            ), "All chunks should have same artifact ID"
 
             # Content should be different across chunks
             content_texts = [chunk.content_text for chunk in result.chunks]
             assert len(set(content_texts)) > 1, "Chunks should have different content"
 
             # Verify BigQuery ingestion
-            self._verify_bigquery_data(temp_dataset.dataset_id, result.chunks, expected_count=len(result.chunks))
+            self._verify_bigquery_data(
+                temp_dataset.dataset_id,
+                result.chunks,
+                expected_count=len(result.chunks),
+            )
 
         finally:
             os.unlink(temp_file)
 
     @pytest.mark.skipif(
-        not all([K8S_PARSER_AVAILABLE, BIGQUERY_WRITER_AVAILABLE, INGESTION_ORCHESTRATOR_AVAILABLE]),
-        reason="Required components not implemented yet"
+        not all(
+            [
+                K8S_PARSER_AVAILABLE,
+                BIGQUERY_WRITER_AVAILABLE,
+                INGESTION_ORCHESTRATOR_AVAILABLE,
+            ]
+        ),
+        reason="Required components not implemented yet",
     )
     def test_ingestion_run_logging(self, temp_dataset, temp_manifest_dir):
         """Test that ingestion runs are properly logged with metadata"""
         orchestrator = KubernetesIngestionOrchestrator(
-            project_id=TEST_PROJECT_ID,
-            dataset_id=temp_dataset.dataset_id
+            project_id=TEST_PROJECT_ID, dataset_id=temp_dataset.dataset_id
         )
 
         # Perform ingestion
@@ -670,19 +763,23 @@ class TestKubernetesIngestionEndToEnd:
             "errors_encountered": len(result.errors),
             "processing_duration_ms": result.processing_duration_ms,
             "parser_version": "1.0.0",
-            "ingestion_timestamp": datetime.now(timezone.utc).isoformat()
+            "ingestion_timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
         # Log the run and get run_id
         writer = BigQueryWriterImpl(project_id=TEST_PROJECT_ID)
-        run_id = writer.log_ingestion_run(run_info, f"{temp_dataset.dataset_id}.ingestion_runs")
+        run_id = writer.log_ingestion_run(
+            run_info, f"{temp_dataset.dataset_id}.ingestion_runs"
+        )
 
         assert run_id is not None and run_id != ""
 
         # Verify run was logged to BigQuery
         self._verify_ingestion_run_logged(temp_dataset.dataset_id, run_id, run_info)
 
-    def _verify_bigquery_data(self, dataset_id: str, chunks: List[ChunkMetadata], expected_count: int):
+    def _verify_bigquery_data(
+        self, dataset_id: str, chunks: list[ChunkMetadata], expected_count: int
+    ):
         """Verify that chunks were properly written to BigQuery source_metadata table"""
         if not BIGQUERY_WRITER_AVAILABLE:
             pytest.skip("BigQuery writer not available for verification")
@@ -707,7 +804,9 @@ class TestKubernetesIngestionEndToEnd:
         results = list(query_job.result())
 
         # Verify row count
-        assert len(results) >= expected_count, f"Expected at least {expected_count} rows, got {len(results)}"
+        assert (
+            len(results) >= expected_count
+        ), f"Expected at least {expected_count} rows, got {len(results)}"
 
         # Verify data integrity
         for row in results:
@@ -719,12 +818,23 @@ class TestKubernetesIngestionEndToEnd:
             assert row.collected_at is not None
 
             # Parse and verify source_metadata JSON
-            metadata = json.loads(row.source_metadata) if isinstance(row.source_metadata, str) else row.source_metadata
-            required_fields = ['kind', 'api_version', 'namespace', 'resource_name', 'labels', 'annotations']
+            metadata = (
+                json.loads(row.source_metadata)
+                if isinstance(row.source_metadata, str)
+                else row.source_metadata
+            )
+            required_fields = [
+                "kind",
+                "api_version",
+                "namespace",
+                "resource_name",
+                "labels",
+                "annotations",
+            ]
             for field in required_fields:
                 assert field in metadata, f"Missing required metadata field: {field}"
 
-    def _verify_bigquery_errors(self, dataset_id: str, errors: List[ParseError]):
+    def _verify_bigquery_errors(self, dataset_id: str, errors: list[ParseError]):
         """Verify that parsing errors were properly logged to BigQuery"""
         if not BIGQUERY_WRITER_AVAILABLE or not errors:
             return
@@ -749,7 +859,9 @@ class TestKubernetesIngestionEndToEnd:
         results = list(query_job.result())
 
         # Verify error logging
-        assert len(results) >= len(errors), f"Expected at least {len(errors)} error rows"
+        assert len(results) >= len(
+            errors
+        ), f"Expected at least {len(errors)} error rows"
 
         for row in results:
             assert row.source_type == "kubernetes"
@@ -757,7 +869,9 @@ class TestKubernetesIngestionEndToEnd:
             assert row.error_msg != ""
             assert row.collected_at is not None
 
-    def _verify_ingestion_run_logged(self, dataset_id: str, run_id: str, run_info: Dict[str, Any]):
+    def _verify_ingestion_run_logged(
+        self, dataset_id: str, run_id: str, run_info: dict[str, Any]
+    ):
         """Verify that ingestion run was properly logged"""
         if not BIGQUERY_WRITER_AVAILABLE:
             return
@@ -781,15 +895,15 @@ class TestKubernetesIngestionEndToEnd:
         """
 
         job_config = bigquery.QueryJobConfig(
-            query_parameters=[
-                bigquery.ScalarQueryParameter("run_id", "STRING", run_id)
-            ]
+            query_parameters=[bigquery.ScalarQueryParameter("run_id", "STRING", run_id)]
         )
 
         query_job = client.query(query, job_config=job_config)
         results = list(query_job.result())
 
-        assert len(results) == 1, f"Expected exactly 1 run log entry, got {len(results)}"
+        assert (
+            len(results) == 1
+        ), f"Expected exactly 1 run log entry, got {len(results)}"
 
         row = results[0]
         assert row.run_id == run_id
@@ -853,21 +967,27 @@ class TestKubernetesIngestionTDDFailures:
         ]:
             try:
                 parsed = yaml.safe_load(manifest_content)
-                assert parsed is not None, f"{manifest_name} manifest should parse as valid YAML"
-                assert 'apiVersion' in parsed, f"{manifest_name} should have apiVersion"
-                assert 'kind' in parsed, f"{manifest_name} should have kind"
-                assert 'metadata' in parsed, f"{manifest_name} should have metadata"
-                assert 'name' in parsed['metadata'], f"{manifest_name} should have metadata.name"
+                assert (
+                    parsed is not None
+                ), f"{manifest_name} manifest should parse as valid YAML"
+                assert "apiVersion" in parsed, f"{manifest_name} should have apiVersion"
+                assert "kind" in parsed, f"{manifest_name} should have kind"
+                assert "metadata" in parsed, f"{manifest_name} should have metadata"
+                assert (
+                    "name" in parsed["metadata"]
+                ), f"{manifest_name} should have metadata.name"
             except yaml.YAMLError as e:
                 pytest.fail(f"Sample {manifest_name} manifest is invalid YAML: {e}")
 
         # Test multi-document manifest
         try:
             documents = list(yaml.safe_load_all(MULTI_DOCUMENT_MANIFEST))
-            assert len(documents) == 4, "Multi-document manifest should contain 4 documents"
+            assert (
+                len(documents) == 4
+            ), "Multi-document manifest should contain 4 documents"
             for i, doc in enumerate(documents):
                 assert doc is not None, f"Document {i} should not be None"
-                assert 'apiVersion' in doc, f"Document {i} should have apiVersion"
+                assert "apiVersion" in doc, f"Document {i} should have apiVersion"
         except yaml.YAMLError as e:
             pytest.fail(f"Multi-document manifest is invalid YAML: {e}")
 

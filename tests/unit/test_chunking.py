@@ -3,17 +3,20 @@ Unit tests for chunking strategies
 T034: Comprehensive tests for ContentChunker with all strategies and edge cases
 """
 
-import pytest
-from typing import List
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from common.chunking import (
-    ContentChunker, ChunkConfig, ChunkResult, ChunkingStrategy,
-    create_chunker, validate_chunks
+    ChunkConfig,
+    ChunkingStrategy,
+    ChunkResult,
+    ContentChunker,
+    validate_chunks,
 )
 
 
@@ -36,7 +39,7 @@ class TestChunkConfig:
             overlap_pct=0.20,
             min_chunk_size=25,
             preserve_boundaries=False,
-            strategy=ChunkingStrategy.SEMANTIC_BLOCKS
+            strategy=ChunkingStrategy.SEMANTIC_BLOCKS,
         )
         assert config.max_tokens == 500
         assert config.overlap_pct == 0.20
@@ -55,7 +58,7 @@ class TestChunkResult:
             start_position=0,
             end_position=12,
             token_count=3,
-            metadata={"source_type": "test"}
+            metadata={"source_type": "test"},
         )
         assert chunk.content == "test content"
         assert chunk.start_position == 0
@@ -94,7 +97,9 @@ class TestContentChunker:
         assert chunker._estimate_tokens("") == 1  # Minimum 1 token
 
         # Test with extra whitespace (should be normalized)
-        assert chunker._estimate_tokens("hello    world") == chunker._estimate_tokens("hello world")
+        assert chunker._estimate_tokens("hello    world") == chunker._estimate_tokens(
+            "hello world"
+        )
 
         # Test longer text
         long_text = "The quick brown fox jumps over the lazy dog"
@@ -105,12 +110,22 @@ class TestContentChunker:
         """Test strategy selection for different source types"""
         chunker = ContentChunker()
 
-        assert chunker._get_strategy_for_source("kubernetes") == ChunkingStrategy.SEMANTIC_BLOCKS
-        assert chunker._get_strategy_for_source("fastapi") == ChunkingStrategy.SEMANTIC_BLOCKS
+        assert (
+            chunker._get_strategy_for_source("kubernetes")
+            == ChunkingStrategy.SEMANTIC_BLOCKS
+        )
+        assert (
+            chunker._get_strategy_for_source("fastapi")
+            == ChunkingStrategy.SEMANTIC_BLOCKS
+        )
         assert chunker._get_strategy_for_source("cobol") == ChunkingStrategy.FIXED_WIDTH
         assert chunker._get_strategy_for_source("irs") == ChunkingStrategy.FIXED_WIDTH
-        assert chunker._get_strategy_for_source("mumps") == ChunkingStrategy.HIERARCHICAL
-        assert chunker._get_strategy_for_source("unknown") == ChunkingStrategy.TOKEN_BASED
+        assert (
+            chunker._get_strategy_for_source("mumps") == ChunkingStrategy.HIERARCHICAL
+        )
+        assert (
+            chunker._get_strategy_for_source("unknown") == ChunkingStrategy.TOKEN_BASED
+        )
 
     def test_empty_content_chunking(self):
         """Test chunking of empty content"""
@@ -323,15 +338,25 @@ if __name__ == "__main__":
         assert chunker._is_semantic_boundary("---", ChunkingStrategy.SEMANTIC_BLOCKS)
 
         # Test function definition
-        assert chunker._is_semantic_boundary("def test_function():", ChunkingStrategy.SEMANTIC_BLOCKS)
-        assert chunker._is_semantic_boundary("async def async_function():", ChunkingStrategy.SEMANTIC_BLOCKS)
+        assert chunker._is_semantic_boundary(
+            "def test_function():", ChunkingStrategy.SEMANTIC_BLOCKS
+        )
+        assert chunker._is_semantic_boundary(
+            "async def async_function():", ChunkingStrategy.SEMANTIC_BLOCKS
+        )
 
         # Test FastAPI decorator
-        assert chunker._is_semantic_boundary("@app.get('/test')", ChunkingStrategy.SEMANTIC_BLOCKS)
+        assert chunker._is_semantic_boundary(
+            "@app.get('/test')", ChunkingStrategy.SEMANTIC_BLOCKS
+        )
 
         # Test K8s manifest start
-        assert chunker._is_semantic_boundary("apiVersion: v1", ChunkingStrategy.SEMANTIC_BLOCKS)
-        assert chunker._is_semantic_boundary("kind: Pod", ChunkingStrategy.SEMANTIC_BLOCKS)
+        assert chunker._is_semantic_boundary(
+            "apiVersion: v1", ChunkingStrategy.SEMANTIC_BLOCKS
+        )
+        assert chunker._is_semantic_boundary(
+            "kind: Pod", ChunkingStrategy.SEMANTIC_BLOCKS
+        )
 
     def test_overlap_calculation(self):
         """Test overlap line calculation"""
@@ -509,15 +534,15 @@ class TestChunkValidation:
                 start_position=0,
                 end_position=15,
                 token_count=3,
-                metadata={"strategy": "test"}
+                metadata={"strategy": "test"},
             ),
             ChunkResult(
                 content="chunk 2 content",
                 start_position=10,
                 end_position=25,
                 token_count=3,
-                metadata={"strategy": "test"}
-            )
+                metadata={"strategy": "test"},
+            ),
         ]
 
         validation = validate_chunks(chunks, "original content")
@@ -541,7 +566,7 @@ class TestChunkValidation:
                 start_position=10,
                 end_position=5,  # Invalid position order
                 token_count=0,  # Zero tokens
-                metadata={}
+                metadata={},
             )
         ]
 

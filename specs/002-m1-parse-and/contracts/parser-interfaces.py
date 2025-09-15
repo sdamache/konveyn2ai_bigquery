@@ -3,15 +3,17 @@ Parser Interface Contracts for M1 Multi-Source Ingestion
 Defines standardized interfaces for all source parsers
 """
 
+import argparse
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Iterator
 from enum import Enum
+from typing import Any, Optional
 
 
 class SourceType(Enum):
     """Supported source types for ingestion"""
+
     KUBERNETES = "kubernetes"
     FASTAPI = "fastapi"
     COBOL = "cobol"
@@ -21,6 +23,7 @@ class SourceType(Enum):
 
 class ErrorClass(Enum):
     """Error classification categories"""
+
     PARSING = "parsing"
     VALIDATION = "validation"
     INGESTION = "ingestion"
@@ -29,6 +32,7 @@ class ErrorClass(Enum):
 @dataclass
 class ChunkMetadata:
     """Common metadata for all chunk types"""
+
     source_type: SourceType
     artifact_id: str
     parent_id: Optional[str] = None
@@ -41,7 +45,7 @@ class ChunkMetadata:
     collected_at: Optional[datetime] = None
 
     # Source-specific metadata stored as dict
-    source_metadata: Dict[str, Any] = None
+    source_metadata: dict[str, Any] = None
 
     def __post_init__(self):
         if self.source_metadata is None:
@@ -53,6 +57,7 @@ class ChunkMetadata:
 @dataclass
 class ParseError:
     """Represents a parsing error during ingestion"""
+
     source_type: SourceType
     source_uri: str
     error_class: ErrorClass
@@ -69,8 +74,9 @@ class ParseError:
 @dataclass
 class ParseResult:
     """Result of parsing operation containing chunks and errors"""
-    chunks: List[ChunkMetadata]
-    errors: List[ParseError]
+
+    chunks: list[ChunkMetadata]
+    errors: list[ParseError]
     files_processed: int
     processing_duration_ms: int
 
@@ -110,10 +116,13 @@ class BaseParser(ABC):
     def generate_content_hash(self, content: str) -> str:
         """Generate SHA256 hash of normalized content"""
         import hashlib
-        normalized = content.strip().encode('utf-8')
+
+        normalized = content.strip().encode("utf-8")
         return hashlib.sha256(normalized).hexdigest()
 
-    def chunk_content(self, content: str, max_tokens: int = 1000, overlap_pct: float = 0.15) -> List[str]:
+    def chunk_content(
+        self, content: str, max_tokens: int = 1000, overlap_pct: float = 0.15
+    ) -> list[str]:
         """Split content into overlapping chunks"""
         # Basic implementation - parsers should override with source-specific logic
         words = content.split()
@@ -141,7 +150,7 @@ class KubernetesParser(BaseParser):
         return SourceType.KUBERNETES
 
     @abstractmethod
-    def parse_manifest(self, manifest_content: str) -> List[ChunkMetadata]:
+    def parse_manifest(self, manifest_content: str) -> list[ChunkMetadata]:
         """Parse individual Kubernetes manifest"""
         pass
 
@@ -158,12 +167,12 @@ class FastAPIParser(BaseParser):
         return SourceType.FASTAPI
 
     @abstractmethod
-    def parse_openapi_spec(self, spec_content: str) -> List[ChunkMetadata]:
+    def parse_openapi_spec(self, spec_content: str) -> list[ChunkMetadata]:
         """Parse OpenAPI specification JSON"""
         pass
 
     @abstractmethod
-    def parse_source_code(self, python_file: str) -> List[ChunkMetadata]:
+    def parse_source_code(self, python_file: str) -> list[ChunkMetadata]:
         """Parse Python source code for FastAPI routes and models"""
         pass
 
@@ -175,12 +184,12 @@ class COBOLParser(BaseParser):
         return SourceType.COBOL
 
     @abstractmethod
-    def parse_copybook(self, copybook_content: str) -> List[ChunkMetadata]:
+    def parse_copybook(self, copybook_content: str) -> list[ChunkMetadata]:
         """Parse COBOL copybook with level structures"""
         pass
 
     @abstractmethod
-    def extract_pic_clauses(self, structure: Dict[str, Any]) -> Dict[str, str]:
+    def extract_pic_clauses(self, structure: dict[str, Any]) -> dict[str, str]:
         """Extract PIC clauses from COBOL structure"""
         pass
 
@@ -192,12 +201,12 @@ class IRSParser(BaseParser):
         return SourceType.IRS
 
     @abstractmethod
-    def parse_imf_layout(self, layout_content: str) -> List[ChunkMetadata]:
+    def parse_imf_layout(self, layout_content: str) -> list[ChunkMetadata]:
         """Parse IRS IMF fixed-width record layout"""
         pass
 
     @abstractmethod
-    def extract_field_positions(self, layout: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def extract_field_positions(self, layout: dict[str, Any]) -> list[dict[str, Any]]:
         """Extract field positions and lengths"""
         pass
 
@@ -209,12 +218,12 @@ class MUMPSParser(BaseParser):
         return SourceType.MUMPS
 
     @abstractmethod
-    def parse_fileman_dict(self, dict_content: str) -> List[ChunkMetadata]:
+    def parse_fileman_dict(self, dict_content: str) -> list[ChunkMetadata]:
         """Parse FileMan data dictionary"""
         pass
 
     @abstractmethod
-    def parse_global_definition(self, global_content: str) -> List[ChunkMetadata]:
+    def parse_global_definition(self, global_content: str) -> list[ChunkMetadata]:
         """Parse MUMPS global variable definitions"""
         pass
 
@@ -224,30 +233,41 @@ class CLIInterface:
     """Standardized CLI interface for all parsers"""
 
     @staticmethod
-    def create_argument_parser(parser_class: str) -> 'argparse.ArgumentParser':
+    def create_argument_parser(parser_class: str) -> "argparse.ArgumentParser":
         """Create standardized argument parser"""
         import argparse
+
         parser = argparse.ArgumentParser(description=f"{parser_class} ingestion")
-        parser.add_argument('--source', required=True, help='Source file or directory')
-        parser.add_argument('--dry-run', action='store_true', help='Show what would be processed')
-        parser.add_argument('--output', default='console', choices=['console', 'json', 'bigquery'])
-        parser.add_argument('--version', action='version', version='%(prog)s 1.0.0')
-        parser.add_argument('--max-rows', type=int, default=None, help='Limit number of rows')
+        parser.add_argument("--source", required=True, help="Source file or directory")
+        parser.add_argument(
+            "--dry-run", action="store_true", help="Show what would be processed"
+        )
+        parser.add_argument(
+            "--output", default="console", choices=["console", "json", "bigquery"]
+        )
+        parser.add_argument("--version", action="version", version="%(prog)s 1.0.0")
+        parser.add_argument(
+            "--max-rows", type=int, default=None, help="Limit number of rows"
+        )
         return parser
 
     @staticmethod
-    def format_output(result: ParseResult, format_type: str = 'console') -> str:
+    def format_output(result: ParseResult, format_type: str = "console") -> str:
         """Format parser result for output"""
-        if format_type == 'json':
+        if format_type == "json":
             import json
+
             # Convert to JSON-serializable format
-            return json.dumps({
-                'chunks_count': len(result.chunks),
-                'errors_count': len(result.errors),
-                'files_processed': result.files_processed,
-                'processing_duration_ms': result.processing_duration_ms
-            }, indent=2)
-        elif format_type == 'console':
+            return json.dumps(
+                {
+                    "chunks_count": len(result.chunks),
+                    "errors_count": len(result.errors),
+                    "files_processed": result.files_processed,
+                    "processing_duration_ms": result.processing_duration_ms,
+                },
+                indent=2,
+            )
+        elif format_type == "console":
             return (
                 f"Processed {result.files_processed} files\n"
                 f"Generated {len(result.chunks)} chunks\n"
@@ -263,17 +283,17 @@ class BigQueryWriter:
     """Contract for writing parsed data to BigQuery"""
 
     @abstractmethod
-    def write_chunks(self, chunks: List[ChunkMetadata], table_name: str) -> int:
+    def write_chunks(self, chunks: list[ChunkMetadata], table_name: str) -> int:
         """Write chunks to BigQuery source_metadata table"""
         pass
 
     @abstractmethod
-    def write_errors(self, errors: List[ParseError], table_name: str) -> int:
+    def write_errors(self, errors: list[ParseError], table_name: str) -> int:
         """Write errors to BigQuery source_metadata_errors table"""
         pass
 
     @abstractmethod
-    def log_ingestion_run(self, run_info: Dict[str, Any], table_name: str) -> str:
+    def log_ingestion_run(self, run_info: dict[str, Any], table_name: str) -> str:
         """Log ingestion run details, return run_id"""
         pass
 

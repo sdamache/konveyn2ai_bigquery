@@ -7,4 +7,4 @@ Bridges the import path expected by tests to the actual implementation
 from src.ingest.irs.parser import IRSParserImpl
 
 # Re-export for compatibility
-__all__ = ['IRSParserImpl']
+__all__ = ["IRSParserImpl"]

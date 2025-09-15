@@ -9,22 +9,23 @@ Tests are designed to FAIL initially (TDD RED phase) since COBOL parser
 implementation doesn't exist yet.
 """
 
-import os
+import importlib.util
 import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List
 
 import pytest
 from google.cloud import bigquery
 
-import sys
-import importlib.util
-from pathlib import Path
-
 # Load parser interfaces directly from file (due to hyphen in filename)
-specs_file = Path(__file__).parent.parent.parent / "specs" / "002-m1-parse-and" / "contracts" / "parser-interfaces.py"
+specs_file = (
+    Path(__file__).parent.parent.parent
+    / "specs"
+    / "002-m1-parse-and"
+    / "contracts"
+    / "parser-interfaces.py"
+)
 spec = importlib.util.spec_from_file_location("parser_interfaces", specs_file)
 parser_interfaces = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(parser_interfaces)
@@ -57,7 +58,6 @@ SAMPLE_COPYBOOKS = {
                10  ACTIVE-FLAG     PIC X.
                10  TEMP-FLAG       PIC X.
     """,
-
     "customer_master.cpy": """
       * CUSTOMER MASTER RECORD
        01  CUSTOMER-MASTER.
@@ -74,7 +74,6 @@ SAMPLE_COPYBOOKS = {
            05  CREDIT-LIMIT        PIC 9(7)V99.
            05  LAST-PAYMENT-DATE   PIC 9(8).
     """,
-
     "array_structure.cpy": """
       * ARRAY AND OCCURS STRUCTURES
        01  SALES-RECORD.
@@ -87,7 +86,6 @@ SAMPLE_COPYBOOKS = {
                10  REGION-TOTAL    PIC 9(8)V99.
            05  TOTAL-SALES         PIC 9(9)V99.
     """,
-
     "redefines_example.cpy": """
       * REDEFINES EXAMPLE
        01  MIXED-RECORD.
@@ -101,7 +99,7 @@ SAMPLE_COPYBOOKS = {
                10  ALPHA-FIELD-1   PIC X(20).
                10  ALPHA-FIELD-2   PIC X(30).
                10  FILLER          PIC X(50).
-    """
+    """,
 }
 
 
@@ -123,13 +121,15 @@ def temp_cobol_files():
         subdir.mkdir()
 
         additional_copybook = subdir / "common_fields.cpy"
-        additional_copybook.write_text("""
+        additional_copybook.write_text(
+            """
       * COMMON FIELDS COPYBOOK
        01  COMMON-FIELDS.
            05  RECORD-TYPE         PIC X(2).
            05  CREATION-DATE       PIC 9(8).
            05  LAST-UPDATE-TIME    PIC 9(6).
-        """)
+        """
+        )
 
         file_paths["includes/common_fields.cpy"] = str(additional_copybook)
 
@@ -137,7 +137,7 @@ def temp_cobol_files():
             "temp_dir": temp_dir,
             "files": file_paths,
             "main_dir": str(temp_path),
-            "sub_dir": str(subdir)
+            "sub_dir": str(subdir),
         }
 
 
@@ -162,7 +162,7 @@ def bigquery_test_dataset():
             "client": client,
             "dataset_id": dataset_id,
             "dataset_ref": dataset_ref,
-            "project_id": client.project
+            "project_id": client.project,
         }
     finally:
         # Cleanup: delete dataset and all tables
@@ -179,7 +179,9 @@ class TestCOBOLIngestionIntegration:
 
     def test_cobol_parser_import_fails_initially(self):
         """Test that COBOL parser doesn't exist yet (TDD RED phase)."""
-        with pytest.raises((ImportError, ModuleNotFoundError), match="No module named.*src.*parser.*"):
+        with pytest.raises(
+            (ImportError, ModuleNotFoundError), match="No module named.*src.*parser.*"
+        ):
             # This should fail because we haven't implemented the parser yet
             from src.parsers.cobol_parser import COBOLParserImpl  # noqa: F401
 
@@ -307,11 +309,13 @@ class TestCOBOLIngestionIntegration:
 
             writer = COBOLBigQueryWriter(
                 project_id=bigquery_test_dataset["project_id"],
-                dataset_id=bigquery_test_dataset["dataset_id"]
+                dataset_id=bigquery_test_dataset["dataset_id"],
             )
 
             # Create tables
-            success = writer.create_tables_if_not_exist(bigquery_test_dataset["dataset_id"])
+            success = writer.create_tables_if_not_exist(
+                bigquery_test_dataset["dataset_id"]
+            )
             assert success is True
 
             # Validate tables exist
@@ -325,17 +329,19 @@ class TestCOBOLIngestionIntegration:
             assert "source_metadata_errors" in table_names
             assert "ingestion_runs" in table_names
 
-    def test_end_to_end_cobol_to_bigquery(self, temp_cobol_files, bigquery_test_dataset):
+    def test_end_to_end_cobol_to_bigquery(
+        self, temp_cobol_files, bigquery_test_dataset
+    ):
         """Test complete end-to-end COBOL copybook to BigQuery ingestion."""
         with pytest.raises((ImportError, NotImplementedError, AttributeError)):
-            from src.parsers.cobol_parser import COBOLParserImpl
             from src.bigquery.cobol_writer import COBOLBigQueryWriter
+            from src.parsers.cobol_parser import COBOLParserImpl
 
             # Initialize components
             parser = COBOLParserImpl()
             writer = COBOLBigQueryWriter(
                 project_id=bigquery_test_dataset["project_id"],
-                dataset_id=bigquery_test_dataset["dataset_id"]
+                dataset_id=bigquery_test_dataset["dataset_id"],
             )
 
             # Create BigQuery tables
@@ -346,7 +352,9 @@ class TestCOBOLIngestionIntegration:
 
             # Write to BigQuery
             chunks_written = writer.write_chunks(result.chunks, "source_metadata")
-            errors_written = writer.write_errors(result.errors, "source_metadata_errors")
+            errors_written = writer.write_errors(
+                result.errors, "source_metadata_errors"
+            )
 
             # Log ingestion run
             run_info = {
@@ -355,7 +363,7 @@ class TestCOBOLIngestionIntegration:
                 "chunks_generated": len(result.chunks),
                 "errors_encountered": len(result.errors),
                 "processing_duration_ms": result.processing_duration_ms,
-                "ingestion_timestamp": datetime.utcnow().isoformat()
+                "ingestion_timestamp": datetime.utcnow().isoformat(),
             }
             run_id = writer.log_ingestion_run(run_info, "ingestion_runs")
 
@@ -392,23 +400,25 @@ class TestCOBOLIngestionIntegration:
     def test_cobol_error_handling(self, temp_cobol_files, bigquery_test_dataset):
         """Test error handling for malformed COBOL copybooks."""
         with pytest.raises((ImportError, NotImplementedError, AttributeError)):
-            from src.parsers.cobol_parser import COBOLParserImpl
             from src.bigquery.cobol_writer import COBOLBigQueryWriter
+            from src.parsers.cobol_parser import COBOLParserImpl
 
             parser = COBOLParserImpl()
             writer = COBOLBigQueryWriter(
                 project_id=bigquery_test_dataset["project_id"],
-                dataset_id=bigquery_test_dataset["dataset_id"]
+                dataset_id=bigquery_test_dataset["dataset_id"],
             )
 
             # Create malformed COBOL file
             malformed_cobol = Path(temp_cobol_files["main_dir"]) / "malformed.cpy"
-            malformed_cobol.write_text("""
+            malformed_cobol.write_text(
+                """
                 INVALID COBOL SYNTAX HERE
                 05 MISSING-LEVEL-01
                 10 BAD-PIC PIC 9(INVALID).
                 REDEFINES WITHOUT-TARGET.
-            """)
+            """
+            )
 
             # Parse directory with malformed file
             result = parser.parse_directory(temp_cobol_files["main_dir"])
@@ -425,7 +435,9 @@ class TestCOBOLIngestionIntegration:
 
             # Write errors to BigQuery
             writer.create_tables_if_not_exist(bigquery_test_dataset["dataset_id"])
-            errors_written = writer.write_errors(result.errors, "source_metadata_errors")
+            errors_written = writer.write_errors(
+                result.errors, "source_metadata_errors"
+            )
             assert errors_written > 0
 
     def test_cobol_pic_clause_extraction(self, temp_cobol_files):
@@ -443,12 +455,14 @@ class TestCOBOLIngestionIntegration:
             pic_clauses = chunk.source_metadata["pic_clauses"]
 
             # Validate various PIC clause types
-            assert pic_clauses["CUSTOMER-ID"] == "9(8)"        # Numeric
-            assert pic_clauses["CUSTOMER-NAME"] == "X(40)"     # Alphanumeric
-            assert pic_clauses["STATE"] == "X(2)"              # Fixed alpha
-            assert pic_clauses["ZIP-CODE"] == "9(5)"           # Numeric fixed
-            assert pic_clauses["ACCOUNT-BALANCE"] == "S9(9)V99 COMP-3"  # Signed packed decimal
-            assert pic_clauses["CREDIT-LIMIT"] == "9(7)V99"    # Decimal
+            assert pic_clauses["CUSTOMER-ID"] == "9(8)"  # Numeric
+            assert pic_clauses["CUSTOMER-NAME"] == "X(40)"  # Alphanumeric
+            assert pic_clauses["STATE"] == "X(2)"  # Fixed alpha
+            assert pic_clauses["ZIP-CODE"] == "9(5)"  # Numeric fixed
+            assert (
+                pic_clauses["ACCOUNT-BALANCE"] == "S9(9)V99 COMP-3"
+            )  # Signed packed decimal
+            assert pic_clauses["CREDIT-LIMIT"] == "9(7)V99"  # Decimal
             assert pic_clauses["LAST-PAYMENT-DATE"] == "9(8)"  # Date as numeric
 
             # Test PIC clause extraction method directly
@@ -456,7 +470,7 @@ class TestCOBOLIngestionIntegration:
                 "fields": {
                     "EMPLOYEE-ID": {"pic": "9(6)"},
                     "SALARY": {"pic": "9(7)V99 COMP-3"},
-                    "STATUS": {"pic": "X"}
+                    "STATUS": {"pic": "X"},
                 }
             }
 
@@ -474,7 +488,10 @@ class TestCOBOLIngestionIntegration:
 
             # Test various file paths
             test_cases = [
-                ("/path/to/copybooks/employee.cpy", "cobol:///path/to/copybooks/employee.cpy"),
+                (
+                    "/path/to/copybooks/employee.cpy",
+                    "cobol:///path/to/copybooks/employee.cpy",
+                ),
                 ("./relative/path.cpy", "cobol://./relative/path.cpy"),
                 ("C:\\windows\\path\\file.cpy", "cobol://C:\\windows\\path\\file.cpy"),
             ]
@@ -500,12 +517,12 @@ class TestCOBOLIngestionIntegration:
             # Each chunk should be valid COBOL fragment
             for chunk in chunks:
                 # Should not break in middle of field definitions
-                lines = chunk.split('\n')
+                lines = chunk.split("\n")
                 for line in lines:
                     line = line.strip()
-                    if line and not line.startswith('*'):
+                    if line and not line.startswith("*"):
                         # Should be complete field definition or structure
-                        assert not line.endswith('PIC') or 'PIC' in line
+                        assert not line.endswith("PIC") or "PIC" in line
 
     @pytest.mark.slow
     def test_large_directory_ingestion_performance(self, bigquery_test_dataset):
@@ -529,13 +546,13 @@ class TestCOBOLIngestionIntegration:
                     file_path = temp_path / f"copybook_{i:03d}.cpy"
                     file_path.write_text(copybook_content)
 
-                from src.parsers.cobol_parser import COBOLParserImpl
                 from src.bigquery.cobol_writer import COBOLBigQueryWriter
+                from src.parsers.cobol_parser import COBOLParserImpl
 
                 parser = COBOLParserImpl()
                 writer = COBOLBigQueryWriter(
                     project_id=bigquery_test_dataset["project_id"],
-                    dataset_id=bigquery_test_dataset["dataset_id"]
+                    dataset_id=bigquery_test_dataset["dataset_id"],
                 )
 
                 # Time the processing

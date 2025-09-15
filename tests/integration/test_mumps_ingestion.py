@@ -8,27 +8,25 @@ Following TDD principles - this test MUST FAIL initially because no
 MUMPS parser implementation exists yet.
 """
 
-import json
+import importlib.util
 import os
+import sys
 import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List
 
 import pytest
 from google.cloud import bigquery
 
-import importlib.util
-import sys
-from pathlib import Path
-from enum import Enum
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
-
 # Import parser interfaces from file with dashes in name
-specs_file = Path(__file__).parent.parent.parent / "specs" / "002-m1-parse-and" / "contracts" / "parser-interfaces.py"
+specs_file = (
+    Path(__file__).parent.parent.parent
+    / "specs"
+    / "002-m1-parse-and"
+    / "contracts"
+    / "parser-interfaces.py"
+)
 spec = importlib.util.spec_from_file_location("parser_interfaces", specs_file)
 parser_interfaces = importlib.util.module_from_spec(spec)
 sys.modules["parser_interfaces"] = parser_interfaces
@@ -146,7 +144,9 @@ class TestMUMPSIngestion:
         yield dataset_id
 
         # Cleanup: Delete dataset and all tables
-        bq_client.delete_dataset(full_dataset_id, delete_contents=True, not_found_ok=True)
+        bq_client.delete_dataset(
+            full_dataset_id, delete_contents=True, not_found_ok=True
+        )
 
     @pytest.fixture(scope="class")
     def temp_tables(self, bq_client, temp_dataset):
@@ -154,8 +154,14 @@ class TestMUMPSIngestion:
         project_id = bq_client.project
 
         # Read DDL schema and create tables
-        ddl_path = Path(__file__).parent.parent.parent / "specs" / "002-m1-parse-and" / "contracts" / "bigquery-ddl.sql"
-        with open(ddl_path, "r") as f:
+        ddl_path = (
+            Path(__file__).parent.parent.parent
+            / "specs"
+            / "002-m1-parse-and"
+            / "contracts"
+            / "bigquery-ddl.sql"
+        )
+        with open(ddl_path) as f:
             ddl_content = f.read()
 
         # Replace placeholders with actual values
@@ -164,7 +170,8 @@ class TestMUMPSIngestion:
 
         # Split DDL into individual CREATE statements
         ddl_statements = [
-            stmt.strip() for stmt in ddl_content.split(";")
+            stmt.strip()
+            for stmt in ddl_content.split(";")
             if stmt.strip() and stmt.strip().upper().startswith("CREATE TABLE")
         ]
 
@@ -175,7 +182,9 @@ class TestMUMPSIngestion:
                 query_job.result()  # Wait for completion
 
                 # Extract table name from DDL
-                table_name = statement.split("`")[5].split("`")[0]  # Extract from backticks
+                table_name = statement.split("`")[5].split("`")[
+                    0
+                ]  # Extract from backticks
                 tables_created.append(table_name)
             except Exception as e:
                 pytest.fail(f"Failed to create table from DDL: {e}")
@@ -243,9 +252,9 @@ class TestMUMPSIngestion:
     def test_mumps_parser_interface_contract(self):
         """Test that MUMPSParser interface follows the contract."""
         # Verify the abstract interface exists and has required methods
-        assert hasattr(MUMPSParser, 'parse_fileman_dict')
-        assert hasattr(MUMPSParser, 'parse_global_definition')
-        assert hasattr(MUMPSParser, '_get_source_type')
+        assert hasattr(MUMPSParser, "parse_fileman_dict")
+        assert hasattr(MUMPSParser, "parse_global_definition")
+        assert hasattr(MUMPSParser, "_get_source_type")
 
         # Verify it inherits from BaseParser
         assert issubclass(MUMPSParser, BaseParser)
@@ -328,7 +337,9 @@ class TestMUMPSIngestion:
             assert 200 in file_numbers  # NEW PERSON
             assert 8925 in file_numbers  # PATIENT ALLERGIES
 
-    def test_bigquery_ingestion_workflow(self, bq_client, temp_dataset, temp_tables, sample_fileman_files):
+    def test_bigquery_ingestion_workflow(
+        self, bq_client, temp_dataset, temp_tables, sample_fileman_files
+    ):
         """
         Test complete BigQuery ingestion workflow.
 
@@ -336,8 +347,8 @@ class TestMUMPSIngestion:
         from MUMPS files to BigQuery source_metadata table.
         """
         with pytest.raises((ImportError, NotImplementedError)):
-            from src.parsers.mumps_parser import MUMPSParserImpl
             from src.ingestion.bigquery_writer import BigQueryWriterImpl
+            from src.parsers.mumps_parser import MUMPSParserImpl
 
             # Parse MUMPS files
             parser = MUMPSParserImpl()
@@ -471,11 +482,18 @@ class TestMUMPSIngestion:
             assert metadata["mumps_global_name"] == "VA"
 
             # Field-specific metadata
-            field_chunks = [c for c in result.chunks if "mumps_field_no" in c.source_metadata]
+            field_chunks = [
+                c for c in result.chunks if "mumps_field_no" in c.source_metadata
+            ]
             assert len(field_chunks) > 0
 
-            name_field = next(c for c in field_chunks if c.source_metadata["mumps_field_no"] == 0.01)
-            assert "input_transform" in name_field.source_metadata or "mumps_input_transform" in name_field.source_metadata
+            name_field = next(
+                c for c in field_chunks if c.source_metadata["mumps_field_no"] == 0.01
+            )
+            assert (
+                "input_transform" in name_field.source_metadata
+                or "mumps_input_transform" in name_field.source_metadata
+            )
 
     def test_performance_requirements_contract(self, sample_mumps_directory):
         """
@@ -496,17 +514,21 @@ class TestMUMPSIngestion:
             processing_time_ms = (end_time - start_time) * 1000
             assert processing_time_ms < 30000  # Should complete within 30 seconds
             assert result.processing_duration_ms > 0
-            assert result.processing_duration_ms <= processing_time_ms * 1.1  # Allow 10% measurement variance
+            assert (
+                result.processing_duration_ms <= processing_time_ms * 1.1
+            )  # Allow 10% measurement variance
 
-    def test_bigquery_schema_compliance_contract(self, bq_client, temp_dataset, temp_tables):
+    def test_bigquery_schema_compliance_contract(
+        self, bq_client, temp_dataset, temp_tables
+    ):
         """
         Test BigQuery schema compliance contract.
 
         Validates that generated chunks conform to the BigQuery schema.
         """
         with pytest.raises((ImportError, NotImplementedError)):
-            from src.parsers.mumps_parser import MUMPSParserImpl
             from src.ingestion.bigquery_writer import BigQueryWriterImpl
+            from src.parsers.mumps_parser import MUMPSParserImpl
 
             # Generate test chunk that should comply with schema
             parser = MUMPSParserImpl()
@@ -523,8 +545,8 @@ class TestMUMPSIngestion:
                     "mumps_file_no": 200,
                     "mumps_field_no": 0.01,
                     "mumps_global_name": "VA",
-                    "mumps_input_transform": "K:$L(X)>30!($L(X)<3) X"
-                }
+                    "mumps_input_transform": "K:$L(X)>30!($L(X)<3) X",
+                },
             )
 
             # Write to BigQuery and verify schema compliance
@@ -560,7 +582,6 @@ class TestMUMPSIngestion:
         """
         with pytest.raises((ImportError, NotImplementedError)):
             from src.parsers.mumps_parser import MUMPSParserImpl
-            from src.ingestion.bigquery_writer import BigQueryWriterImpl
 
             # This test validates the workflow integration
             # In the real system, chunks should be suitable for:
@@ -573,8 +594,8 @@ class TestMUMPSIngestion:
             # for semantic search
 
             # For now, just validate the contract exists
-            assert hasattr(parser, 'parse_fileman_dict')
-            assert hasattr(parser, 'parse_global_definition')
+            assert hasattr(parser, "parse_fileman_dict")
+            assert hasattr(parser, "parse_global_definition")
 
 
 # Test data validation functions
@@ -621,21 +642,21 @@ def create_test_fileman_dict(file_no: int, field_count: int = 5) -> str:
     lines = [
         f'^DDD({file_no},"DD")="TEST DATA DICTIONARY #{file_no}"',
         f'^DDD({file_no},0)="TEST FILE^{file_no}^1001^{field_count}^{file_no}.001^3080903^1001"',
-        f'^DDD({file_no},"GL")="^TEST({file_no},"'
+        f'^DDD({file_no},"GL")="^TEST({file_no},"',
     ]
 
     for i in range(field_count):
         field_no = f".{i:02d}" if i < 10 else str(i)
-        lines.append(f'^DDD({file_no},{field_no},0)="FIELD_{i}^RF^^0;{i+1}^K:$L(X)>30 X"')
+        lines.append(
+            f'^DDD({file_no},{field_no},0)="FIELD_{i}^RF^^0;{i+1}^K:$L(X)>30 X"'
+        )
 
     return "\n".join(lines)
 
 
 def create_test_global_def(file_no: int, record_count: int = 3) -> str:
     """Generate test global definition content."""
-    lines = [
-        f'^TEST({file_no},0)="TEST FILE^{file_no}^{record_count}^{record_count}"'
-    ]
+    lines = [f'^TEST({file_no},0)="TEST FILE^{file_no}^{record_count}^{record_count}"']
 
     for i in range(1, record_count + 1):
         lines.append(f'^TEST({file_no},{i},0)="RECORD_{i}^VALUE_{i}^DATA_{i}"')

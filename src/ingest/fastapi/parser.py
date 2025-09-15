@@ -15,31 +15,32 @@ This parser extends the FastAPIParser contract to provide:
 
 import ast
 import json
-import yaml
+import logging
 import os
-import re
+import sys
 import time
-from typing import Dict, List, Any, Optional, Tuple, Iterator, Union
 from datetime import datetime, timezone
 from pathlib import Path
-import logging
-import sys
+from typing import Any, Optional, Union
+
+import yaml
 
 # Contract interfaces (standardized import)
 from src.common.parser_interfaces import (
-    BaseParser,
-    FastAPIParser,
-    SourceType,
     ChunkMetadata,
-    ParseResult,
-    ParseError,
     ErrorClass,
+    FastAPIParser,
+    ParseError,
+    ParseResult,
+    SourceType,
 )
 
 # Import common utilities
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+project_root = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+)
 sys.path.append(os.path.join(project_root, "src"))
-from common.chunking import ContentChunker, ChunkConfig, ChunkingStrategy
+from common.chunking import ChunkConfig, ChunkingStrategy, ContentChunker
 from common.ids import ArtifactIDGenerator, ContentHashGenerator
 from common.normalize import ContentNormalizer
 
@@ -61,26 +62,28 @@ class FastAPIParserImpl(FastAPIParser):
         self.logger = logging.getLogger(__name__)
 
         # Initialize utilities
-        self.chunker = ContentChunker(ChunkConfig(
-            max_tokens=1000,
-            overlap_pct=0.15,
-            strategy=ChunkingStrategy.SEMANTIC_BLOCKS
-        ))
+        self.chunker = ContentChunker(
+            ChunkConfig(
+                max_tokens=1000,
+                overlap_pct=0.15,
+                strategy=ChunkingStrategy.SEMANTIC_BLOCKS,
+            )
+        )
         self.id_generator = ArtifactIDGenerator("fastapi")
         self.hash_generator = ContentHashGenerator()
         self.normalizer = ContentNormalizer()
 
         # FastAPI-specific patterns
         self.fastapi_decorators = [
-            r'@app\.(get|post|put|delete|patch|head|options|trace)',
-            r'@router\.(get|post|put|delete|patch|head|options|trace)',
-            r'@.*\.(get|post|put|delete|patch|head|options|trace)'
+            r"@app\.(get|post|put|delete|patch|head|options|trace)",
+            r"@router\.(get|post|put|delete|patch|head|options|trace)",
+            r"@.*\.(get|post|put|delete|patch|head|options|trace)",
         ]
 
         self.pydantic_model_patterns = [
-            r'class\s+\w+\s*\(\s*BaseModel\s*\)',
-            r'class\s+\w+\s*\(\s*.*BaseModel.*\)',
-            r'from\s+pydantic\s+import.*BaseModel'
+            r"class\s+\w+\s*\(\s*BaseModel\s*\)",
+            r"class\s+\w+\s*\(\s*.*BaseModel.*\)",
+            r"from\s+pydantic\s+import.*BaseModel",
         ]
 
     def _get_source_type(self) -> SourceType:
@@ -95,26 +98,30 @@ class FastAPIParserImpl(FastAPIParser):
 
         try:
             if not os.path.exists(file_path):
-                errors.append(ParseError(
-                    source_type=self.source_type,
-                    source_uri=file_path,
-                    error_class=ErrorClass.PARSING,
-                    error_msg=f"File not found: {file_path}",
-                    collected_at=datetime.now(timezone.utc)
-                ))
-                return ParseResult(chunks, errors, 0, int((time.time() - start_time) * 1000))
+                errors.append(
+                    ParseError(
+                        source_type=self.source_type,
+                        source_uri=file_path,
+                        error_class=ErrorClass.PARSING,
+                        error_msg=f"File not found: {file_path}",
+                        collected_at=datetime.now(timezone.utc),
+                    )
+                )
+                return ParseResult(
+                    chunks, errors, 0, int((time.time() - start_time) * 1000)
+                )
 
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
 
             # Determine file type and parse accordingly
-            if file_path.endswith(('.json', '.yaml', '.yml')):
+            if file_path.endswith((".json", ".yaml", ".yml")):
                 # OpenAPI specification
                 file_chunks = self.parse_openapi_spec(content)
                 for chunk in file_chunks:
                     chunk.source_uri = file_path
                 chunks.extend(file_chunks)
-            elif file_path.endswith('.py'):
+            elif file_path.endswith(".py"):
                 # Python source code
                 file_chunks = self.parse_source_code(content)
                 for chunk in file_chunks:
@@ -123,7 +130,7 @@ class FastAPIParserImpl(FastAPIParser):
             else:
                 # Try to validate as either
                 if self.validate_content(content):
-                    if content.strip().startswith(('{', '---', 'openapi:')):
+                    if content.strip().startswith(("{", "---", "openapi:")):
                         file_chunks = self.parse_openapi_spec(content)
                     else:
                         file_chunks = self.parse_source_code(content)
@@ -133,14 +140,16 @@ class FastAPIParserImpl(FastAPIParser):
                     chunks.extend(file_chunks)
 
         except Exception as e:
-            errors.append(ParseError(
-                source_type=self.source_type,
-                source_uri=file_path,
-                error_class=ErrorClass.PARSING,
-                error_msg=str(e),
-                stack_trace=str(e),
-                collected_at=datetime.now(datetime.timezone.utc)
-            ))
+            errors.append(
+                ParseError(
+                    source_type=self.source_type,
+                    source_uri=file_path,
+                    error_class=ErrorClass.PARSING,
+                    error_msg=str(e),
+                    stack_trace=str(e),
+                    collected_at=datetime.now(datetime.timezone.utc),
+                )
+            )
 
         processing_duration = max(1, int((time.time() - start_time) * 1000))
         return ParseResult(chunks, errors, 1, processing_duration)
@@ -155,26 +164,38 @@ class FastAPIParserImpl(FastAPIParser):
         try:
             path = Path(directory_path)
             if not path.exists():
-                all_errors.append(ParseError(
-                    source_type=self.source_type,
-                    source_uri=directory_path,
-                    error_class=ErrorClass.PARSING,
-                    error_msg=f"Directory not found: {directory_path}",
-                    collected_at=datetime.now(timezone.utc)
-                ))
-                return ParseResult(all_chunks, all_errors, 0, int((time.time() - start_time) * 1000))
+                all_errors.append(
+                    ParseError(
+                        source_type=self.source_type,
+                        source_uri=directory_path,
+                        error_class=ErrorClass.PARSING,
+                        error_msg=f"Directory not found: {directory_path}",
+                        collected_at=datetime.now(timezone.utc),
+                    )
+                )
+                return ParseResult(
+                    all_chunks, all_errors, 0, int((time.time() - start_time) * 1000)
+                )
 
             # Find relevant files
             relevant_files = []
-            for pattern in ['**/*.py', '**/*.json', '**/*.yaml', '**/*.yml']:
+            for pattern in ["**/*.py", "**/*.json", "**/*.yaml", "**/*.yml"]:
                 relevant_files.extend(path.glob(pattern))
 
             for file_path in relevant_files:
                 # Skip common non-relevant files
-                if any(skip in str(file_path) for skip in [
-                    '__pycache__', '.pyc', '.git', 'node_modules',
-                    '.env', 'requirements.txt', 'setup.py'
-                ]):
+                if any(
+                    skip in str(file_path)
+                    for skip in [
+                        "__pycache__",
+                        ".pyc",
+                        ".git",
+                        "node_modules",
+                        ".env",
+                        "requirements.txt",
+                        "setup.py",
+                    ]
+                ):
                     continue
 
                 result = self.parse_file(str(file_path))
@@ -183,13 +204,15 @@ class FastAPIParserImpl(FastAPIParser):
                 files_processed += result.files_processed
 
         except Exception as e:
-            all_errors.append(ParseError(
-                source_type=self.source_type,
-                source_uri=directory_path,
-                error_class=ErrorClass.PARSING,
-                error_msg=f"Error processing directory: {str(e)}",
-                collected_at=datetime.now(datetime.timezone.utc)
-            ))
+            all_errors.append(
+                ParseError(
+                    source_type=self.source_type,
+                    source_uri=directory_path,
+                    error_class=ErrorClass.PARSING,
+                    error_msg=f"Error processing directory: {str(e)}",
+                    collected_at=datetime.now(datetime.timezone.utc),
+                )
+            )
 
         processing_duration = max(1, int((time.time() - start_time) * 1000))
         return ParseResult(all_chunks, all_errors, files_processed, processing_duration)
@@ -214,7 +237,7 @@ class FastAPIParserImpl(FastAPIParser):
 
         return False
 
-    def parse_openapi_spec(self, spec_content: str) -> List[ChunkMetadata]:
+    def parse_openapi_spec(self, spec_content: str) -> list[ChunkMetadata]:
         """Parse OpenAPI specification and extract endpoint metadata"""
         chunks = []
 
@@ -225,22 +248,31 @@ class FastAPIParserImpl(FastAPIParser):
             except json.JSONDecodeError:
                 spec = yaml.safe_load(spec_content)
 
-            if not isinstance(spec, dict) or 'openapi' not in spec:
+            if not isinstance(spec, dict) or "openapi" not in spec:
                 raise ValueError("Invalid OpenAPI specification format")
 
             # Parse paths and operations
-            paths = spec.get('paths', {})
+            paths = spec.get("paths", {})
             for path, path_item in paths.items():
                 for method, operation in path_item.items():
-                    if method.upper() in ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS', 'TRACE']:
+                    if method.upper() in [
+                        "GET",
+                        "POST",
+                        "PUT",
+                        "DELETE",
+                        "PATCH",
+                        "HEAD",
+                        "OPTIONS",
+                        "TRACE",
+                    ]:
                         chunk = self._create_openapi_endpoint_chunk(
                             path, method.upper(), operation, spec_content
                         )
                         chunks.append(chunk)
 
             # Parse component schemas
-            components = spec.get('components', {})
-            schemas = components.get('schemas', {})
+            components = spec.get("components", {})
+            schemas = components.get("schemas", {})
             for schema_name, schema_def in schemas.items():
                 chunk = self._create_openapi_schema_chunk(
                     schema_name, schema_def, spec_content
@@ -253,7 +285,7 @@ class FastAPIParserImpl(FastAPIParser):
 
         return chunks
 
-    def parse_source_code(self, python_code: str) -> List[ChunkMetadata]:
+    def parse_source_code(self, python_code: str) -> list[ChunkMetadata]:
         """Parse Python source code for FastAPI routes and models"""
         chunks = []
 
@@ -275,13 +307,13 @@ class FastAPIParserImpl(FastAPIParser):
     def _is_fastapi_python_content(self, content: str) -> bool:
         """Check if content is FastAPI Python code"""
         fastapi_indicators = [
-            'from fastapi import',
-            'import fastapi',
-            '@app.',
-            '@router.',
-            'FastAPI(',
-            'APIRouter(',
-            'BaseModel'
+            "from fastapi import",
+            "import fastapi",
+            "@app.",
+            "@router.",
+            "FastAPI(",
+            "APIRouter(",
+            "BaseModel",
         ]
 
         return any(indicator in content for indicator in fastapi_indicators)
@@ -291,31 +323,37 @@ class FastAPIParserImpl(FastAPIParser):
         content = content.strip()
 
         # JSON format
-        if content.startswith('{'):
+        if content.startswith("{"):
             try:
                 spec = json.loads(content)
-                return 'openapi' in spec or 'swagger' in spec
+                return "openapi" in spec or "swagger" in spec
             except:
                 return False
 
         # YAML format
-        if content.startswith(('openapi:', '---', 'swagger:')):
+        if content.startswith(("openapi:", "---", "swagger:")):
             try:
                 spec = yaml.safe_load(content)
-                return isinstance(spec, dict) and ('openapi' in spec or 'swagger' in spec)
+                return isinstance(spec, dict) and (
+                    "openapi" in spec or "swagger" in spec
+                )
             except:
                 return False
 
         return False
 
-    def _create_openapi_endpoint_chunk(self, path: str, method: str,
-                                     operation: Dict, spec_content: str) -> ChunkMetadata:
+    def _create_openapi_endpoint_chunk(
+        self, path: str, method: str, operation: dict, spec_content: str
+    ) -> ChunkMetadata:
         """Create chunk for OpenAPI endpoint"""
-        operation_id = operation.get('operationId', f"{method.lower()}_{path.replace('/', '_').replace('{', '').replace('}', '')}")
+        operation_id = operation.get(
+            "operationId",
+            f"{method.lower()}_{path.replace('/', '_').replace('{', '').replace('}', '')}",
+        )
 
         # Extract status codes
         status_codes = []
-        responses = operation.get('responses', {})
+        responses = operation.get("responses", {})
         for status_code in responses.keys():
             try:
                 status_codes.append(int(status_code))
@@ -326,31 +364,29 @@ class FastAPIParserImpl(FastAPIParser):
         request_model = None
         response_model = None
 
-        request_body = operation.get('requestBody', {})
+        request_body = operation.get("requestBody", {})
         if request_body:
-            content = request_body.get('content', {})
-            json_content = content.get('application/json', {})
-            schema = json_content.get('schema', {})
-            request_model = schema.get('$ref', str(schema))
+            content = request_body.get("content", {})
+            json_content = content.get("application/json", {})
+            schema = json_content.get("schema", {})
+            request_model = schema.get("$ref", str(schema))
 
         # Get primary response model (usually 200 or 201)
-        for status in ['200', '201', '202']:
+        for status in ["200", "201", "202"]:
             if status in responses:
-                response_content = responses[status].get('content', {})
-                json_content = response_content.get('application/json', {})
-                schema = json_content.get('schema', {})
-                response_model = schema.get('$ref', str(schema))
+                response_content = responses[status].get("content", {})
+                json_content = response_content.get("application/json", {})
+                schema = json_content.get("schema", {})
+                response_model = schema.get("$ref", str(schema))
                 break
 
         # Create content chunk
-        chunk_content = json.dumps({
-            'path': path,
-            'method': method,
-            'operation': operation
-        }, indent=2)
+        chunk_content = json.dumps(
+            {"path": path, "method": method, "operation": operation}, indent=2
+        )
 
         # Generate artifact ID with line numbers (estimated from content)
-        lines = spec_content.split('\n')
+        lines = spec_content.split("\n")
         start_line = 1
         end_line = len(lines)
 
@@ -363,68 +399,74 @@ class FastAPIParserImpl(FastAPIParser):
 
         artifact_id = self.id_generator.generate_artifact_id(
             f"openapi_spec_{operation_id}",
-            {"start_line": start_line, "end_line": end_line}
+            {"start_line": start_line, "end_line": end_line},
         )
 
         return ChunkMetadata(
             source_type=self.source_type,
             artifact_id=artifact_id,
             content_text=chunk_content,
-            content_hash=self.hash_generator.generate_content_hash(chunk_content, "fastapi"),
+            content_hash=self.hash_generator.generate_content_hash(
+                chunk_content, "fastapi"
+            ),
             collected_at=datetime.now(timezone.utc),
             source_metadata={
-                'http_method': method,
-                'route_path': path,
-                'operation_id': operation_id,
-                'status_codes': status_codes,
-                'request_model': request_model,
-                'response_model': response_model,
-                'tags': operation.get('tags', []),
-                'summary': operation.get('summary', ''),
-                'description': operation.get('description', ''),
-                'openapi_path': path,
-                'openapi_operation': operation_id
-            }
+                "http_method": method,
+                "route_path": path,
+                "operation_id": operation_id,
+                "status_codes": status_codes,
+                "request_model": request_model,
+                "response_model": response_model,
+                "tags": operation.get("tags", []),
+                "summary": operation.get("summary", ""),
+                "description": operation.get("description", ""),
+                "openapi_path": path,
+                "openapi_operation": operation_id,
+            },
         )
 
-    def _create_openapi_schema_chunk(self, schema_name: str, schema_def: Dict,
-                                   spec_content: str) -> ChunkMetadata:
+    def _create_openapi_schema_chunk(
+        self, schema_name: str, schema_def: dict, spec_content: str
+    ) -> ChunkMetadata:
         """Create chunk for OpenAPI schema definition"""
-        chunk_content = json.dumps({
-            'schema_name': schema_name,
-            'schema_definition': schema_def
-        }, indent=2)
+        chunk_content = json.dumps(
+            {"schema_name": schema_name, "schema_definition": schema_def}, indent=2
+        )
 
         # Generate artifact ID
         artifact_id = self.id_generator.generate_artifact_id(
             f"openapi_schema_{schema_name}",
-            {"start_line": 1, "end_line": 10}  # Estimated
+            {"start_line": 1, "end_line": 10},  # Estimated
         )
 
         # Extract field information
-        properties = schema_def.get('properties', {})
-        required_fields = schema_def.get('required', [])
+        properties = schema_def.get("properties", {})
+        required_fields = schema_def.get("required", [])
 
         return ChunkMetadata(
             source_type=self.source_type,
             artifact_id=artifact_id,
             content_text=chunk_content,
-            content_hash=self.hash_generator.generate_content_hash(chunk_content, "fastapi"),
+            content_hash=self.hash_generator.generate_content_hash(
+                chunk_content, "fastapi"
+            ),
             collected_at=datetime.now(timezone.utc),
             source_metadata={
-                'openapi_schema': schema_name,
-                'schema_type': schema_def.get('type', 'object'),
-                'schema_properties': list(properties.keys()),
-                'required_fields': required_fields,
-                'description': schema_def.get('description', ''),
-                'example': schema_def.get('example')
-            }
+                "openapi_schema": schema_name,
+                "schema_type": schema_def.get("type", "object"),
+                "schema_properties": list(properties.keys()),
+                "required_fields": required_fields,
+                "description": schema_def.get("description", ""),
+                "example": schema_def.get("example"),
+            },
         )
 
-    def _extract_route_functions(self, tree: ast.AST, source_code: str) -> List[ChunkMetadata]:
+    def _extract_route_functions(
+        self, tree: ast.AST, source_code: str
+    ) -> list[ChunkMetadata]:
         """Extract FastAPI route functions from AST"""
         chunks = []
-        lines = source_code.split('\n')
+        lines = source_code.split("\n")
 
         for node in ast.walk(tree):
             # Support both regular and async functions
@@ -439,26 +481,28 @@ class FastAPIParserImpl(FastAPIParser):
 
         return chunks
 
-    def _extract_pydantic_models(self, tree: ast.AST, source_code: str) -> List[ChunkMetadata]:
+    def _extract_pydantic_models(
+        self, tree: ast.AST, source_code: str
+    ) -> list[ChunkMetadata]:
         """Extract Pydantic model classes from AST"""
         chunks = []
-        lines = source_code.split('\n')
+        lines = source_code.split("\n")
 
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef):
                 # Check if class inherits from BaseModel
                 if self._is_pydantic_model(node):
-                    chunk = self._create_pydantic_model_chunk(
-                        node, source_code, lines
-                    )
+                    chunk = self._create_pydantic_model_chunk(node, source_code, lines)
                     chunks.append(chunk)
 
         return chunks
 
-    def _extract_dependency_functions(self, tree: ast.AST, source_code: str) -> List[ChunkMetadata]:
+    def _extract_dependency_functions(
+        self, tree: ast.AST, source_code: str
+    ) -> list[ChunkMetadata]:
         """Extract dependency injection functions"""
         chunks = []
-        lines = source_code.split('\n')
+        lines = source_code.split("\n")
 
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -471,14 +515,25 @@ class FastAPIParserImpl(FastAPIParser):
 
         return chunks
 
-    def _analyze_route_decorators(self, func_node: Union[ast.FunctionDef, ast.AsyncFunctionDef]) -> Optional[Dict[str, Any]]:
+    def _analyze_route_decorators(
+        self, func_node: Union[ast.FunctionDef, ast.AsyncFunctionDef]
+    ) -> Optional[dict[str, Any]]:
         """Analyze function decorators for FastAPI route information"""
         for decorator in func_node.decorator_list:
             if isinstance(decorator, ast.Call):
                 # Handle @app.get("/path") style decorators
                 if isinstance(decorator.func, ast.Attribute):
                     method = decorator.func.attr.upper()
-                    if method in ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS', 'TRACE']:
+                    if method in [
+                        "GET",
+                        "POST",
+                        "PUT",
+                        "DELETE",
+                        "PATCH",
+                        "HEAD",
+                        "OPTIONS",
+                        "TRACE",
+                    ]:
                         path = None
                         status_code = None
 
@@ -491,17 +546,22 @@ class FastAPIParserImpl(FastAPIParser):
 
                         # Extract status_code from keywords
                         for keyword in decorator.keywords:
-                            if keyword.arg == 'status_code':
+                            if keyword.arg == "status_code":
                                 if isinstance(keyword.value, ast.Num):
                                     status_code = keyword.value.n
                                 elif isinstance(keyword.value, ast.Constant):
                                     status_code = keyword.value.value
 
                         return {
-                            'http_method': method,
-                            'route_path': path or f"/{func_node.name}",
-                            'status_code': status_code or (200 if method == 'GET' else 201 if method == 'POST' else 200),
-                            'operation_id': func_node.name
+                            "http_method": method,
+                            "route_path": path or f"/{func_node.name}",
+                            "status_code": status_code
+                            or (
+                                200
+                                if method == "GET"
+                                else 201 if method == "POST" else 200
+                            ),
+                            "operation_id": func_node.name,
                         }
 
         return None
@@ -509,42 +569,48 @@ class FastAPIParserImpl(FastAPIParser):
     def _is_pydantic_model(self, class_node: ast.ClassDef) -> bool:
         """Check if class inherits from BaseModel"""
         for base in class_node.bases:
-            if isinstance(base, ast.Name) and base.id == 'BaseModel':
+            if isinstance(base, ast.Name) and base.id == "BaseModel":
                 return True
-            elif isinstance(base, ast.Attribute) and base.attr == 'BaseModel':
+            elif isinstance(base, ast.Attribute) and base.attr == "BaseModel":
                 return True
         return False
 
-    def _is_dependency_function(self, func_node: Union[ast.FunctionDef, ast.AsyncFunctionDef], tree: ast.AST) -> bool:
+    def _is_dependency_function(
+        self, func_node: Union[ast.FunctionDef, ast.AsyncFunctionDef], tree: ast.AST
+    ) -> bool:
         """Check if function is used as FastAPI dependency"""
         func_name = func_node.name
 
         # Look for Depends(function_name) patterns
         for node in ast.walk(tree):
             if isinstance(node, ast.Call):
-                if isinstance(node.func, ast.Name) and node.func.id == 'Depends':
+                if isinstance(node.func, ast.Name) and node.func.id == "Depends":
                     if node.args and isinstance(node.args[0], ast.Name):
                         if node.args[0].id == func_name:
                             return True
         return False
 
-    def _create_route_function_chunk(self, func_node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
-                                   route_info: Dict[str, Any],
-                                   source_code: str, lines: List[str]) -> ChunkMetadata:
+    def _create_route_function_chunk(
+        self,
+        func_node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
+        route_info: dict[str, Any],
+        source_code: str,
+        lines: list[str],
+    ) -> ChunkMetadata:
         """Create chunk for FastAPI route function"""
         start_line = func_node.lineno
         end_line = func_node.end_lineno or start_line
 
         # Extract function source
-        function_lines = lines[start_line - 1:end_line]
+        function_lines = lines[start_line - 1 : end_line]
 
         # Include decorators
         if func_node.decorator_list:
             decorator_start = func_node.decorator_list[0].lineno
-            function_lines = lines[decorator_start - 1:end_line]
+            function_lines = lines[decorator_start - 1 : end_line]
             start_line = decorator_start
 
-        chunk_content = '\n'.join(function_lines)
+        chunk_content = "\n".join(function_lines)
 
         # Analyze function signature for dependencies and parameters
         dependencies = []
@@ -554,8 +620,12 @@ class FastAPIParserImpl(FastAPIParser):
         for arg in func_node.args.args:
             if arg.annotation:
                 param_info = {
-                    'name': arg.arg,
-                    'type': ast.unparse(arg.annotation) if hasattr(ast, 'unparse') else str(arg.annotation)
+                    "name": arg.arg,
+                    "type": (
+                        ast.unparse(arg.annotation)
+                        if hasattr(ast, "unparse")
+                        else str(arg.annotation)
+                    ),
                 }
                 parameters.append(param_info)
 
@@ -563,47 +633,49 @@ class FastAPIParserImpl(FastAPIParser):
         for decorator in func_node.decorator_list:
             if isinstance(decorator, ast.Call):
                 for keyword in decorator.keywords:
-                    if keyword.arg == 'response_model':
-                        if hasattr(ast, 'unparse'):
+                    if keyword.arg == "response_model":
+                        if hasattr(ast, "unparse"):
                             response_model = ast.unparse(keyword.value)
                         else:
                             response_model = str(keyword.value)
 
         artifact_id = self.id_generator.generate_artifact_id(
-            f"route_{func_node.name}",
-            {"start_line": start_line, "end_line": end_line}
+            f"route_{func_node.name}", {"start_line": start_line, "end_line": end_line}
         )
 
         return ChunkMetadata(
             source_type=self.source_type,
             artifact_id=artifact_id,
             content_text=chunk_content,
-            content_hash=self.hash_generator.generate_content_hash(chunk_content, "fastapi"),
+            content_hash=self.hash_generator.generate_content_hash(
+                chunk_content, "fastapi"
+            ),
             collected_at=datetime.now(timezone.utc),
             source_metadata={
-                'http_method': route_info['http_method'],
-                'route_path': route_info['route_path'],
-                'operation_id': route_info['operation_id'],
-                'status_codes': [route_info['status_code']],
-                'response_model': response_model,
-                'function_name': func_node.name,
-                'parameters': parameters,
-                'dependencies': dependencies,
-                'start_line': start_line,
-                'end_line': end_line,
-                'is_async': isinstance(func_node, ast.AsyncFunctionDef)
-            }
+                "http_method": route_info["http_method"],
+                "route_path": route_info["route_path"],
+                "operation_id": route_info["operation_id"],
+                "status_codes": [route_info["status_code"]],
+                "response_model": response_model,
+                "function_name": func_node.name,
+                "parameters": parameters,
+                "dependencies": dependencies,
+                "start_line": start_line,
+                "end_line": end_line,
+                "is_async": isinstance(func_node, ast.AsyncFunctionDef),
+            },
         )
 
-    def _create_pydantic_model_chunk(self, class_node: ast.ClassDef,
-                                   source_code: str, lines: List[str]) -> ChunkMetadata:
+    def _create_pydantic_model_chunk(
+        self, class_node: ast.ClassDef, source_code: str, lines: list[str]
+    ) -> ChunkMetadata:
         """Create chunk for Pydantic model class"""
         start_line = class_node.lineno
         end_line = class_node.end_lineno or start_line
 
         # Extract class source
-        class_lines = lines[start_line - 1:end_line]
-        chunk_content = '\n'.join(class_lines)
+        class_lines = lines[start_line - 1 : end_line]
+        chunk_content = "\n".join(class_lines)
 
         # Analyze class fields
         fields = []
@@ -613,65 +685,83 @@ class FastAPIParserImpl(FastAPIParser):
             if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
                 # Field with type annotation
                 field_info = {
-                    'name': node.target.id,
-                    'type': ast.unparse(node.annotation) if hasattr(ast, 'unparse') else str(node.annotation),
-                    'has_default': node.value is not None
+                    "name": node.target.id,
+                    "type": (
+                        ast.unparse(node.annotation)
+                        if hasattr(ast, "unparse")
+                        else str(node.annotation)
+                    ),
+                    "has_default": node.value is not None,
                 }
                 fields.append(field_info)
-            elif isinstance(node, ast.FunctionDef) and node.name.startswith('validate_'):
+            elif isinstance(node, ast.FunctionDef) and node.name.startswith(
+                "validate_"
+            ):
                 # Validator function
                 validators.append(node.name)
 
         artifact_id = self.id_generator.generate_artifact_id(
-            f"model_{class_node.name}",
-            {"start_line": start_line, "end_line": end_line}
+            f"model_{class_node.name}", {"start_line": start_line, "end_line": end_line}
         )
 
         return ChunkMetadata(
             source_type=self.source_type,
             artifact_id=artifact_id,
             content_text=chunk_content,
-            content_hash=self.hash_generator.generate_content_hash(chunk_content, "fastapi"),
+            content_hash=self.hash_generator.generate_content_hash(
+                chunk_content, "fastapi"
+            ),
             collected_at=datetime.now(timezone.utc),
             source_metadata={
-                'fastapi_model_type': 'pydantic',
-                'fastapi_model_name': class_node.name,
-                'fastapi_model_fields': [f"{field['name']}: {field['type']}" for field in fields],
-                'model_validators': validators,
-                'field_count': len(fields),
-                'start_line': start_line,
-                'end_line': end_line,
-                'base_classes': [ast.unparse(base) if hasattr(ast, 'unparse') else str(base) for base in class_node.bases]
-            }
+                "fastapi_model_type": "pydantic",
+                "fastapi_model_name": class_node.name,
+                "fastapi_model_fields": [
+                    f"{field['name']}: {field['type']}" for field in fields
+                ],
+                "model_validators": validators,
+                "field_count": len(fields),
+                "start_line": start_line,
+                "end_line": end_line,
+                "base_classes": [
+                    ast.unparse(base) if hasattr(ast, "unparse") else str(base)
+                    for base in class_node.bases
+                ],
+            },
         )
 
-    def _create_dependency_function_chunk(self, func_node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
-                                        source_code: str, lines: List[str]) -> ChunkMetadata:
+    def _create_dependency_function_chunk(
+        self,
+        func_node: Union[ast.FunctionDef, ast.AsyncFunctionDef],
+        source_code: str,
+        lines: list[str],
+    ) -> ChunkMetadata:
         """Create chunk for dependency function"""
         start_line = func_node.lineno
         end_line = func_node.end_lineno or start_line
 
         # Extract function source
-        function_lines = lines[start_line - 1:end_line]
-        chunk_content = '\n'.join(function_lines)
+        function_lines = lines[start_line - 1 : end_line]
+        chunk_content = "\n".join(function_lines)
 
         artifact_id = self.id_generator.generate_artifact_id(
             f"dependency_{func_node.name}",
-            {"start_line": start_line, "end_line": end_line}
+            {"start_line": start_line, "end_line": end_line},
         )
 
         return ChunkMetadata(
             source_type=self.source_type,
             artifact_id=artifact_id,
             content_text=chunk_content,
-            content_hash=self.hash_generator.generate_content_hash(chunk_content, "fastapi"),
+            content_hash=self.hash_generator.generate_content_hash(
+                chunk_content, "fastapi"
+            ),
             collected_at=datetime.now(timezone.utc),
             source_metadata={
-                'fastapi_dependency': True,
-                'function_name': func_node.name,
-                'dependency_type': 'function',
-                'start_line': start_line,
-                'end_line': end_line,
-                'is_async': isinstance(func_node, ast.AsyncFunctionDef)
-            }
+                "fastapi_dependency": True,
+                "function_name": func_node.name,
+                "dependency_type": "function",
+                "start_line": start_line,
+                "end_line": end_line,
+                "is_async": isinstance(func_node, ast.AsyncFunctionDef),
+            },
         )

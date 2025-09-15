@@ -30,23 +30,21 @@ import textwrap
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any
-from unittest.mock import patch
 
 import pytest
 from google.cloud import bigquery
-from google.cloud.exceptions import NotFound
 
 # Import contracts - these imports will FAIL until implementation exists
 try:
     from specs.contracts.parser_interfaces import (
-        FastAPIParser,
         BigQueryWriter,
         ChunkMetadata,
+        ErrorClass,
+        FastAPIParser,
         ParseResult,
         SourceType,
-        ErrorClass
     )
+
     CONTRACTS_AVAILABLE = True
 except ImportError:
     CONTRACTS_AVAILABLE = False
@@ -55,6 +53,7 @@ except ImportError:
 try:
     from src.parsers.fastapi_parser import FastAPIParser
     from src.storage.bigquery_writer import BigQueryWriter
+
     IMPLEMENTATION_AVAILABLE = True
 except ImportError:
     IMPLEMENTATION_AVAILABLE = False
@@ -71,19 +70,18 @@ class TestFastAPIIngestion:
     @pytest.fixture(scope="class")
     def bigquery_client(self):
         """Create BigQuery client for integration testing."""
-        project_id = os.getenv('GOOGLE_CLOUD_PROJECT', 'konveyn2ai')
+        project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "konveyn2ai")
         return bigquery.Client(project=project_id)
 
     @pytest.fixture(scope="class")
     def bigquery_writer(self, bigquery_client, temp_dataset_name):
         """BigQuery writer instance - will fail until implementation exists."""
         if not IMPLEMENTATION_AVAILABLE:
-            pytest.skip("BigQueryWriter implementation not available yet (TDD Red phase)")
+            pytest.skip(
+                "BigQueryWriter implementation not available yet (TDD Red phase)"
+            )
 
-        writer = BigQueryWriter(
-            client=bigquery_client,
-            dataset_name=temp_dataset_name
-        )
+        writer = BigQueryWriter(client=bigquery_client, dataset_name=temp_dataset_name)
 
         # Create temporary dataset and tables for testing
         writer.create_tables_if_not_exist(temp_dataset_name)
@@ -93,7 +91,9 @@ class TestFastAPIIngestion:
         # Cleanup: Delete temporary dataset after tests
         try:
             dataset_ref = bigquery_client.dataset(temp_dataset_name)
-            bigquery_client.delete_dataset(dataset_ref, delete_contents=True, not_found_ok=True)
+            bigquery_client.delete_dataset(
+                dataset_ref, delete_contents=True, not_found_ok=True
+            )
         except Exception as e:
             print(f"Warning: Could not cleanup dataset {temp_dataset_name}: {e}")
 
@@ -101,13 +101,16 @@ class TestFastAPIIngestion:
     def fastapi_parser(self):
         """FastAPI parser instance - will fail until implementation exists."""
         if not IMPLEMENTATION_AVAILABLE:
-            pytest.skip("FastAPIParser implementation not available yet (TDD Red phase)")
+            pytest.skip(
+                "FastAPIParser implementation not available yet (TDD Red phase)"
+            )
         return FastAPIParser()
 
     @pytest.fixture
     def sample_fastapi_route_file(self):
         """Create sample FastAPI route file for testing."""
-        return textwrap.dedent("""
+        return textwrap.dedent(
+            """
         from fastapi import FastAPI, HTTPException, Depends
         from pydantic import BaseModel
         from typing import List, Optional
@@ -158,12 +161,14 @@ class TestFastAPIIngestion:
         async def delete_user(user_id: int):
             '''Delete user by ID'''
             pass
-        """)
+        """
+        )
 
     @pytest.fixture
     def sample_fastapi_models_file(self):
         """Create sample Pydantic models file for testing."""
-        return textwrap.dedent("""
+        return textwrap.dedent(
+            """
         from pydantic import BaseModel, Field, validator
         from typing import List, Optional, Union
         from datetime import datetime
@@ -209,7 +214,8 @@ class TestFastAPIIngestion:
             active_users: int
             users_by_role: dict[UserRole, int]
             growth_rate: float = Field(..., ge=0, le=100)
-        """)
+        """
+        )
 
     @pytest.fixture
     def sample_openapi_spec(self):
@@ -219,13 +225,10 @@ class TestFastAPIIngestion:
             "info": {
                 "title": "Sample API",
                 "version": "1.0.0",
-                "description": "A sample FastAPI application for testing"
+                "description": "A sample FastAPI application for testing",
             },
             "servers": [
-                {
-                    "url": "https://api.example.com",
-                    "description": "Production server"
-                }
+                {"url": "https://api.example.com", "description": "Production server"}
             ],
             "paths": {
                 "/users": {
@@ -237,14 +240,14 @@ class TestFastAPIIngestion:
                                 "name": "skip",
                                 "in": "query",
                                 "required": False,
-                                "schema": {"type": "integer", "default": 0}
+                                "schema": {"type": "integer", "default": 0},
                             },
                             {
                                 "name": "limit",
                                 "in": "query",
                                 "required": False,
-                                "schema": {"type": "integer", "default": 100}
-                            }
+                                "schema": {"type": "integer", "default": 100},
+                            },
                         ],
                         "responses": {
                             "200": {
@@ -253,13 +256,15 @@ class TestFastAPIIngestion:
                                     "application/json": {
                                         "schema": {
                                             "type": "array",
-                                            "items": {"$ref": "#/components/schemas/UserResponse"}
+                                            "items": {
+                                                "$ref": "#/components/schemas/UserResponse"
+                                            },
                                         }
                                     }
-                                }
+                                },
                             }
                         },
-                        "tags": ["users"]
+                        "tags": ["users"],
                     },
                     "post": {
                         "summary": "Create User",
@@ -267,23 +272,27 @@ class TestFastAPIIngestion:
                         "requestBody": {
                             "content": {
                                 "application/json": {
-                                    "schema": {"$ref": "#/components/schemas/UserCreate"}
+                                    "schema": {
+                                        "$ref": "#/components/schemas/UserCreate"
+                                    }
                                 }
                             },
-                            "required": True
+                            "required": True,
                         },
                         "responses": {
                             "201": {
                                 "description": "Successful Response",
                                 "content": {
                                     "application/json": {
-                                        "schema": {"$ref": "#/components/schemas/UserResponse"}
+                                        "schema": {
+                                            "$ref": "#/components/schemas/UserResponse"
+                                        }
                                     }
-                                }
+                                },
                             }
                         },
-                        "tags": ["users"]
-                    }
+                        "tags": ["users"],
+                    },
                 },
                 "/users/{user_id}": {
                     "get": {
@@ -294,7 +303,7 @@ class TestFastAPIIngestion:
                                 "name": "user_id",
                                 "in": "path",
                                 "required": True,
-                                "schema": {"type": "integer"}
+                                "schema": {"type": "integer"},
                             }
                         ],
                         "responses": {
@@ -302,14 +311,16 @@ class TestFastAPIIngestion:
                                 "description": "Successful Response",
                                 "content": {
                                     "application/json": {
-                                        "schema": {"$ref": "#/components/schemas/UserResponse"}
+                                        "schema": {
+                                            "$ref": "#/components/schemas/UserResponse"
+                                        }
                                     }
-                                }
+                                },
                             }
                         },
-                        "tags": ["users"]
+                        "tags": ["users"],
                     }
-                }
+                },
             },
             "components": {
                 "schemas": {
@@ -320,8 +331,8 @@ class TestFastAPIIngestion:
                         "properties": {
                             "username": {"type": "string"},
                             "email": {"type": "string"},
-                            "password": {"type": "string"}
-                        }
+                            "password": {"type": "string"},
+                        },
                     },
                     "UserResponse": {
                         "title": "UserResponse",
@@ -331,15 +342,17 @@ class TestFastAPIIngestion:
                             "id": {"type": "integer"},
                             "username": {"type": "string"},
                             "email": {"type": "string"},
-                            "is_active": {"type": "boolean"}
-                        }
-                    }
+                            "is_active": {"type": "boolean"},
+                        },
+                    },
                 }
-            }
+            },
         }
 
     @pytest.fixture
-    def temp_fastapi_project(self, sample_fastapi_route_file, sample_fastapi_models_file, sample_openapi_spec):
+    def temp_fastapi_project(
+        self, sample_fastapi_route_file, sample_fastapi_models_file, sample_openapi_spec
+    ):
         """Create temporary FastAPI project directory structure."""
         with tempfile.TemporaryDirectory() as temp_dir:
             project_path = Path(temp_dir)
@@ -359,7 +372,9 @@ class TestFastAPIIngestion:
                 json.dump(sample_openapi_spec, f, indent=2)
 
             # Create additional files
-            (project_path / "requirements.txt").write_text("fastapi==0.104.1\nuvicorn==0.24.0\npydantic==2.5.0")
+            (project_path / "requirements.txt").write_text(
+                "fastapi==0.104.1\nuvicorn==0.24.0\npydantic==2.5.0"
+            )
 
             yield project_path
 
@@ -368,7 +383,9 @@ class TestFastAPIIngestion:
     def test_contracts_available(self):
         """Test that parser interfaces contracts are available."""
         if not CONTRACTS_AVAILABLE:
-            pytest.fail("Parser interface contracts not available - check specs/contracts/parser_interfaces.py")
+            pytest.fail(
+                "Parser interface contracts not available - check specs/contracts/parser_interfaces.py"
+            )
 
     @pytest.mark.integration
     @pytest.mark.bigquery
@@ -396,30 +413,42 @@ class TestFastAPIIngestion:
         assert result.processing_duration_ms > 0
 
         # Should find multiple chunks for routes and models
-        assert len(result.chunks) >= 8, "Should find at least 8 chunks (5 routes + 3 models)"
+        assert (
+            len(result.chunks) >= 8
+        ), "Should find at least 8 chunks (5 routes + 3 models)"
 
         # Validate FastAPI-specific metadata
-        route_chunks = [chunk for chunk in result.chunks
-                       if chunk.source_metadata.get('fastapi_http_method')]
+        route_chunks = [
+            chunk
+            for chunk in result.chunks
+            if chunk.source_metadata.get("fastapi_http_method")
+        ]
         assert len(route_chunks) == 5, "Should find 5 HTTP routes"
 
         # Check specific route metadata
-        get_users_chunk = next((chunk for chunk in route_chunks
-                               if chunk.source_metadata.get('fastapi_route_path') == '/users'
-                               and chunk.source_metadata.get('fastapi_http_method') == 'GET'), None)
+        get_users_chunk = next(
+            (
+                chunk
+                for chunk in route_chunks
+                if chunk.source_metadata.get("fastapi_route_path") == "/users"
+                and chunk.source_metadata.get("fastapi_http_method") == "GET"
+            ),
+            None,
+        )
         assert get_users_chunk is not None, "Should find GET /users route"
 
         expected_metadata = {
-            'fastapi_http_method': 'GET',
-            'fastapi_route_path': '/users',
-            'fastapi_operation_id': 'get_users',
-            'fastapi_response_model': 'List[UserResponse]',
-            'fastapi_status_codes': [200]
+            "fastapi_http_method": "GET",
+            "fastapi_route_path": "/users",
+            "fastapi_operation_id": "get_users",
+            "fastapi_response_model": "List[UserResponse]",
+            "fastapi_status_codes": [200],
         }
 
         for key, expected_value in expected_metadata.items():
-            assert get_users_chunk.source_metadata.get(key) == expected_value, \
-                f"Expected {key}={expected_value}, got {get_users_chunk.source_metadata.get(key)}"
+            assert (
+                get_users_chunk.source_metadata.get(key) == expected_value
+            ), f"Expected {key}={expected_value}, got {get_users_chunk.source_metadata.get(key)}"
 
     @pytest.mark.integration
     @pytest.mark.bigquery
@@ -434,31 +463,47 @@ class TestFastAPIIngestion:
         assert len(result.chunks) >= 3, "Should find chunks for paths and schemas"
 
         # Check for path chunks
-        path_chunks = [chunk for chunk in result.chunks
-                      if 'openapi_path' in chunk.source_metadata]
+        path_chunks = [
+            chunk for chunk in result.chunks if "openapi_path" in chunk.source_metadata
+        ]
         assert len(path_chunks) >= 2, "Should find at least 2 API paths"
 
         # Check for schema chunks
-        schema_chunks = [chunk for chunk in result.chunks
-                        if 'openapi_schema' in chunk.source_metadata]
+        schema_chunks = [
+            chunk
+            for chunk in result.chunks
+            if "openapi_schema" in chunk.source_metadata
+        ]
         assert len(schema_chunks) >= 2, "Should find at least 2 schema definitions"
 
     @pytest.mark.integration
     @pytest.mark.bigquery
-    def test_parse_fastapi_project_directory(self, fastapi_parser, temp_fastapi_project):
+    def test_parse_fastapi_project_directory(
+        self, fastapi_parser, temp_fastapi_project
+    ):
         """Test parsing entire FastAPI project directory."""
         # This will fail until parser implementation exists
         result = fastapi_parser.parse_directory(str(temp_fastapi_project))
 
         assert isinstance(result, ParseResult)
-        assert result.files_processed >= 3, "Should process at least 3 files (main.py, models.py, openapi.json)"
-        assert len(result.chunks) >= 15, "Should find substantial number of chunks from all files"
+        assert (
+            result.files_processed >= 3
+        ), "Should process at least 3 files (main.py, models.py, openapi.json)"
+        assert (
+            len(result.chunks) >= 15
+        ), "Should find substantial number of chunks from all files"
 
         # Validate we have chunks from different source types
         source_files = set(chunk.source_uri for chunk in result.chunks)
-        assert any('main.py' in uri for uri in source_files), "Should have chunks from main.py"
-        assert any('models.py' in uri for uri in source_files), "Should have chunks from models.py"
-        assert any('openapi.json' in uri for uri in source_files), "Should have chunks from openapi.json"
+        assert any(
+            "main.py" in uri for uri in source_files
+        ), "Should have chunks from main.py"
+        assert any(
+            "models.py" in uri for uri in source_files
+        ), "Should have chunks from models.py"
+        assert any(
+            "openapi.json" in uri for uri in source_files
+        ), "Should have chunks from openapi.json"
 
     @pytest.mark.integration
     @pytest.mark.bigquery
@@ -469,19 +514,37 @@ class TestFastAPIIngestion:
         # This will fail until parser implementation exists
         result = fastapi_parser.parse_file(str(models_file))
 
-        model_chunks = [chunk for chunk in result.chunks
-                       if chunk.source_metadata.get('fastapi_model_type')]
+        model_chunks = [
+            chunk
+            for chunk in result.chunks
+            if chunk.source_metadata.get("fastapi_model_type")
+        ]
         assert len(model_chunks) >= 4, "Should find at least 4 model definitions"
 
         # Check specific model metadata
-        user_model = next((chunk for chunk in model_chunks
-                          if 'User' in chunk.content_text and 'BaseUser' not in chunk.content_text), None)
+        user_model = next(
+            (
+                chunk
+                for chunk in model_chunks
+                if "User" in chunk.content_text and "BaseUser" not in chunk.content_text
+            ),
+            None,
+        )
         assert user_model is not None, "Should find User model"
 
-        expected_fields = ['id', 'role', 'is_active', 'created_at', 'last_login', 'metadata']
-        model_fields = user_model.source_metadata.get('fastapi_model_fields', [])
+        expected_fields = [
+            "id",
+            "role",
+            "is_active",
+            "created_at",
+            "last_login",
+            "metadata",
+        ]
+        model_fields = user_model.source_metadata.get("fastapi_model_fields", [])
         for field in expected_fields:
-            assert any(field in f for f in model_fields), f"Should find field {field} in User model"
+            assert any(
+                field in f for f in model_fields
+            ), f"Should find field {field} in User model"
 
     @pytest.mark.integration
     @pytest.mark.bigquery
@@ -509,23 +572,33 @@ class TestFastAPIIngestion:
         assert fastapi_parser.validate_content(invalid_content) is False
 
         # OpenAPI spec validation
-        openapi_content = '{"openapi": "3.0.2", "info": {"title": "Test", "version": "1.0.0"}}'
+        openapi_content = (
+            '{"openapi": "3.0.2", "info": {"title": "Test", "version": "1.0.0"}}'
+        )
         assert fastapi_parser.validate_content(openapi_content) is True
 
     @pytest.mark.integration
     @pytest.mark.bigquery
-    def test_end_to_end_bigquery_ingestion(self, fastapi_parser, bigquery_writer, temp_fastapi_project, temp_dataset_name):
+    def test_end_to_end_bigquery_ingestion(
+        self, fastapi_parser, bigquery_writer, temp_fastapi_project, temp_dataset_name
+    ):
         """Test complete end-to-end ingestion from FastAPI parsing to BigQuery storage."""
         # Parse the FastAPI project
         parse_result = fastapi_parser.parse_directory(str(temp_fastapi_project))
 
         # Write chunks to BigQuery
-        chunks_written = bigquery_writer.write_chunks(parse_result.chunks, "source_metadata")
-        assert chunks_written == len(parse_result.chunks), "All chunks should be written to BigQuery"
+        chunks_written = bigquery_writer.write_chunks(
+            parse_result.chunks, "source_metadata"
+        )
+        assert chunks_written == len(
+            parse_result.chunks
+        ), "All chunks should be written to BigQuery"
 
         # Write errors to BigQuery if any
         if parse_result.errors:
-            errors_written = bigquery_writer.write_errors(parse_result.errors, "source_metadata_errors")
+            errors_written = bigquery_writer.write_errors(
+                parse_result.errors, "source_metadata_errors"
+            )
             assert errors_written == len(parse_result.errors)
 
         # Log ingestion run
@@ -536,14 +609,21 @@ class TestFastAPIIngestion:
             "chunks_generated": len(parse_result.chunks),
             "errors_count": len(parse_result.errors),
             "processing_duration_ms": parse_result.processing_duration_ms,
-            "parser_version": fastapi_parser.version
+            "parser_version": fastapi_parser.version,
         }
         run_id = bigquery_writer.log_ingestion_run(run_info, "ingestion_log")
         assert run_id is not None, "Should return ingestion run ID"
 
     @pytest.mark.integration
     @pytest.mark.bigquery
-    def test_bigquery_data_validation(self, bigquery_client, temp_dataset_name, fastapi_parser, bigquery_writer, temp_fastapi_project):
+    def test_bigquery_data_validation(
+        self,
+        bigquery_client,
+        temp_dataset_name,
+        fastapi_parser,
+        bigquery_writer,
+        temp_fastapi_project,
+    ):
         """Test that data written to BigQuery has correct structure and content."""
         # Parse and ingest data
         parse_result = fastapi_parser.parse_directory(str(temp_fastapi_project))
@@ -569,20 +649,26 @@ class TestFastAPIIngestion:
         assert len(rows) >= 5, "Should have at least 5 route records in BigQuery"
 
         # Validate specific route data
-        get_users_row = next((row for row in rows
-                             if row.fastapi_route_path == '/users'
-                             and row.fastapi_http_method == 'GET'), None)
+        get_users_row = next(
+            (
+                row
+                for row in rows
+                if row.fastapi_route_path == "/users"
+                and row.fastapi_http_method == "GET"
+            ),
+            None,
+        )
         assert get_users_row is not None, "Should find GET /users route in BigQuery"
-        assert get_users_row.fastapi_operation_id == 'get_users'
-        assert 'List[UserResponse]' in get_users_row.fastapi_response_model
-        assert 'async def get_users' in get_users_row.content_text
+        assert get_users_row.fastapi_operation_id == "get_users"
+        assert "List[UserResponse]" in get_users_row.fastapi_response_model
+        assert "async def get_users" in get_users_row.content_text
 
     @pytest.mark.integration
     @pytest.mark.bigquery
     def test_error_handling_and_logging(self, fastapi_parser):
         """Test error handling for invalid FastAPI files."""
         # Create invalid Python file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write("invalid python syntax $$$ @#!")
             invalid_file = f.name
 
@@ -599,7 +685,7 @@ class TestFastAPIIngestion:
             error = result.errors[0]
             assert error.source_type == SourceType.FASTAPI
             assert error.error_class == ErrorClass.PARSING
-            assert 'syntax' in error.error_msg.lower()
+            assert "syntax" in error.error_msg.lower()
 
         finally:
             os.unlink(invalid_file)
@@ -609,9 +695,11 @@ class TestFastAPIIngestion:
     def test_chunking_strategy(self, fastapi_parser, sample_fastapi_route_file):
         """Test that FastAPI content is chunked appropriately."""
         # Create a large FastAPI file to test chunking
-        large_content = sample_fastapi_route_file + "\n" * 50 + sample_fastapi_route_file
+        large_content = (
+            sample_fastapi_route_file + "\n" * 50 + sample_fastapi_route_file
+        )
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write(large_content)
             large_file = f.name
 
@@ -620,13 +708,17 @@ class TestFastAPIIngestion:
             result = fastapi_parser.parse_file(large_file)
 
             # Should create multiple chunks for large files
-            assert len(result.chunks) > 1, "Should create multiple chunks for large files"
+            assert (
+                len(result.chunks) > 1
+            ), "Should create multiple chunks for large files"
 
             # Chunks should have proper overlap and structure
             for chunk in result.chunks:
                 assert len(chunk.content_text) > 0, "Chunks should have content"
                 assert chunk.content_hash is not None, "Chunks should have content hash"
-                assert chunk.content_tokens is not None, "Chunks should have token count"
+                assert (
+                    chunk.content_tokens is not None
+                ), "Chunks should have token count"
 
         finally:
             os.unlink(large_file)
@@ -647,12 +739,18 @@ class TestFastAPIIngestion:
         assert artifact_ids_1 == artifact_ids_2, "Artifact IDs should be deterministic"
 
         # All artifact IDs should be unique within a parse result
-        assert len(set(artifact_ids_1)) == len(artifact_ids_1), "All artifact IDs should be unique"
+        assert len(set(artifact_ids_1)) == len(
+            artifact_ids_1
+        ), "All artifact IDs should be unique"
 
         # Artifact IDs should follow expected pattern
         for artifact_id in artifact_ids_1:
-            assert artifact_id.startswith('fastapi://'), "Artifact IDs should start with fastapi://"
-            assert str(route_file) in artifact_id, "Artifact IDs should contain file path"
+            assert artifact_id.startswith(
+                "fastapi://"
+            ), "Artifact IDs should start with fastapi://"
+            assert (
+                str(route_file) in artifact_id
+            ), "Artifact IDs should contain file path"
 
     @pytest.mark.integration
     @pytest.mark.bigquery
@@ -661,26 +759,37 @@ class TestFastAPIIngestion:
         result = fastapi_parser.parse_directory(str(temp_fastapi_project))
 
         required_fields = [
-            'source_type', 'artifact_id', 'content_text', 'content_hash',
-            'source_uri', 'collected_at'
+            "source_type",
+            "artifact_id",
+            "content_text",
+            "content_hash",
+            "source_uri",
+            "collected_at",
         ]
 
         for chunk in result.chunks:
             # Check required common fields
             for field in required_fields:
                 value = getattr(chunk, field, None)
-                assert value is not None, f"Required field {field} is missing in chunk {chunk.artifact_id}"
-                assert value != "", f"Required field {field} is empty in chunk {chunk.artifact_id}"
+                assert (
+                    value is not None
+                ), f"Required field {field} is missing in chunk {chunk.artifact_id}"
+                assert (
+                    value != ""
+                ), f"Required field {field} is empty in chunk {chunk.artifact_id}"
 
             # Check source type
             assert chunk.source_type == SourceType.FASTAPI
 
             # Check that FastAPI-specific metadata is present where appropriate
-            if any(keyword in chunk.content_text.lower() for keyword in ['@app.', 'async def', 'def ']):
+            if any(
+                keyword in chunk.content_text.lower()
+                for keyword in ["@app.", "async def", "def "]
+            ):
                 # Should have FastAPI-specific metadata for route chunks
-                if '@app.' in chunk.content_text:
-                    assert chunk.source_metadata.get('fastapi_http_method') is not None
-                    assert chunk.source_metadata.get('fastapi_route_path') is not None
+                if "@app." in chunk.content_text:
+                    assert chunk.source_metadata.get("fastapi_http_method") is not None
+                    assert chunk.source_metadata.get("fastapi_route_path") is not None
 
     @pytest.mark.integration
     @pytest.mark.bigquery
@@ -693,8 +802,12 @@ class TestFastAPIIngestion:
         total_duration_ms = (end_time - start_time).total_seconds() * 1000
 
         # Performance assertions
-        assert result.processing_duration_ms <= total_duration_ms, "Reported duration should be <= actual duration"
-        assert result.processing_duration_ms < 5000, "Parsing should complete within 5 seconds for small project"
+        assert (
+            result.processing_duration_ms <= total_duration_ms
+        ), "Reported duration should be <= actual duration"
+        assert (
+            result.processing_duration_ms < 5000
+        ), "Parsing should complete within 5 seconds for small project"
 
         # Throughput assertions
         if result.files_processed > 0:

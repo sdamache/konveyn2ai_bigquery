@@ -8,14 +8,11 @@ Following TDD methodology - these tests will FAIL initially because the
 IRS parser implementation doesn't exist yet (RED phase).
 """
 
-import json
 import os
 import tempfile
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any
-from unittest.mock import patch
 
 import pytest
 from google.cloud import bigquery
@@ -23,15 +20,10 @@ from google.cloud.exceptions import NotFound
 
 # Import contracts - these should exist from the specs
 from specs.contracts.parser_interfaces import (
-    IRSParser,
-    SourceType,
-    ChunkMetadata,
-    ParseResult,
-    ParseError,
     ErrorClass,
-    BigQueryWriter
+    ParseResult,
+    SourceType,
 )
-
 
 # Sample IRS IMF layout content for testing
 SAMPLE_IMF_LAYOUT_BASIC = """
@@ -140,17 +132,17 @@ def sample_irs_files(temp_test_dir):
     # Basic IMF layout
     basic_file = temp_test_dir / "imf_basic_layout.txt"
     basic_file.write_text(SAMPLE_IMF_LAYOUT_BASIC)
-    files['basic'] = str(basic_file)
+    files["basic"] = str(basic_file)
 
     # Complex business layout
     complex_file = temp_test_dir / "imf_business_layout.txt"
     complex_file.write_text(SAMPLE_IMF_LAYOUT_COMPLEX)
-    files['complex'] = str(complex_file)
+    files["complex"] = str(complex_file)
 
     # Invalid layout
     invalid_file = temp_test_dir / "invalid_layout.txt"
     invalid_file.write_text(SAMPLE_INVALID_LAYOUT)
-    files['invalid'] = str(invalid_file)
+    files["invalid"] = str(invalid_file)
 
     return files
 
@@ -158,7 +150,7 @@ def sample_irs_files(temp_test_dir):
 @pytest.fixture
 def temp_bigquery_dataset():
     """Create temporary BigQuery dataset for testing."""
-    project_id = os.getenv('GOOGLE_CLOUD_PROJECT', 'konveyn2ai')
+    project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "konveyn2ai")
     dataset_id = f"test_irs_ingestion_{uuid.uuid4().hex[:8]}"
 
     client = bigquery.Client(project=project_id)
@@ -175,11 +167,7 @@ def temp_bigquery_dataset():
         # Create test tables using the contract DDL
         create_test_tables(client, project_id, dataset_id)
 
-        yield {
-            'project_id': project_id,
-            'dataset_id': dataset_id,
-            'client': client
-        }
+        yield {"project_id": project_id, "dataset_id": dataset_id, "client": client}
 
     finally:
         # Cleanup - delete dataset and all tables
@@ -274,9 +262,12 @@ class TestIRSIngestionIntegration:
         with pytest.raises((ImportError, NotImplementedError, AttributeError)):
             # This should fail because the actual implementation doesn't exist
             from src.parsers.irs_parser import IRSParserImpl
+
             parser = IRSParserImpl()
 
-    def test_single_file_ingestion_basic_layout(self, sample_irs_files, temp_bigquery_dataset):
+    def test_single_file_ingestion_basic_layout(
+        self, sample_irs_files, temp_bigquery_dataset
+    ):
         """
         Test ingestion of a single basic IRS IMF layout file.
 
@@ -292,7 +283,7 @@ class TestIRSIngestionIntegration:
             from src.parsers.irs_parser import IRSParserImpl
 
             parser = IRSParserImpl(version="1.0.0")
-            result = parser.parse_file(sample_irs_files['basic'])
+            result = parser.parse_file(sample_irs_files["basic"])
 
             # Expected assertions when implementation exists:
             assert isinstance(result, ParseResult)
@@ -303,15 +294,17 @@ class TestIRSIngestionIntegration:
             # Validate chunk metadata structure
             chunk = result.chunks[0]
             assert chunk.source_type == SourceType.IRS
-            assert chunk.source_uri == sample_irs_files['basic']
+            assert chunk.source_uri == sample_irs_files["basic"]
             assert "Social Security Number" in chunk.content_text
 
             # Validate IRS-specific metadata
-            assert 'record_type' in chunk.source_metadata
-            assert 'layout_version' in chunk.source_metadata
-            assert 'field_positions' in chunk.source_metadata
+            assert "record_type" in chunk.source_metadata
+            assert "layout_version" in chunk.source_metadata
+            assert "field_positions" in chunk.source_metadata
 
-    def test_single_file_ingestion_complex_layout(self, sample_irs_files, temp_bigquery_dataset):
+    def test_single_file_ingestion_complex_layout(
+        self, sample_irs_files, temp_bigquery_dataset
+    ):
         """
         Test ingestion of complex business tax layout with sections.
 
@@ -326,7 +319,7 @@ class TestIRSIngestionIntegration:
             from src.parsers.irs_parser import IRSParserImpl
 
             parser = IRSParserImpl()
-            result = parser.parse_file(sample_irs_files['complex'])
+            result = parser.parse_file(sample_irs_files["complex"])
 
             # Expected validations:
             assert len(result.chunks) >= 4  # At least one chunk per section
@@ -337,7 +330,9 @@ class TestIRSIngestionIntegration:
             assert any("FINANCIAL DATA" in content for content in section_contents)
             assert any("BUSINESS CODES" in content for content in section_contents)
 
-    def test_directory_ingestion_multiple_files(self, sample_irs_files, temp_bigquery_dataset):
+    def test_directory_ingestion_multiple_files(
+        self, sample_irs_files, temp_bigquery_dataset
+    ):
         """
         Test ingestion of directory containing multiple IRS layout files.
 
@@ -347,7 +342,7 @@ class TestIRSIngestionIntegration:
             from src.parsers.irs_parser import IRSParserImpl
 
             parser = IRSParserImpl()
-            test_dir = Path(sample_irs_files['basic']).parent
+            test_dir = Path(sample_irs_files["basic"]).parent
             result = parser.parse_directory(str(test_dir))
 
             # Expected behavior:
@@ -365,7 +360,7 @@ class TestIRSIngestionIntegration:
             from src.parsers.irs_parser import IRSParserImpl
 
             parser = IRSParserImpl()
-            result = parser.parse_file(sample_irs_files['invalid'])
+            result = parser.parse_file(sample_irs_files["invalid"])
 
             # Expected error handling:
             assert len(result.chunks) == 0
@@ -386,66 +381,72 @@ class TestIRSIngestionIntegration:
             parser = IRSParserImpl()
 
             # This method should extract field positions from layout
-            field_positions = parser.extract_field_positions({
-                'layout_content': SAMPLE_IMF_LAYOUT_BASIC
-            })
+            field_positions = parser.extract_field_positions(
+                {"layout_content": SAMPLE_IMF_LAYOUT_BASIC}
+            )
 
             # Expected field extraction:
             assert len(field_positions) >= 22  # All fields in basic layout
 
             # Validate specific field parsing
-            ssn_field = next((f for f in field_positions if 'Social Security' in f['description']), None)
+            ssn_field = next(
+                (f for f in field_positions if "Social Security" in f["description"]),
+                None,
+            )
             assert ssn_field is not None
-            assert ssn_field['start_position'] == 1
-            assert ssn_field['end_position'] == 9
-            assert ssn_field['length'] == 9
-            assert ssn_field['data_type'] == 'N'
+            assert ssn_field["start_position"] == 1
+            assert ssn_field["end_position"] == 9
+            assert ssn_field["length"] == 9
+            assert ssn_field["data_type"] == "N"
 
-    def test_bigquery_ingestion_end_to_end(self, sample_irs_files, temp_bigquery_dataset):
+    def test_bigquery_ingestion_end_to_end(
+        self, sample_irs_files, temp_bigquery_dataset
+    ):
         """
         Test complete end-to-end flow from IRS layout to BigQuery.
 
         This is the primary integration test validating the entire pipeline.
         """
         with pytest.raises((ImportError, NotImplementedError)):
-            from src.parsers.irs_parser import IRSParserImpl
             from src.bigquery.writer import BigQueryWriterImpl
+            from src.parsers.irs_parser import IRSParserImpl
 
             # Parse IRS layout
             parser = IRSParserImpl()
-            parse_result = parser.parse_file(sample_irs_files['basic'])
+            parse_result = parser.parse_file(sample_irs_files["basic"])
 
             # Write to BigQuery
             writer = BigQueryWriterImpl(
-                project_id=temp_bigquery_dataset['project_id'],
-                dataset_id=temp_bigquery_dataset['dataset_id']
+                project_id=temp_bigquery_dataset["project_id"],
+                dataset_id=temp_bigquery_dataset["dataset_id"],
             )
 
             # Ensure tables exist
-            assert writer.create_tables_if_not_exist(temp_bigquery_dataset['dataset_id'])
+            assert writer.create_tables_if_not_exist(
+                temp_bigquery_dataset["dataset_id"]
+            )
 
             # Write chunks to source_metadata
-            rows_written = writer.write_chunks(
-                parse_result.chunks,
-                'source_metadata'
-            )
+            rows_written = writer.write_chunks(parse_result.chunks, "source_metadata")
             assert rows_written == len(parse_result.chunks)
 
             # Write errors if any
             if parse_result.errors:
                 errors_written = writer.write_errors(
-                    parse_result.errors,
-                    'source_metadata_errors'
+                    parse_result.errors, "source_metadata_errors"
                 )
                 assert errors_written == len(parse_result.errors)
 
             # Log ingestion run
-            run_id = writer.log_ingestion_run({
-                'source_type': 'irs',
-                'files_processed': parse_result.files_processed,
-                'rows_written': rows_written,
-                'processing_duration_ms': parse_result.processing_duration_ms
-            }, 'ingestion_log')
+            run_id = writer.log_ingestion_run(
+                {
+                    "source_type": "irs",
+                    "files_processed": parse_result.files_processed,
+                    "rows_written": rows_written,
+                    "processing_duration_ms": parse_result.processing_duration_ms,
+                },
+                "ingestion_log",
+            )
 
             assert run_id is not None
 
@@ -456,22 +457,22 @@ class TestIRSIngestionIntegration:
         Ensures IRS-specific fields are populated correctly.
         """
         with pytest.raises((ImportError, NotImplementedError)):
-            from src.parsers.irs_parser import IRSParserImpl
             from src.bigquery.writer import BigQueryWriterImpl
+            from src.parsers.irs_parser import IRSParserImpl
 
             # Complete ingestion (would need implementation)
             parser = IRSParserImpl()
             writer = BigQueryWriterImpl(
-                project_id=temp_bigquery_dataset['project_id'],
-                dataset_id=temp_bigquery_dataset['dataset_id']
+                project_id=temp_bigquery_dataset["project_id"],
+                dataset_id=temp_bigquery_dataset["dataset_id"],
             )
 
             # Parse and ingest
-            result = parser.parse_file(sample_irs_files['basic'])
-            writer.write_chunks(result.chunks, 'source_metadata')
+            result = parser.parse_file(sample_irs_files["basic"])
+            writer.write_chunks(result.chunks, "source_metadata")
 
             # Query and validate data
-            client = temp_bigquery_dataset['client']
+            client = temp_bigquery_dataset["client"]
             query = f"""
             SELECT
                 source_type,
@@ -492,8 +493,8 @@ class TestIRSIngestionIntegration:
 
             # Validate IRS-specific fields
             for row in rows:
-                assert row.source_type == 'irs'
-                assert row.artifact_id.startswith('irs://')
+                assert row.source_type == "irs"
+                assert row.artifact_id.startswith("irs://")
                 assert row.irs_record_type is not None
                 assert row.irs_layout_version is not None
 
@@ -517,8 +518,10 @@ class TestIRSIngestionIntegration:
             # Each chunk should contain related fields
             for chunk in chunks:
                 # Should not split field definitions across chunks
-                lines = chunk.split('\n')
-                field_lines = [line for line in lines if '-' in line and len(line.split()) >= 4]
+                lines = chunk.split("\n")
+                field_lines = [
+                    line for line in lines if "-" in line and len(line.split()) >= 4
+                ]
 
                 # Validate field line integrity
                 for field_line in field_lines:
@@ -614,15 +617,15 @@ class TestIRSBigQueryIntegration:
             from src.bigquery.writer import BigQueryWriterImpl
 
             writer = BigQueryWriterImpl(
-                project_id=temp_bigquery_dataset['project_id'],
-                dataset_id=temp_bigquery_dataset['dataset_id']
+                project_id=temp_bigquery_dataset["project_id"],
+                dataset_id=temp_bigquery_dataset["dataset_id"],
             )
 
             # Validate interface methods exist
-            assert hasattr(writer, 'write_chunks')
-            assert hasattr(writer, 'write_errors')
-            assert hasattr(writer, 'log_ingestion_run')
-            assert hasattr(writer, 'create_tables_if_not_exist')
+            assert hasattr(writer, "write_chunks")
+            assert hasattr(writer, "write_errors")
+            assert hasattr(writer, "log_ingestion_run")
+            assert hasattr(writer, "create_tables_if_not_exist")
 
     def test_schema_compatibility(self, temp_bigquery_dataset):
         """

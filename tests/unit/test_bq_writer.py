@@ -5,29 +5,29 @@ T036: Comprehensive test coverage for BigQuery integration, schema handling, and
 Tests batch writing, error handling, schema validation, and context managers
 """
 
-import pytest
 import json
 from datetime import datetime, timezone
-from unittest.mock import Mock, patch, MagicMock, call
-from typing import List, Dict, Any
+from unittest.mock import Mock, patch
+
+import pytest
 
 # Import test dependencies
 try:
-    from google.cloud import bigquery
-    from google.cloud.exceptions import GoogleCloudError, NotFound, Conflict
     from google.api_core import exceptions
+    from google.cloud import bigquery
+    from google.cloud.exceptions import Conflict, GoogleCloudError, NotFound
 except ImportError:
     pytest.skip("Google Cloud BigQuery not available", allow_module_level=True)
 
 # Import modules under test
 from common.bq_writer import (
-    BigQueryWriter,
-    WriteResult,
     BatchConfig,
-    SourceType,
-    ErrorClass,
+    BigQueryWriter,
     ChunkMetadata,
-    ParseError
+    ErrorClass,
+    ParseError,
+    SourceType,
+    WriteResult,
 )
 
 
@@ -42,7 +42,7 @@ class TestWriteResult:
             processing_time_ms=1500,
             run_id="01H8XY2K3MNBQJFGASDFGHJKLQ",
             table_name="source_metadata",
-            success=True
+            success=True,
         )
 
         assert result.rows_written == 100
@@ -62,7 +62,7 @@ class TestWriteResult:
             run_id="01H8XY2K3MNBQJFGASDFGHJKLQ",
             table_name="source_metadata",
             success=False,
-            error_message="Connection timeout"
+            error_message="Connection timeout",
         )
 
         assert result.success is False
@@ -89,7 +89,7 @@ class TestBatchConfig:
             max_retries=5,
             retry_delay_seconds=2.0,
             timeout_seconds=600,
-            use_storage_write_api=False
+            use_storage_write_api=False,
         )
 
         assert config.batch_size == 500
@@ -102,7 +102,7 @@ class TestBatchConfig:
 class TestBigQueryWriter:
     """Test BigQuery writer functionality"""
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_initialization_default(self, mock_client_class):
         """Test BigQueryWriter initialization with defaults"""
         mock_client = Mock()
@@ -117,7 +117,7 @@ class TestBigQueryWriter:
         assert writer.client == mock_client
         mock_client_class.assert_called_once_with(project="konveyn2ai")
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_initialization_custom(self, mock_client_class):
         """Test BigQueryWriter initialization with custom values"""
         mock_client = Mock()
@@ -128,7 +128,7 @@ class TestBigQueryWriter:
             project_id="test-project",
             dataset_id="test_dataset",
             location="EU",
-            batch_config=custom_config
+            batch_config=custom_config,
         )
 
         assert writer.project_id == "test-project"
@@ -137,8 +137,10 @@ class TestBigQueryWriter:
         assert writer.batch_config.batch_size == 500
         assert writer.batch_config.max_retries == 5
 
-    @patch.dict('os.environ', {'BQ_PROJECT': 'env-project', 'BQ_DATASET': 'env_dataset'})
-    @patch('common.bq_writer.bigquery.Client')
+    @patch.dict(
+        "os.environ", {"BQ_PROJECT": "env-project", "BQ_DATASET": "env_dataset"}
+    )
+    @patch("common.bq_writer.bigquery.Client")
     def test_initialization_from_env(self, mock_client_class):
         """Test BigQueryWriter initialization from environment variables"""
         mock_client = Mock()
@@ -149,7 +151,7 @@ class TestBigQueryWriter:
         assert writer.project_id == "env-project"
         assert writer.dataset_id == "env_dataset"
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_setup_table_schemas(self, mock_client_class):
         """Test table schema setup"""
         mock_client = Mock()
@@ -167,15 +169,23 @@ class TestBigQueryWriter:
         field_names = [field.name for field in source_metadata_schema]
 
         expected_fields = [
-            "source_type", "artifact_id", "parent_id", "parent_type",
-            "content_text", "content_tokens", "content_hash", "source_uri",
-            "repo_ref", "collected_at", "source_metadata"
+            "source_type",
+            "artifact_id",
+            "parent_id",
+            "parent_type",
+            "content_text",
+            "content_tokens",
+            "content_hash",
+            "source_uri",
+            "repo_ref",
+            "collected_at",
+            "source_metadata",
         ]
 
         for field in expected_fields:
             assert field in field_names
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_create_dataset_if_not_exists_new(self, mock_client_class):
         """Test dataset creation when dataset doesn't exist"""
         mock_client = Mock()
@@ -193,7 +203,7 @@ class TestBigQueryWriter:
         mock_client.get_dataset.assert_called_once()
         mock_client.create_dataset.assert_called_once()
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_create_dataset_if_not_exists_existing(self, mock_client_class):
         """Test dataset creation when dataset already exists"""
         mock_client = Mock()
@@ -210,7 +220,7 @@ class TestBigQueryWriter:
         mock_client.get_dataset.assert_called_once()
         mock_client.create_dataset.assert_not_called()
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_create_tables_if_not_exist(self, mock_client_class):
         """Test table creation"""
         mock_client = Mock()
@@ -232,7 +242,7 @@ class TestBigQueryWriter:
         # Should call create_table for each schema
         assert mock_client.create_table.call_count == len(writer.schemas)
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_chunk_to_row_conversion(self, mock_client_class):
         """Test ChunkMetadata to row conversion"""
         mock_client = Mock()
@@ -251,7 +261,7 @@ class TestBigQueryWriter:
             source_uri="file:///manifests/deployment.yaml",
             repo_ref="main",
             collected_at=datetime(2024, 1, 15, 10, 30, 45, tzinfo=timezone.utc),
-            source_metadata={"namespace": "production", "labels": {"app": "web"}}
+            source_metadata={"namespace": "production", "labels": {"app": "web"}},
         )
 
         row = writer._chunk_to_row(chunk)
@@ -273,7 +283,7 @@ class TestBigQueryWriter:
         assert source_metadata["namespace"] == "production"
         assert source_metadata["labels"]["app"] == "web"
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_error_to_row_conversion(self, mock_client_class):
         """Test ParseError to row conversion"""
         mock_client = Mock()
@@ -288,7 +298,7 @@ class TestBigQueryWriter:
             error_msg="Syntax error in Python code",
             sample_text="def broken_func(",
             stack_trace="Traceback...",
-            collected_at=datetime(2024, 1, 15, 10, 30, 45, tzinfo=timezone.utc)
+            collected_at=datetime(2024, 1, 15, 10, 30, 45, tzinfo=timezone.utc),
         )
 
         row = writer._error_to_row(error)
@@ -304,7 +314,7 @@ class TestBigQueryWriter:
         assert isinstance(row["collected_at"], str)
         assert "2024-01-15T10:30:45" in row["collected_at"]
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_run_info_to_row_conversion(self, mock_client_class):
         """Test run info to row conversion"""
         mock_client = Mock()
@@ -323,7 +333,7 @@ class TestBigQueryWriter:
             "errors_encountered": 2,
             "processing_duration_ms": 300000,
             "config_used": {"batch_size": 1000},
-            "error_summary": "2 minor parsing errors"
+            "error_summary": "2 minor parsing errors",
         }
 
         row = writer._run_info_to_row(run_info)
@@ -346,7 +356,7 @@ class TestBigQueryWriter:
         config = json.loads(row["config_used"])
         assert config["batch_size"] == 1000
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_batch_iterator(self, mock_client_class):
         """Test batch iterator functionality"""
         mock_client = Mock()
@@ -365,7 +375,7 @@ class TestBigQueryWriter:
         assert batches[1] == list(range(10, 20))
         assert batches[2] == list(range(20, 25))
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_clustering_fields(self, mock_client_class):
         """Test clustering fields configuration"""
         mock_client = Mock()
@@ -389,7 +399,7 @@ class TestBigQueryWriter:
         clustering = writer._get_clustering_fields("unknown_table")
         assert clustering is None
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_partitioning(self, mock_client_class):
         """Test table partitioning configuration"""
         mock_client = Mock()
@@ -421,7 +431,7 @@ class TestBigQueryWriter:
 class TestBigQueryWriterWriteOperations:
     """Test BigQuery writer write operations with mocking"""
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_write_chunks_success(self, mock_client_class):
         """Test successful chunk writing"""
         mock_client = Mock()
@@ -434,11 +444,11 @@ class TestBigQueryWriterWriteOperations:
             processing_time_ms=500,
             run_id="test-run-id",
             table_name="source_metadata",
-            success=True
+            success=True,
         )
 
         writer = BigQueryWriter()
-        with patch.object(writer, '_write_batch', return_value=mock_write_result):
+        with patch.object(writer, "_write_batch", return_value=mock_write_result):
             chunks = [
                 ChunkMetadata(
                     source_type=SourceType.KUBERNETES,
@@ -446,7 +456,7 @@ class TestBigQueryWriterWriteOperations:
                     content_text="apiVersion: v1",
                     content_hash="hash1",
                     source_uri="file:///test.yaml",
-                    collected_at=datetime.now(timezone.utc)
+                    collected_at=datetime.now(timezone.utc),
                 ),
                 ChunkMetadata(
                     source_type=SourceType.FASTAPI,
@@ -454,8 +464,8 @@ class TestBigQueryWriterWriteOperations:
                     content_text="from fastapi import FastAPI",
                     content_hash="hash2",
                     source_uri="file:///api.py",
-                    collected_at=datetime.now(timezone.utc)
-                )
+                    collected_at=datetime.now(timezone.utc),
+                ),
             ]
 
             result = writer.write_chunks(chunks, "test-run-id")
@@ -465,7 +475,7 @@ class TestBigQueryWriterWriteOperations:
             assert result.errors_count == 0
             assert result.table_name == "source_metadata"
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_write_errors_success(self, mock_client_class):
         """Test successful error writing"""
         mock_client = Mock()
@@ -478,18 +488,18 @@ class TestBigQueryWriterWriteOperations:
             processing_time_ms=300,
             run_id="test-run-id",
             table_name="source_metadata_errors",
-            success=True
+            success=True,
         )
 
         writer = BigQueryWriter()
-        with patch.object(writer, '_write_batch', return_value=mock_write_result):
+        with patch.object(writer, "_write_batch", return_value=mock_write_result):
             errors = [
                 ParseError(
                     source_type=SourceType.COBOL,
                     source_uri="file:///copybook.cbl",
                     error_class=ErrorClass.PARSING,
                     error_msg="Invalid COBOL syntax",
-                    collected_at=datetime.now(timezone.utc)
+                    collected_at=datetime.now(timezone.utc),
                 )
             ]
 
@@ -499,7 +509,7 @@ class TestBigQueryWriterWriteOperations:
             assert result.rows_written == 1
             assert result.table_name == "source_metadata_errors"
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_log_ingestion_run_success(self, mock_client_class):
         """Test successful ingestion run logging"""
         mock_client = Mock()
@@ -512,17 +522,17 @@ class TestBigQueryWriterWriteOperations:
             processing_time_ms=200,
             run_id="test-run-id",
             table_name="ingestion_log",
-            success=True
+            success=True,
         )
 
         writer = BigQueryWriter()
-        with patch.object(writer, '_write_batch', return_value=mock_write_result):
+        with patch.object(writer, "_write_batch", return_value=mock_write_result):
             run_info = {
                 "run_id": "test-run-id",
                 "source_type": "kubernetes",
                 "started_at": datetime.now(timezone.utc),
                 "status": "completed",
-                "files_processed": 10
+                "files_processed": 10,
             }
 
             result = writer.log_ingestion_run(run_info)
@@ -531,7 +541,7 @@ class TestBigQueryWriterWriteOperations:
             assert result.rows_written == 1
             assert result.table_name == "ingestion_log"
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_ingestion_run_context_success(self, mock_client_class):
         """Test ingestion run context manager"""
         mock_client = Mock()
@@ -541,20 +551,32 @@ class TestBigQueryWriterWriteOperations:
 
         # Mock the log_ingestion_run method
         mock_start_result = WriteResult(
-            rows_written=1, errors_count=0, processing_time_ms=100,
-            run_id="test-run", table_name="ingestion_log", success=True
+            rows_written=1,
+            errors_count=0,
+            processing_time_ms=100,
+            run_id="test-run",
+            table_name="ingestion_log",
+            success=True,
         )
         mock_end_result = WriteResult(
-            rows_written=1, errors_count=0, processing_time_ms=100,
-            run_id="test-run", table_name="ingestion_log", success=True
+            rows_written=1,
+            errors_count=0,
+            processing_time_ms=100,
+            run_id="test-run",
+            table_name="ingestion_log",
+            success=True,
         )
 
-        with patch.object(writer, 'log_ingestion_run', side_effect=[mock_start_result, mock_end_result]):
+        with patch.object(
+            writer,
+            "log_ingestion_run",
+            side_effect=[mock_start_result, mock_end_result],
+        ):
             with writer.ingestion_run_context(
                 run_id="test-run",
                 source_type="kubernetes",
                 source_uri="file:///test",
-                config_used={"batch_size": 1000}
+                config_used={"batch_size": 1000},
             ) as context:
                 # Simulate some work
                 context["files_processed"] = 5
@@ -563,7 +585,7 @@ class TestBigQueryWriterWriteOperations:
             # Context manager should call log_ingestion_run twice (start and end)
             assert writer.log_ingestion_run.call_count == 2
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_ingestion_run_context_with_exception(self, mock_client_class):
         """Test ingestion run context manager with exception"""
         mock_client = Mock()
@@ -573,16 +595,20 @@ class TestBigQueryWriterWriteOperations:
 
         # Mock the log_ingestion_run method
         mock_result = WriteResult(
-            rows_written=1, errors_count=0, processing_time_ms=100,
-            run_id="test-run", table_name="ingestion_log", success=True
+            rows_written=1,
+            errors_count=0,
+            processing_time_ms=100,
+            run_id="test-run",
+            table_name="ingestion_log",
+            success=True,
         )
 
-        with patch.object(writer, 'log_ingestion_run', return_value=mock_result):
+        with patch.object(writer, "log_ingestion_run", return_value=mock_result):
             with pytest.raises(ValueError):
                 with writer.ingestion_run_context(
                     run_id="test-run",
                     source_type="kubernetes",
-                    source_uri="file:///test"
+                    source_uri="file:///test",
                 ) as context:
                     raise ValueError("Test exception")
 
@@ -599,7 +625,7 @@ class TestBigQueryWriterWriteOperations:
 class TestBigQueryWriterEdgeCases:
     """Test edge cases and error conditions"""
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_empty_chunks_list(self, mock_client_class):
         """Test writing empty chunks list"""
         mock_client = Mock()
@@ -613,7 +639,7 @@ class TestBigQueryWriterEdgeCases:
         assert result.success is True
         assert result.table_name == "source_metadata"
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_empty_errors_list(self, mock_client_class):
         """Test writing empty errors list"""
         mock_client = Mock()
@@ -627,7 +653,7 @@ class TestBigQueryWriterEdgeCases:
         assert result.success is True
         assert result.table_name == "source_metadata_errors"
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_chunk_with_none_values(self, mock_client_class):
         """Test chunk conversion with None values"""
         mock_client = Mock()
@@ -647,7 +673,7 @@ class TestBigQueryWriterEdgeCases:
             parent_type=None,
             content_tokens=None,
             repo_ref=None,
-            source_metadata=None
+            source_metadata=None,
         )
 
         row = writer._chunk_to_row(chunk)
@@ -658,7 +684,7 @@ class TestBigQueryWriterEdgeCases:
         assert row["repo_ref"] is None
         assert row["source_metadata"] is None
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_error_with_none_values(self, mock_client_class):
         """Test error conversion with None values"""
         mock_client = Mock()
@@ -674,7 +700,7 @@ class TestBigQueryWriterEdgeCases:
             collected_at=datetime.now(timezone.utc),
             # Optional fields as None
             sample_text=None,
-            stack_trace=None
+            stack_trace=None,
         )
 
         row = writer._error_to_row(error)
@@ -682,7 +708,7 @@ class TestBigQueryWriterEdgeCases:
         assert row["sample_text"] is None
         assert row["stack_trace"] is None
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_enum_serialization(self, mock_client_class):
         """Test proper enum serialization"""
         mock_client = Mock()
@@ -698,7 +724,7 @@ class TestBigQueryWriterEdgeCases:
                 content_text="test",
                 content_hash="hash",
                 source_uri="file:///test",
-                collected_at=datetime.now(timezone.utc)
+                collected_at=datetime.now(timezone.utc),
             )
 
             row = writer._chunk_to_row(chunk)
@@ -711,13 +737,13 @@ class TestBigQueryWriterEdgeCases:
                 source_uri="file:///test",
                 error_class=error_class,
                 error_msg="test error",
-                collected_at=datetime.now(timezone.utc)
+                collected_at=datetime.now(timezone.utc),
             )
 
             row = writer._error_to_row(error)
             assert row["error_class"] == error_class.value
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_large_content_handling(self, mock_client_class):
         """Test handling of large content"""
         mock_client = Mock()
@@ -734,7 +760,7 @@ class TestBigQueryWriterEdgeCases:
             content_text=large_content,
             content_hash="large_hash",
             source_uri="file:///large.yaml",
-            collected_at=datetime.now(timezone.utc)
+            collected_at=datetime.now(timezone.utc),
         )
 
         row = writer._chunk_to_row(chunk)
@@ -742,7 +768,7 @@ class TestBigQueryWriterEdgeCases:
         assert len(row["content_text"]) == 100000
         assert row["content_text"] == large_content
 
-    @patch('common.bq_writer.bigquery.Client')
+    @patch("common.bq_writer.bigquery.Client")
     def test_unicode_content_handling(self, mock_client_class):
         """Test handling of Unicode content"""
         mock_client = Mock()
@@ -758,7 +784,7 @@ class TestBigQueryWriterEdgeCases:
             content_text=unicode_content,
             content_hash="unicode_hash",
             source_uri="file:///unicode_test.py",
-            collected_at=datetime.now(timezone.utc)
+            collected_at=datetime.now(timezone.utc),
         )
 
         row = writer._chunk_to_row(chunk)

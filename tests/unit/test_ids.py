@@ -5,12 +5,11 @@ T035: Comprehensive test coverage for artifact ID generation, content hashing, a
 Tests deterministic behavior, validation utilities, and edge cases
 """
 
-import pytest
-import hashlib
 import re
 from datetime import datetime, timezone
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
 from common.ids import (
     ArtifactIDGenerator,
     ContentHashGenerator,
@@ -20,7 +19,9 @@ from common.ids import (
     generate_run_id,
     validate_artifact_id,
     validate_content_hash,
-    test_determinism as check_determinism
+)
+from common.ids import (
+    test_determinism as check_determinism,
 )
 
 
@@ -35,11 +36,7 @@ class TestArtifactIDGenerator:
     def test_generate_k8s_id(self):
         """Test Kubernetes artifact ID generation"""
         generator = ArtifactIDGenerator("kubernetes")
-        metadata = {
-            "namespace": "production",
-            "kind": "Deployment",
-            "name": "web-app"
-        }
+        metadata = {"namespace": "production", "kind": "Deployment", "name": "web-app"}
 
         result = generator.generate_artifact_id("/path/to/manifest.yaml", metadata)
         assert result == "k8s://production/Deployment/web-app"
@@ -58,7 +55,7 @@ class TestArtifactIDGenerator:
         metadata = {
             "namespace": "test@namespace",
             "kind": "Config Map",
-            "name": "app-config/v1"
+            "name": "app-config/v1",
         }
 
         result = generator.generate_artifact_id("/path/to/config.yaml", metadata)
@@ -67,10 +64,7 @@ class TestArtifactIDGenerator:
     def test_generate_fastapi_id(self):
         """Test FastAPI artifact ID generation"""
         generator = ArtifactIDGenerator("fastapi")
-        metadata = {
-            "start_line": 15,
-            "end_line": 25
-        }
+        metadata = {"start_line": 15, "end_line": 25}
 
         result = generator.generate_artifact_id("/src/api/routes.py", metadata)
         assert result == "py://api/routes.py#15-25"
@@ -80,7 +74,9 @@ class TestArtifactIDGenerator:
         generator = ArtifactIDGenerator("fastapi")
         metadata = {"start_line": 1, "end_line": 10}
 
-        result = generator.generate_artifact_id("/project/src/services/auth.py", metadata)
+        result = generator.generate_artifact_id(
+            "/project/src/services/auth.py", metadata
+        )
         assert result == "py://services/auth.py#1-10"
 
     def test_generate_cobol_id(self):
@@ -102,11 +98,7 @@ class TestArtifactIDGenerator:
     def test_generate_irs_id(self):
         """Test IRS artifact ID generation"""
         generator = ArtifactIDGenerator("irs")
-        metadata = {
-            "record_type": "IMF",
-            "layout_version": "2024",
-            "section": "header"
-        }
+        metadata = {"record_type": "IMF", "layout_version": "2024", "section": "header"}
 
         result = generator.generate_artifact_id("/layouts/imf_2024.txt", metadata)
         assert result == "irs://IMF/2024/header"
@@ -122,10 +114,7 @@ class TestArtifactIDGenerator:
     def test_generate_mumps_id(self):
         """Test MUMPS artifact ID generation"""
         generator = ArtifactIDGenerator("mumps")
-        metadata = {
-            "global_name": "PATIENT",
-            "node_path": "demographics.address"
-        }
+        metadata = {"global_name": "PATIENT", "node_path": "demographics.address"}
 
         result = generator.generate_artifact_id("/globals/patient.m", metadata)
         assert result == "mumps://PATIENT/demographics.address"
@@ -133,10 +122,7 @@ class TestArtifactIDGenerator:
     def test_generate_mumps_id_with_fallbacks(self):
         """Test MUMPS ID with fallback fields"""
         generator = ArtifactIDGenerator("mumps")
-        metadata = {
-            "file_name": "VISIT",
-            "field_path": "procedures.primary"
-        }
+        metadata = {"file_name": "VISIT", "field_path": "procedures.primary"}
 
         result = generator.generate_artifact_id("/globals/visit.m", metadata)
         assert result == "mumps://VISIT/procedures.primary"
@@ -183,7 +169,9 @@ class TestArtifactIDGenerator:
         assert generator._sanitize_path_component("app.config") == "app.config"
 
         # Test multiple underscores
-        assert generator._sanitize_path_component("test___component") == "test_component"
+        assert (
+            generator._sanitize_path_component("test___component") == "test_component"
+        )
 
         # Test leading/trailing underscores
         assert generator._sanitize_path_component("_test_") == "test"
@@ -202,7 +190,9 @@ class TestContentHashGenerator:
         assert generator.normalize_whitespace is True
         assert generator.ignore_comments is False
 
-        generator = ContentHashGenerator(normalize_whitespace=False, ignore_comments=True)
+        generator = ContentHashGenerator(
+            normalize_whitespace=False, ignore_comments=True
+        )
         assert generator.normalize_whitespace is False
         assert generator.ignore_comments is True
 
@@ -215,7 +205,7 @@ class TestContentHashGenerator:
 
         # Should be valid SHA256 hex string
         assert len(result) == 64
-        assert re.match(r'^[a-f0-9]+$', result)
+        assert re.match(r"^[a-f0-9]+$", result)
 
         # Should be deterministic
         result2 = generator.generate_content_hash(content)
@@ -249,10 +239,10 @@ spec:
 """
 
         normalized = generator._normalize_yaml_content(yaml_content)
-        lines = normalized.split('\n')
+        lines = normalized.split("\n")
 
         # Should remove empty lines and trailing whitespace
-        assert '' not in lines
+        assert "" not in lines
         assert not any(line != line.rstrip() for line in lines)
 
     def test_normalize_python_content(self):
@@ -267,10 +257,10 @@ def hello_world():
 """
 
         normalized = generator._normalize_python_content(python_content)
-        lines = normalized.split('\n')
+        lines = normalized.split("\n")
 
         # Should remove empty lines and trailing whitespace
-        assert '' not in lines
+        assert "" not in lines
         assert not any(line != line.rstrip() for line in lines if line)
 
     def test_normalize_python_content_ignore_comments(self):
@@ -290,7 +280,7 @@ def hello_world():  # This is a comment
         # Should not contain comment lines
         assert "# This is a comment" not in normalized
         assert "# Another comment" not in normalized
-        assert "print(\"Hello, World!\")" in normalized
+        assert 'print("Hello, World!")' in normalized
 
     def test_normalize_cobol_content(self):
         """Test COBOL content normalization (minimal)"""
@@ -306,7 +296,7 @@ def hello_world():  # This is a comment
 
         # Should preserve structure but remove trailing whitespace
         assert "       01  EMPLOYEE-RECORD." in normalized
-        assert not any(line != line.rstrip() for line in normalized.split('\n') if line)
+        assert not any(line != line.rstrip() for line in normalized.split("\n") if line)
 
     def test_normalize_irs_content(self):
         """Test IRS content normalization (minimal)"""
@@ -333,10 +323,10 @@ def hello_world():  # This is a comment
 """
 
         normalized = generator._normalize_mumps_content(mumps_content)
-        lines = normalized.split('\n')
+        lines = normalized.split("\n")
 
         # Should remove empty lines and trailing whitespace
-        assert '' not in lines
+        assert "" not in lines
         assert not any(line != line.rstrip() for line in lines)
 
     def test_normalize_whitespace_general(self):
@@ -348,10 +338,10 @@ def hello_world():  # This is a comment
         normalized = generator._normalize_whitespace_general(content)
 
         # Should normalize line endings and remove consecutive empty lines
-        assert '\r' not in normalized
-        assert '\n\n\n' not in normalized
+        assert "\r" not in normalized
+        assert "\n\n\n" not in normalized
         # Content should end with "Line 4" (trailing whitespace removed)
-        assert normalized.rstrip().endswith('Line 4')
+        assert normalized.rstrip().endswith("Line 4")
 
     def test_remove_comments_python(self):
         """Test Python comment removal"""
@@ -475,7 +465,9 @@ class TestFactoryFunctions:
 
     def test_create_content_hash_generator(self):
         """Test content hash generator factory"""
-        generator = create_content_hash_generator(normalize_whitespace=False, ignore_comments=True)
+        generator = create_content_hash_generator(
+            normalize_whitespace=False, ignore_comments=True
+        )
 
         assert isinstance(generator, ContentHashGenerator)
         assert generator.normalize_whitespace is False
@@ -504,7 +496,7 @@ class TestValidationUtilities:
             ("py://api/routes.py#15-25", "py"),  # Use actual py prefix
             ("cobol://employee/01-EMPLOYEE_RECORD", "cobol"),
             ("irs://IMF/2024/header", "irs"),
-            ("mumps://PATIENT/demographics", "mumps")
+            ("mumps://PATIENT/demographics", "mumps"),
         ]
 
         for artifact_id, source_type in valid_ids_with_correct_prefixes:
@@ -590,7 +582,7 @@ class TestEdgeCases:
 
         # Should still produce valid hash
         assert len(result) == 64
-        assert re.match(r'^[a-f0-9]+$', result)
+        assert re.match(r"^[a-f0-9]+$", result)
 
     def test_content_hash_unicode_content(self):
         """Test content hash with Unicode content"""
@@ -602,7 +594,7 @@ class TestEdgeCases:
 
         # Should handle Unicode properly
         assert len(result) == 64
-        assert re.match(r'^[a-f0-9]+$', result)
+        assert re.match(r"^[a-f0-9]+$", result)
 
     def test_normalize_content_unknown_source_type(self):
         """Test content normalization with unknown source type"""
@@ -630,11 +622,13 @@ class TestEdgeCases:
         result = generator._sanitize_path_component("test123-component.v1")
         assert result == "test123-component.v1"
 
-    @patch('ulid.new')
+    @patch("ulid.new")
     def test_ulid_generation_with_mock(self, mock_ulid):
         """Test ULID generation with mocked ulid library"""
         mock_ulid.return_value = MagicMock()
-        mock_ulid.return_value.__str__ = MagicMock(return_value="01H8XY2K3MNBQJFGASDFGHJKLQ")
+        mock_ulid.return_value.__str__ = MagicMock(
+            return_value="01H8XY2K3MNBQJFGASDFGHJKLQ"
+        )
 
         result = ULIDGenerator.generate()
 

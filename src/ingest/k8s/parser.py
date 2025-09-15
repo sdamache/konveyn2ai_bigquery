@@ -4,42 +4,41 @@ Implements KubernetesParserImpl class extending the contract from parser-interfa
 Uses kr8s + PyYAML for Kubernetes API integration and manifest parsing
 """
 
+import asyncio
+import logging
 import os
 import time
-import yaml
-import logging
-from typing import Dict, List, Optional, Any, Iterator, Union
+import traceback
 from datetime import datetime
 from pathlib import Path
-import asyncio
-import traceback
+from typing import Any, Optional
+
+import yaml
 
 try:
     import kr8s
     from kr8s.asyncapi import Api
+
     KR8S_AVAILABLE = True
 except ImportError:
     KR8S_AVAILABLE = False
     # Only log warning when live cluster functionality is specifically requested
     # The warning will be shown in extract_live_resources() if needed
 
-import sys
 
 # Contract interfaces (standardized import)
+# Import common utilities
+from src.common.chunking import ChunkConfig, ChunkingStrategy, ContentChunker
+from src.common.ids import ArtifactIDGenerator
+from src.common.normalize import ContentNormalizer
 from src.common.parser_interfaces import (
-    KubernetesParser,
     ChunkMetadata,
+    ErrorClass,
+    KubernetesParser,
     ParseError,
     ParseResult,
     SourceType,
-    ErrorClass,
 )
-
-# Import common utilities
-from src.common.chunking import ContentChunker, ChunkConfig, ChunkingStrategy
-from src.common.ids import ArtifactIDGenerator
-from src.common.normalize import ContentNormalizer
-from src.common.bq_writer import BigQueryWriter
 
 
 class KubernetesParserImpl(KubernetesParser):
@@ -60,23 +59,42 @@ class KubernetesParserImpl(KubernetesParser):
         super().__init__(version)
 
         # Initialize utilities
-        self.chunker = ContentChunker(ChunkConfig(
-            max_tokens=1000,
-            overlap_pct=0.15,
-            strategy=ChunkingStrategy.SEMANTIC_BLOCKS,
-            preserve_boundaries=True
-        ))
+        self.chunker = ContentChunker(
+            ChunkConfig(
+                max_tokens=1000,
+                overlap_pct=0.15,
+                strategy=ChunkingStrategy.SEMANTIC_BLOCKS,
+                preserve_boundaries=True,
+            )
+        )
         self.id_generator = ArtifactIDGenerator("kubernetes")
         self.normalizer = ContentNormalizer(preserve_semantics=True)
 
         # Kubernetes resource types that we support
         self.supported_kinds = {
-            'Pod', 'Service', 'Deployment', 'ConfigMap', 'Secret',
-            'PersistentVolume', 'PersistentVolumeClaim', 'StatefulSet',
-            'DaemonSet', 'ReplicaSet', 'Job', 'CronJob', 'Ingress',
-            'NetworkPolicy', 'ServiceAccount', 'Role', 'RoleBinding',
-            'ClusterRole', 'ClusterRoleBinding', 'HorizontalPodAutoscaler',
-            'Namespace', 'Node', 'CustomResourceDefinition'
+            "Pod",
+            "Service",
+            "Deployment",
+            "ConfigMap",
+            "Secret",
+            "PersistentVolume",
+            "PersistentVolumeClaim",
+            "StatefulSet",
+            "DaemonSet",
+            "ReplicaSet",
+            "Job",
+            "CronJob",
+            "Ingress",
+            "NetworkPolicy",
+            "ServiceAccount",
+            "Role",
+            "RoleBinding",
+            "ClusterRole",
+            "ClusterRoleBinding",
+            "HorizontalPodAutoscaler",
+            "Namespace",
+            "Node",
+            "CustomResourceDefinition",
         }
 
         # Setup logging
@@ -94,7 +112,7 @@ class KubernetesParserImpl(KubernetesParser):
 
         try:
             # Read file content
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
 
             # Parse the manifest content
@@ -111,8 +129,8 @@ class KubernetesParserImpl(KubernetesParser):
                 source_uri=file_path,
                 error_class=ErrorClass.PARSING,
                 error_msg=f"Failed to parse file: {str(e)}",
-                sample_text=content[:200] if 'content' in locals() else None,
-                stack_trace=traceback.format_exc()
+                sample_text=content[:200] if "content" in locals() else None,
+                stack_trace=traceback.format_exc(),
             )
             errors.append(error)
             self.logger.error(f"Error parsing file {file_path}: {e}")
@@ -123,7 +141,7 @@ class KubernetesParserImpl(KubernetesParser):
             chunks=chunks,
             errors=errors,
             files_processed=1,
-            processing_duration_ms=duration_ms
+            processing_duration_ms=duration_ms,
         )
 
     def parse_directory(self, directory_path: str) -> ParseResult:
@@ -139,7 +157,7 @@ class KubernetesParserImpl(KubernetesParser):
                 raise FileNotFoundError(f"Directory not found: {directory_path}")
 
             # Find all YAML/JSON files
-            patterns = ['*.yaml', '*.yml', '*.json']
+            patterns = ["*.yaml", "*.yml", "*.json"]
             manifest_files = []
             for pattern in patterns:
                 manifest_files.extend(directory.rglob(pattern))
@@ -157,7 +175,7 @@ class KubernetesParserImpl(KubernetesParser):
                         source_uri=str(file_path),
                         error_class=ErrorClass.PARSING,
                         error_msg=f"Failed to parse file: {str(e)}",
-                        stack_trace=traceback.format_exc()
+                        stack_trace=traceback.format_exc(),
                     )
                     errors.append(error)
                     self.logger.error(f"Error parsing file {file_path}: {e}")
@@ -168,7 +186,7 @@ class KubernetesParserImpl(KubernetesParser):
                 source_uri=directory_path,
                 error_class=ErrorClass.PARSING,
                 error_msg=f"Failed to parse directory: {str(e)}",
-                stack_trace=traceback.format_exc()
+                stack_trace=traceback.format_exc(),
             )
             errors.append(error)
             self.logger.error(f"Error parsing directory {directory_path}: {e}")
@@ -179,7 +197,7 @@ class KubernetesParserImpl(KubernetesParser):
             chunks=chunks,
             errors=errors,
             files_processed=files_processed,
-            processing_duration_ms=duration_ms
+            processing_duration_ms=duration_ms,
         )
 
     def validate_content(self, content: str) -> bool:
@@ -194,7 +212,7 @@ class KubernetesParserImpl(KubernetesParser):
                     continue
 
                 # Must have apiVersion and kind
-                if 'apiVersion' in doc and 'kind' in doc:
+                if "apiVersion" in doc and "kind" in doc:
                     return True
 
             return False
@@ -204,15 +222,14 @@ class KubernetesParserImpl(KubernetesParser):
         except Exception:
             return False
 
-    def parse_manifest(self, manifest_content: str) -> List[ChunkMetadata]:
+    def parse_manifest(self, manifest_content: str) -> list[ChunkMetadata]:
         """Parse individual Kubernetes manifest with multi-document support"""
         chunks = []
 
         try:
             # Normalize content
             normalized_content = self.normalizer.normalize_content(
-                manifest_content,
-                source_type="yaml"
+                manifest_content, source_type="yaml"
             )
 
             # Parse YAML documents
@@ -232,23 +249,23 @@ class KubernetesParserImpl(KubernetesParser):
                     continue
 
                 # Extract resource metadata
-                kind = document.get('kind', 'Unknown')
-                api_version = document.get('apiVersion', '')
-                metadata = document.get('metadata', {})
+                kind = document.get("kind", "Unknown")
+                api_version = document.get("apiVersion", "")
+                metadata = document.get("metadata", {})
                 if not isinstance(metadata, dict):
                     metadata = {}
-                name = metadata.get('name', f'unnamed-{doc_index}')
-                namespace = metadata.get('namespace', 'default')
+                name = metadata.get("name", f"unnamed-{doc_index}")
+                namespace = metadata.get("namespace", "default")
 
                 # Generate artifact ID
                 artifact_id = self.id_generator.generate_artifact_id(
                     source_path=f"{namespace}/{kind}/{name}",
                     metadata={
-                        'namespace': namespace,
-                        'kind': kind,
-                        'name': name,
-                        'apiVersion': api_version
-                    }
+                        "namespace": namespace,
+                        "kind": kind,
+                        "name": name,
+                        "apiVersion": api_version,
+                    },
                 )
 
                 # Convert document back to YAML for chunking
@@ -276,18 +293,20 @@ class KubernetesParserImpl(KubernetesParser):
                         source_uri="",  # Will be updated by caller
                         collected_at=datetime.utcnow(),
                         source_metadata={
-                            'kind': kind,
-                            'api_version': api_version,  # Use snake_case for consistency
-                            'namespace': namespace,
-                            'resource_name': name,  # Use resource_name as expected by tests
-                            'labels': metadata.get('labels', {}),
-                            'annotations': metadata.get('annotations', {}),
-                            'resource_version': metadata.get('resourceVersion'),  # snake_case
-                            'uid': metadata.get('uid'),
-                            'chunk_index': chunk_index,
-                            'total_chunks': len(chunk_texts),
-                            'document_index': doc_index
-                        }
+                            "kind": kind,
+                            "api_version": api_version,  # Use snake_case for consistency
+                            "namespace": namespace,
+                            "resource_name": name,  # Use resource_name as expected by tests
+                            "labels": metadata.get("labels", {}),
+                            "annotations": metadata.get("annotations", {}),
+                            "resource_version": metadata.get(
+                                "resourceVersion"
+                            ),  # snake_case
+                            "uid": metadata.get("uid"),
+                            "chunk_index": chunk_index,
+                            "total_chunks": len(chunk_texts),
+                            "document_index": doc_index,
+                        },
                     )
                     chunks.append(chunk_metadata)
 
@@ -309,10 +328,12 @@ class KubernetesParserImpl(KubernetesParser):
                 source_type=self.source_type,
                 source_uri="live-cluster",
                 error_class=ErrorClass.VALIDATION,
-                error_msg="kr8s library not available - cannot extract live resources"
+                error_msg="kr8s library not available - cannot extract live resources",
             )
             errors.append(error)
-            return ParseResult(chunks=[], errors=errors, files_processed=0, processing_duration_ms=0)
+            return ParseResult(
+                chunks=[], errors=errors, files_processed=0, processing_duration_ms=0
+            )
 
         try:
             # Run async extraction
@@ -332,7 +353,7 @@ class KubernetesParserImpl(KubernetesParser):
                 source_uri="live-cluster",
                 error_class=ErrorClass.INGESTION,
                 error_msg=f"Failed to extract live resources: {str(e)}",
-                stack_trace=traceback.format_exc()
+                stack_trace=traceback.format_exc(),
             )
             errors.append(error)
             self.logger.error(f"Error extracting live resources: {e}")
@@ -343,10 +364,12 @@ class KubernetesParserImpl(KubernetesParser):
             chunks=chunks,
             errors=errors,
             files_processed=len(chunks),
-            processing_duration_ms=duration_ms
+            processing_duration_ms=duration_ms,
         )
 
-    async def _extract_live_resources_async(self, namespace: Optional[str] = None) -> tuple[List[ChunkMetadata], List[ParseError]]:
+    async def _extract_live_resources_async(
+        self, namespace: Optional[str] = None
+    ) -> tuple[list[ChunkMetadata], list[ParseError]]:
         """Async implementation of live resource extraction"""
         chunks = []
         errors = []
@@ -368,8 +391,14 @@ class KubernetesParserImpl(KubernetesParser):
                         for resource in resources:
                             try:
                                 # Convert resource to YAML
-                                resource_dict = resource.raw if hasattr(resource, 'raw') else dict(resource)
-                                resource_yaml = yaml.dump(resource_dict, default_flow_style=False)
+                                resource_dict = (
+                                    resource.raw
+                                    if hasattr(resource, "raw")
+                                    else dict(resource)
+                                )
+                                resource_yaml = yaml.dump(
+                                    resource_dict, default_flow_style=False
+                                )
 
                                 # Parse as manifest
                                 resource_chunks = self.parse_manifest(resource_yaml)
@@ -385,7 +414,7 @@ class KubernetesParserImpl(KubernetesParser):
                                     source_type=self.source_type,
                                     source_uri=f"live://{kind}",
                                     error_class=ErrorClass.INGESTION,
-                                    error_msg=f"Failed to process live resource: {str(e)}"
+                                    error_msg=f"Failed to process live resource: {str(e)}",
                                 )
                                 errors.append(error)
 
@@ -394,7 +423,7 @@ class KubernetesParserImpl(KubernetesParser):
                             source_type=self.source_type,
                             source_uri=f"live://{kind}",
                             error_class=ErrorClass.INGESTION,
-                            error_msg=f"Failed to get resources of kind {kind}: {str(e)}"
+                            error_msg=f"Failed to get resources of kind {kind}: {str(e)}",
                         )
                         errors.append(error)
 
@@ -403,35 +432,37 @@ class KubernetesParserImpl(KubernetesParser):
                 source_type=self.source_type,
                 source_uri="live-cluster",
                 error_class=ErrorClass.INGESTION,
-                error_msg=f"Failed to connect to cluster: {str(e)}"
+                error_msg=f"Failed to connect to cluster: {str(e)}",
             )
             errors.append(error)
 
         return chunks, errors
 
-    def _is_valid_k8s_resource(self, document: Dict[str, Any]) -> bool:
+    def _is_valid_k8s_resource(self, document: dict[str, Any]) -> bool:
         """Check if document is a valid Kubernetes resource"""
         if not isinstance(document, dict):
             return False
 
         # Must have apiVersion and kind
-        if 'apiVersion' not in document or 'kind' not in document:
+        if "apiVersion" not in document or "kind" not in document:
             return False
 
         # Kind should be recognized (but we're lenient for custom resources)
-        kind = document.get('kind', '')
+        kind = document.get("kind", "")
         if kind in self.supported_kinds:
             return True
 
         # Allow custom resources if they have proper structure
-        if 'metadata' in document:
-            metadata = document['metadata']
-            if isinstance(metadata, dict) and 'name' in metadata:
+        if "metadata" in document:
+            metadata = document["metadata"]
+            if isinstance(metadata, dict) and "name" in metadata:
                 return True
 
         return False
 
-    def _chunk_k8s_manifest(self, manifest_yaml: str, document: Dict[str, Any]) -> List[str]:
+    def _chunk_k8s_manifest(
+        self, manifest_yaml: str, document: dict[str, Any]
+    ) -> list[str]:
         """Chunk Kubernetes manifest using semantic boundaries"""
         # For small manifests, return as single chunk
         if len(manifest_yaml) < 500:
@@ -439,7 +470,7 @@ class KubernetesParserImpl(KubernetesParser):
 
         # Split by major sections while preserving YAML structure
         chunks = []
-        lines = manifest_yaml.split('\n')
+        lines = manifest_yaml.split("\n")
 
         current_chunk = []
         current_section = None
@@ -453,13 +484,13 @@ class KubernetesParserImpl(KubernetesParser):
                 line_indent = len(line) - len(line.lstrip())
 
                 # Major section boundaries (top-level keys)
-                if line_indent == 0 and ':' in line and not line.startswith(' '):
+                if line_indent == 0 and ":" in line and not line.startswith(" "):
                     # Start new chunk for major sections
-                    if current_chunk and len('\n'.join(current_chunk)) > 200:
-                        chunks.append('\n'.join(current_chunk))
+                    if current_chunk and len("\n".join(current_chunk)) > 200:
+                        chunks.append("\n".join(current_chunk))
                         current_chunk = []
 
-                    current_section = stripped.split(':')[0]
+                    current_section = stripped.split(":")[0]
 
                 current_chunk.append(line)
             else:
@@ -467,11 +498,13 @@ class KubernetesParserImpl(KubernetesParser):
 
         # Add final chunk
         if current_chunk:
-            chunks.append('\n'.join(current_chunk))
+            chunks.append("\n".join(current_chunk))
 
         # If we only got one chunk, use traditional chunking
         if len(chunks) == 1:
-            chunk_results = self.chunker.chunk_content(manifest_yaml, source_type="kubernetes")
+            chunk_results = self.chunker.chunk_content(
+                manifest_yaml, source_type="kubernetes"
+            )
             return [chunk_result.content for chunk_result in chunk_results]
 
         return chunks
@@ -484,21 +517,21 @@ class KubernetesParserImpl(KubernetesParser):
     def generate_artifact_id(self, source_path: str, **kwargs) -> str:
         """Generate Kubernetes-specific artifact ID"""
         # Support both metadata dict and direct kwargs
-        metadata = kwargs.get('metadata', {})
+        metadata = kwargs.get("metadata", {})
 
         # Check for direct kwargs first, then fallback to metadata dict
         # Handle None vs empty string properly
-        namespace = kwargs.get('namespace')
+        namespace = kwargs.get("namespace")
         if namespace is None:
-            namespace = metadata.get('namespace', 'default')
+            namespace = metadata.get("namespace", "default")
 
-        kind = kwargs.get('kind')
+        kind = kwargs.get("kind")
         if kind is None:
-            kind = metadata.get('kind', 'Unknown')
+            kind = metadata.get("kind", "Unknown")
 
-        name = kwargs.get('name')
+        name = kwargs.get("name")
         if name is None:
-            name = metadata.get('name', 'unnamed')
+            name = metadata.get("name", "unnamed")
 
         return f"k8s://{namespace}/{kind}/{name}"
 
@@ -514,12 +547,20 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Kubernetes manifest parser")
-    parser.add_argument('--source', required=True, help='Source file or directory')
-    parser.add_argument('--live', action='store_true', help='Extract from live cluster')
-    parser.add_argument('--namespace', help='Kubernetes namespace (for live extraction)')
-    parser.add_argument('--dry-run', action='store_true', help='Show what would be processed')
-    parser.add_argument('--output', default='console', choices=['console', 'json', 'bigquery'])
-    parser.add_argument('--version', action='version', version='Kubernetes Parser 1.0.0')
+    parser.add_argument("--source", required=True, help="Source file or directory")
+    parser.add_argument("--live", action="store_true", help="Extract from live cluster")
+    parser.add_argument(
+        "--namespace", help="Kubernetes namespace (for live extraction)"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Show what would be processed"
+    )
+    parser.add_argument(
+        "--output", default="console", choices=["console", "json", "bigquery"]
+    )
+    parser.add_argument(
+        "--version", action="version", version="Kubernetes Parser 1.0.0"
+    )
 
     args = parser.parse_args()
 
@@ -541,7 +582,7 @@ def main():
         return 1
 
     # Output results
-    if args.output == 'console':
+    if args.output == "console":
         print(f"Processed {result.files_processed} files")
         print(f"Generated {len(result.chunks)} chunks")
         print(f"Encountered {len(result.errors)} errors")
@@ -552,18 +593,19 @@ def main():
             for error in result.errors:
                 print(f"  - {error.error_msg}")
 
-    elif args.output == 'json':
+    elif args.output == "json":
         import json
+
         output = {
-            'chunks_count': len(result.chunks),
-            'errors_count': len(result.errors),
-            'files_processed': result.files_processed,
-            'processing_duration_ms': result.processing_duration_ms
+            "chunks_count": len(result.chunks),
+            "errors_count": len(result.errors),
+            "files_processed": result.files_processed,
+            "processing_duration_ms": result.processing_duration_ms,
         }
         print(json.dumps(output, indent=2))
 
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     exit(main())

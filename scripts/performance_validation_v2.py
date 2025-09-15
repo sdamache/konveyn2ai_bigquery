@@ -6,27 +6,24 @@ T037: Process 100+ files per source type within 5 minutes
 Validates ingestion performance across all 5 parser types using template files
 """
 
-import sys
-import os
-import time
-import tempfile
-import shutil
-from pathlib import Path
-from typing import Dict, List, Tuple
 import logging
-from datetime import datetime, timezone
+import os
+import shutil
+import sys
+import tempfile
+import time
+from pathlib import Path
 
 # Add src to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-
-from ingest.k8s.parser import KubernetesParserImpl
-from ingest.fastapi.parser import FastAPIParserImpl
-from ingest.cobol.parser import COBOLParserImpl
-from ingest.irs.parser import IRSParserImpl
-from ingest.mumps.parser import MUMPSParserImpl
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 # Import BigQuery writer for ingestion
 from common.bq_writer import BigQueryWriter
+from ingest.cobol.parser import COBOLParserImpl
+from ingest.fastapi.parser import FastAPIParserImpl
+from ingest.irs.parser import IRSParserImpl
+from ingest.k8s.parser import KubernetesParserImpl
+from ingest.mumps.parser import MUMPSParserImpl
 
 
 class TemplateBasedPerformanceValidator:
@@ -40,16 +37,14 @@ class TemplateBasedPerformanceValidator:
 
         # Setup logging
         logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s'
+            level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
         )
         self.logger = logging.getLogger(__name__)
 
         # Initialize BigQuery writer for ingestion if needed
         if self.with_bigquery:
             self.bq_writer = BigQueryWriter(
-                project_id='konveyn2ai',
-                dataset_id='source_ingestion'
+                project_id="konveyn2ai", dataset_id="source_ingestion"
             )
 
         # Performance targets
@@ -58,7 +53,9 @@ class TemplateBasedPerformanceValidator:
         self.TARGET_TOTAL_TIME_SECONDS = self.TARGET_TOTAL_TIME_MINUTES * 60
 
         # Template directory
-        self.template_dir = Path(__file__).parent.parent / "examples" / "performance_templates"
+        self.template_dir = (
+            Path(__file__).parent.parent / "examples" / "performance_templates"
+        )
 
         # Verify templates exist
         self._verify_templates()
@@ -70,7 +67,7 @@ class TemplateBasedPerformanceValidator:
             "fastapi_template.py",
             "cobol_template.cbl",
             "irs_template.txt",
-            "mumps_template.m"
+            "mumps_template.m",
         ]
 
         missing = []
@@ -95,7 +92,7 @@ class TemplateBasedPerformanceValidator:
             "fastapi": Path(self.temp_dir) / "fastapi",
             "cobol": Path(self.temp_dir) / "cobol",
             "irs": Path(self.temp_dir) / "irs",
-            "mumps": Path(self.temp_dir) / "mumps"
+            "mumps": Path(self.temp_dir) / "mumps",
         }
 
         for source_type, dir_path in self.test_dirs.items():
@@ -103,14 +100,16 @@ class TemplateBasedPerformanceValidator:
 
     def generate_test_files(self):
         """Generate test files for each source type using templates"""
-        self.logger.info(f"Generating {self.TARGET_FILES_PER_SOURCE} files per source type...")
+        self.logger.info(
+            f"Generating {self.TARGET_FILES_PER_SOURCE} files per source type..."
+        )
 
         generators = {
             "kubernetes": self._generate_from_k8s_template,
             "fastapi": self._generate_from_fastapi_template,
             "cobol": self._generate_from_cobol_template,
             "irs": self._generate_from_irs_template,
-            "mumps": self._generate_from_mumps_template
+            "mumps": self._generate_from_mumps_template,
         }
 
         for source_type, generator in generators.items():
@@ -141,7 +140,7 @@ class TemplateBasedPerformanceValidator:
                 LIVENESS_DELAY=30 + (i % 60),
                 LIVENESS_PERIOD=10 + (i % 20),
                 READINESS_DELAY=5 + (i % 15),
-                READINESS_PERIOD=5 + (i % 10)
+                READINESS_PERIOD=5 + (i % 10),
             )
 
             file_path = output_dir / f"deployment_{str(i).zfill(3)}.yaml"
@@ -157,7 +156,7 @@ class TemplateBasedPerformanceValidator:
                 ITEM_ID="{item_id}",  # Keep as placeholder for FastAPI path parameter
                 MAX_ITEM_ID=10000,
                 ID_OFFSET=i * 1000,
-                PORT=8000 + i
+                PORT=8000 + i,
             )
 
             file_path = output_dir / f"api_module_{str(i).zfill(3)}.py"
@@ -168,10 +167,7 @@ class TemplateBasedPerformanceValidator:
         template = self._load_template("cobol_template.cbl")
 
         for i in range(self.TARGET_FILES_PER_SOURCE):
-            content = template.format(
-                ID=str(i).zfill(3),
-                FILLER_SIZE=50 + (i % 50)
-            )
+            content = template.format(ID=str(i).zfill(3), FILLER_SIZE=50 + (i % 50))
 
             file_path = output_dir / f"record_{str(i).zfill(3)}.cbl"
             file_path.write_text(content)
@@ -193,7 +189,7 @@ class TemplateBasedPerformanceValidator:
                 DLN_NUMBER=f"{tax_year}{str(i % 365).zfill(3)}{str(i % 999).zfill(3)}",
                 CYCLE_CODE=f"{tax_year}{str(i % 52 + 1).zfill(2)}01",
                 AGI_LOW=f"{i * 1000:,}",
-                AGI_HIGH=f"{i * 1000 + 50000:,}"
+                AGI_HIGH=f"{i * 1000 + 50000:,}",
             )
 
             file_path = output_dir / f"imf_layout_{str(i).zfill(3)}.txt"
@@ -213,13 +209,13 @@ class TemplateBasedPerformanceValidator:
                 TEST_ID_3=3000 + i,
                 SCORE_1=85.5 + (i % 15),
                 SCORE_2=78.3 + (i % 22),
-                SCORE_3=95.7 + (i % 5)
+                SCORE_3=95.7 + (i % 5),
             )
 
             file_path = output_dir / f"vista_dd_{str(i).zfill(3)}.m"
             file_path.write_text(content)
 
-    def run_performance_test(self) -> Dict:
+    def run_performance_test(self) -> dict:
         """Run the full performance test"""
         self.logger.info("Starting performance validation test...")
 
@@ -259,12 +255,18 @@ class TemplateBasedPerformanceValidator:
                             # Generate run_id for this ingestion
                             run_id = f"perf_test_{source_type}_{int(time.time())}"
                             result = self.bq_writer.write_chunks(all_chunks, run_id)
-                            self.logger.info(f"  Ingested to BigQuery: {successful_files} files, {chunks_processed} chunks, {result.rows_written} rows written")
+                            self.logger.info(
+                                f"  Ingested to BigQuery: {successful_files} files, {chunks_processed} chunks, {result.rows_written} rows written"
+                            )
                         except Exception as e:
-                            self.logger.warning(f"Error writing to BigQuery for {source_type}: {e}")
+                            self.logger.warning(
+                                f"Error writing to BigQuery for {source_type}: {e}"
+                            )
 
                 except Exception as e:
-                    self.logger.warning(f"Error with BigQuery ingestion for {source_type}: {e}")
+                    self.logger.warning(
+                        f"Error with BigQuery ingestion for {source_type}: {e}"
+                    )
             else:
                 # Original parsing-only logic
                 for file_path in files:
@@ -284,12 +286,18 @@ class TemplateBasedPerformanceValidator:
                 "files_attempted": len(files),
                 "chunks_created": chunks_processed,
                 "duration_seconds": source_duration,
-                "files_per_second": successful_files / source_duration if source_duration > 0 else 0,
-                "chunks_per_second": chunks_processed / source_duration if source_duration > 0 else 0,
-                "success_rate": successful_files / len(files) if files else 0
+                "files_per_second": (
+                    successful_files / source_duration if source_duration > 0 else 0
+                ),
+                "chunks_per_second": (
+                    chunks_processed / source_duration if source_duration > 0 else 0
+                ),
+                "success_rate": successful_files / len(files) if files else 0,
             }
 
-            self.logger.info(f"{source_type}: {successful_files}/{len(files)} files, {chunks_processed} chunks in {source_duration:.2f}s")
+            self.logger.info(
+                f"{source_type}: {successful_files}/{len(files)} files, {chunks_processed} chunks in {source_duration:.2f}s"
+            )
 
         total_end_time = time.time()
         total_duration = total_end_time - total_start_time
@@ -303,9 +311,18 @@ class TemplateBasedPerformanceValidator:
             "total_chunks": total_chunks,
             "total_duration_seconds": total_duration,
             "total_duration_minutes": total_duration / 60,
-            "overall_files_per_second": total_files / total_duration if total_duration > 0 else 0,
-            "overall_chunks_per_second": total_chunks / total_duration if total_duration > 0 else 0,
-            "overall_success_rate": sum(r["success_rate"] for r in self.results.values() if r["success_rate"] is not None) / 5
+            "overall_files_per_second": (
+                total_files / total_duration if total_duration > 0 else 0
+            ),
+            "overall_chunks_per_second": (
+                total_chunks / total_duration if total_duration > 0 else 0
+            ),
+            "overall_success_rate": sum(
+                r["success_rate"]
+                for r in self.results.values()
+                if r["success_rate"] is not None
+            )
+            / 5,
         }
 
         return self.results
@@ -317,11 +334,11 @@ class TemplateBasedPerformanceValidator:
             "fastapi": FastAPIParserImpl(),
             "cobol": COBOLParserImpl(),
             "irs": IRSParserImpl(),
-            "mumps": MUMPSParserImpl()
+            "mumps": MUMPSParserImpl(),
         }
         return parsers[source_type]
 
-    def evaluate_performance(self) -> Dict:
+    def evaluate_performance(self) -> dict:
         """Evaluate if performance targets were met"""
         totals = self.results["totals"]
 
@@ -339,15 +356,17 @@ class TemplateBasedPerformanceValidator:
             },
             "targets_met": {
                 "files_per_source": all(
-                    self.results[source]["files_processed"] >= self.TARGET_FILES_PER_SOURCE
+                    self.results[source]["files_processed"]
+                    >= self.TARGET_FILES_PER_SOURCE
                     for source in ["kubernetes", "fastapi", "cobol", "irs", "mumps"]
                 ),
-                "total_time": totals["total_duration_minutes"] <= self.TARGET_TOTAL_TIME_MINUTES,
+                "total_time": totals["total_duration_minutes"]
+                <= self.TARGET_TOTAL_TIME_MINUTES,
                 "success_rates": all(
                     self.results[source]["success_rate"] >= 0.95  # 95% success rate
                     for source in ["kubernetes", "fastapi", "cobol", "irs", "mumps"]
-                )
-            }
+                ),
+            },
         }
 
         evaluation["overall_success"] = all(evaluation["targets_met"].values())
@@ -362,15 +381,17 @@ class TemplateBasedPerformanceValidator:
 
     def print_results(self):
         """Print performance test results"""
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("PERFORMANCE VALIDATION RESULTS")
-        print("="*80)
+        print("=" * 80)
 
         # Per-source results
         for source_type in ["kubernetes", "fastapi", "cobol", "irs", "mumps"]:
             result = self.results[source_type]
             print(f"\n{source_type.upper()}:")
-            print(f"  Files processed: {result['files_processed']}/{result['files_attempted']} ({result['success_rate']:.1%})")
+            print(
+                f"  Files processed: {result['files_processed']}/{result['files_attempted']} ({result['success_rate']:.1%})"
+            )
             print(f"  Chunks created: {result['chunks_created']}")
             print(f"  Duration: {result['duration_seconds']:.2f}s")
             print(f"  Files/sec: {result['files_per_second']:.2f}")
@@ -378,7 +399,7 @@ class TemplateBasedPerformanceValidator:
 
         # Totals
         totals = self.results["totals"]
-        print(f"\nTOTALS:")
+        print("\nTOTALS:")
         print(f"  Total files: {totals['total_files']}")
         print(f"  Total chunks: {totals['total_chunks']}")
         print(f"  Total duration: {totals['total_duration_minutes']:.2f} minutes")
@@ -388,44 +409,67 @@ class TemplateBasedPerformanceValidator:
 
         # Evaluation
         evaluation = self.evaluate_performance()
-        print(f"\nPERFORMANCE EVALUATION:")
-        print(f"  Target: {self.TARGET_FILES_PER_SOURCE} files per source in {self.TARGET_TOTAL_TIME_MINUTES} minutes")
-        print(f"  Files per source target met: {evaluation['targets_met']['files_per_source']}")
+        print("\nPERFORMANCE EVALUATION:")
+        print(
+            f"  Target: {self.TARGET_FILES_PER_SOURCE} files per source in {self.TARGET_TOTAL_TIME_MINUTES} minutes"
+        )
+        print(
+            f"  Files per source target met: {evaluation['targets_met']['files_per_source']}"
+        )
         print(f"  Time target met: {evaluation['targets_met']['total_time']}")
-        print(f"  Success rate target met: {evaluation['targets_met']['success_rates']}")
+        print(
+            f"  Success rate target met: {evaluation['targets_met']['success_rates']}"
+        )
         print(f"  Overall success: {evaluation['overall_success']}")
 
-        if evaluation['overall_success']:
-            print(f"\n🎉 PERFORMANCE VALIDATION PASSED!")
+        if evaluation["overall_success"]:
+            print("\n🎉 PERFORMANCE VALIDATION PASSED!")
         else:
-            print(f"\n❌ PERFORMANCE VALIDATION FAILED")
+            print("\n❌ PERFORMANCE VALIDATION FAILED")
 
             # Print specific failures
-            if not evaluation['targets_met']['files_per_source']:
+            if not evaluation["targets_met"]["files_per_source"]:
                 print("  - File count targets not met")
-            if not evaluation['targets_met']['total_time']:
+            if not evaluation["targets_met"]["total_time"]:
                 print("  - Time target exceeded")
-            if not evaluation['targets_met']['success_rates']:
+            if not evaluation["targets_met"]["success_rates"]:
                 print("  - Success rate targets not met")
 
-        print("="*80)
+        print("=" * 80)
 
 
 def main():
     """Main entry point"""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Performance validation for M1 Multi-Source Ingestion")
-    parser.add_argument("--no-dry-run", action="store_true", help="Run with actual BigQuery writes")
-    parser.add_argument("--with-bigquery", action="store_true", help="Ingest data into BigQuery (for T038 validation)")
-    parser.add_argument("--files-per-source", type=int, default=100, help="Number of files per source type")
-    parser.add_argument("--target-minutes", type=int, default=5, help="Target completion time in minutes")
+    parser = argparse.ArgumentParser(
+        description="Performance validation for M1 Multi-Source Ingestion"
+    )
+    parser.add_argument(
+        "--no-dry-run", action="store_true", help="Run with actual BigQuery writes"
+    )
+    parser.add_argument(
+        "--with-bigquery",
+        action="store_true",
+        help="Ingest data into BigQuery (for T038 validation)",
+    )
+    parser.add_argument(
+        "--files-per-source",
+        type=int,
+        default=100,
+        help="Number of files per source type",
+    )
+    parser.add_argument(
+        "--target-minutes",
+        type=int,
+        default=5,
+        help="Target completion time in minutes",
+    )
 
     args = parser.parse_args()
 
     validator = TemplateBasedPerformanceValidator(
-        dry_run=not args.no_dry_run,
-        with_bigquery=args.with_bigquery
+        dry_run=not args.no_dry_run, with_bigquery=args.with_bigquery
     )
     validator.TARGET_FILES_PER_SOURCE = args.files_per_source
     validator.TARGET_TOTAL_TIME_MINUTES = args.target_minutes

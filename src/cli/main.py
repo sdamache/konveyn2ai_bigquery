@@ -3,23 +3,23 @@ Main CLI entrypoint for M1 multi-source ingestion
 T029: Provides standardized command-line interface with argument parsing, dry-run support, and output formatting
 """
 
-import os
-import sys
 import argparse
 import json
-from typing import Dict, Any, Optional, List
-from pathlib import Path
+import os
+import sys
 import time
+from typing import Any
 
-from common.logging import setup_logging, get_logger, log_cli_command, LogCategory
 from common import generate_run_id
+from common.logging import LogCategory, log_cli_command, setup_logging
+
 from .commands import (
-    ingest_kubernetes,
-    ingest_fastapi,
     ingest_cobol,
+    ingest_fastapi,
     ingest_irs,
+    ingest_kubernetes,
     ingest_mumps,
-    setup_environment
+    setup_environment,
 )
 
 
@@ -53,33 +53,30 @@ Environment Variables:
   LOG_LEVEL           Logging level: DEBUG, INFO, WARNING, ERROR (default: INFO)
   LOG_FILE            Log file path (default: console only)
   LOG_CONSOLE         Enable console logging: true/false (default: true)
-        """
+        """,
     )
 
     # Global options
-    parser.add_argument(
-        "--version",
-        action="version",
-        version="%(prog)s 1.0.0"
-    )
+    parser.add_argument("--version", action="version", version="%(prog)s 1.0.0")
 
     parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         default=os.getenv("LOG_LEVEL", "INFO"),
-        help="Set logging level"
+        help="Set logging level",
     )
 
     parser.add_argument(
         "--log-file",
         default=os.getenv("LOG_FILE"),
-        help="Log to file instead of console"
+        help="Log to file instead of console",
     )
 
     parser.add_argument(
-        "--quiet", "-q",
+        "--quiet",
+        "-q",
         action="store_true",
-        help="Suppress console output (except errors)"
+        help="Suppress console output (except errors)",
     )
 
     # Create subparsers for commands
@@ -87,13 +84,12 @@ Environment Variables:
         dest="command",
         title="Commands",
         description="Available ingestion commands",
-        help="Use <command> --help for command-specific options"
+        help="Use <command> --help for command-specific options",
     )
 
     # Setup command
     setup_parser = subparsers.add_parser(
-        "setup",
-        help="Setup environment and create BigQuery tables"
+        "setup", help="Setup environment and create BigQuery tables"
     )
     add_bigquery_args(setup_parser)
 
@@ -101,101 +97,81 @@ Environment Variables:
     def add_ingestion_args(cmd_parser):
         """Add common arguments for ingestion commands"""
         cmd_parser.add_argument(
-            "--source", "-s",
-            required=True,
-            help="Source file or directory to ingest"
+            "--source", "-s", required=True, help="Source file or directory to ingest"
         )
 
         cmd_parser.add_argument(
-            "--output", "-o",
+            "--output",
+            "-o",
             choices=["console", "json", "bigquery"],
             default="bigquery",
-            help="Output format (default: bigquery)"
+            help="Output format (default: bigquery)",
         )
 
         cmd_parser.add_argument(
-            "--dry-run", "-n",
+            "--dry-run",
+            "-n",
             action="store_true",
-            help="Show what would be processed without executing"
+            help="Show what would be processed without executing",
         )
 
         cmd_parser.add_argument(
-            "--max-rows",
-            type=int,
-            help="Limit number of rows to process"
+            "--max-rows", type=int, help="Limit number of rows to process"
         )
 
         cmd_parser.add_argument(
             "--run-id",
-            help="Custom run ID for tracking (auto-generated if not provided)"
+            help="Custom run ID for tracking (auto-generated if not provided)",
         )
 
         add_bigquery_args(cmd_parser)
 
     # Kubernetes ingestion
     k8s_parser = subparsers.add_parser(
-        "k8s",
-        aliases=["kubernetes"],
-        help="Ingest Kubernetes YAML/JSON manifests"
+        "k8s", aliases=["kubernetes"], help="Ingest Kubernetes YAML/JSON manifests"
     )
     add_ingestion_args(k8s_parser)
-    k8s_parser.add_argument(
-        "--namespace",
-        help="Filter by Kubernetes namespace"
-    )
+    k8s_parser.add_argument("--namespace", help="Filter by Kubernetes namespace")
     k8s_parser.add_argument(
         "--live-cluster",
         action="store_true",
-        help="Extract from live cluster (requires kubectl access)"
+        help="Extract from live cluster (requires kubectl access)",
     )
 
     # FastAPI ingestion
     fastapi_parser = subparsers.add_parser(
-        "fastapi",
-        aliases=["api"],
-        help="Ingest FastAPI source code and OpenAPI specs"
+        "fastapi", aliases=["api"], help="Ingest FastAPI source code and OpenAPI specs"
     )
     add_ingestion_args(fastapi_parser)
     fastapi_parser.add_argument(
-        "--include-tests",
-        action="store_true",
-        help="Include test files in analysis"
+        "--include-tests", action="store_true", help="Include test files in analysis"
     )
 
     # COBOL ingestion
     cobol_parser = subparsers.add_parser(
-        "cobol",
-        help="Ingest COBOL copybooks and data definitions"
+        "cobol", help="Ingest COBOL copybooks and data definitions"
     )
     add_ingestion_args(cobol_parser)
     cobol_parser.add_argument(
         "--encoding",
         default="utf-8",
-        help="File encoding for COBOL files (default: utf-8)"
+        help="File encoding for COBOL files (default: utf-8)",
     )
 
     # IRS ingestion
-    irs_parser = subparsers.add_parser(
-        "irs",
-        help="Ingest IRS IMF record layouts"
-    )
+    irs_parser = subparsers.add_parser("irs", help="Ingest IRS IMF record layouts")
     add_ingestion_args(irs_parser)
-    irs_parser.add_argument(
-        "--layout-version",
-        help="IRS layout version identifier"
-    )
+    irs_parser.add_argument("--layout-version", help="IRS layout version identifier")
 
     # MUMPS ingestion
     mumps_parser = subparsers.add_parser(
-        "mumps",
-        aliases=["vista"],
-        help="Ingest MUMPS/VistA FileMan dictionaries"
+        "mumps", aliases=["vista"], help="Ingest MUMPS/VistA FileMan dictionaries"
     )
     add_ingestion_args(mumps_parser)
     mumps_parser.add_argument(
         "--fileman-only",
         action="store_true",
-        help="Process only FileMan dictionaries (skip globals)"
+        help="Process only FileMan dictionaries (skip globals)",
     )
 
     return parser
@@ -206,23 +182,21 @@ def add_bigquery_args(parser: argparse.ArgumentParser):
     parser.add_argument(
         "--project",
         default=os.getenv("BQ_PROJECT", "konveyn2ai"),
-        help="BigQuery project ID"
+        help="BigQuery project ID",
     )
 
     parser.add_argument(
         "--dataset",
         default=os.getenv("BQ_DATASET", "source_ingestion"),
-        help="BigQuery dataset name"
+        help="BigQuery dataset name",
     )
 
     parser.add_argument(
-        "--location",
-        default="US",
-        help="BigQuery location (default: US)"
+        "--location", default="US", help="BigQuery location (default: US)"
     )
 
 
-def format_output(result: Dict[str, Any], output_format: str) -> str:
+def format_output(result: dict[str, Any], output_format: str) -> str:
     """Format command result for output"""
     if output_format == "json":
         return json.dumps(result, indent=2, default=str)
@@ -233,25 +207,25 @@ def format_output(result: Dict[str, Any], output_format: str) -> str:
         lines.append(f"✅ Command: {result.get('command', 'unknown')}")
         lines.append(f"📊 Status: {result.get('status', 'unknown')}")
 
-        if result.get('run_id'):
+        if result.get("run_id"):
             lines.append(f"🔄 Run ID: {result['run_id']}")
 
-        if result.get('duration_ms'):
+        if result.get("duration_ms"):
             lines.append(f"⏱️  Duration: {result['duration_ms']}ms")
 
-        if result.get('files_processed'):
+        if result.get("files_processed"):
             lines.append(f"📁 Files processed: {result['files_processed']}")
 
-        if result.get('chunks_created'):
+        if result.get("chunks_created"):
             lines.append(f"🧩 Chunks created: {result['chunks_created']}")
 
-        if result.get('errors_encountered'):
+        if result.get("errors_encountered"):
             lines.append(f"❌ Errors: {result['errors_encountered']}")
 
-        if result.get('bigquery_rows'):
+        if result.get("bigquery_rows"):
             lines.append(f"💾 BigQuery rows: {result['bigquery_rows']}")
 
-        if result.get('error'):
+        if result.get("error"):
             lines.append(f"💥 Error: {result['error']}")
 
         return "\n".join(lines)
@@ -268,9 +242,7 @@ def main():
 
     # Setup logging
     logger = setup_logging(
-        log_level=args.log_level,
-        log_file=args.log_file,
-        console_output=not args.quiet
+        log_level=args.log_level, log_file=args.log_file, console_output=not args.quiet
     )
 
     # Log the command execution
@@ -282,7 +254,7 @@ def main():
         return 1
 
     # Generate run ID if not provided
-    run_id = getattr(args, 'run_id', None) or generate_run_id()
+    run_id = getattr(args, "run_id", None) or generate_run_id()
 
     try:
         start_time = time.time()
@@ -312,14 +284,16 @@ def main():
 
         # Add timing and status info
         duration_ms = int((time.time() - start_time) * 1000)
-        result.update({
-            "command": args.command,
-            "duration_ms": duration_ms,
-            "status": "success" if result.get("success", True) else "failed"
-        })
+        result.update(
+            {
+                "command": args.command,
+                "duration_ms": duration_ms,
+                "status": "success" if result.get("success", True) else "failed",
+            }
+        )
 
         # Output result
-        output = format_output(result, getattr(args, 'output', 'console'))
+        output = format_output(result, getattr(args, "output", "console"))
         if not args.quiet:
             print(output)
 
@@ -329,13 +303,15 @@ def main():
             category=LogCategory.CLI,
             run_id=run_id,
             duration_ms=duration_ms,
-            metadata=result
+            metadata=result,
         )
 
         return 0 if result.get("success", True) else 1
 
     except KeyboardInterrupt:
-        logger.warning("Command interrupted by user", category=LogCategory.CLI, run_id=run_id)
+        logger.warning(
+            "Command interrupted by user", category=LogCategory.CLI, run_id=run_id
+        )
         return 130  # Standard exit code for Ctrl+C
 
     except Exception as e:
@@ -346,7 +322,7 @@ def main():
             category=LogCategory.CLI,
             run_id=run_id,
             duration_ms=duration_ms,
-            error=e
+            error=e,
         )
 
         if not args.quiet:

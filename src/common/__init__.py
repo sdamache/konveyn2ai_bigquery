@@ -21,6 +21,18 @@ from .agent_manifest import (
     MethodSchema,
     ParameterSchema,
 )
+from .bq_writer import BatchConfig, BigQueryWriter, WriteResult, create_bigquery_writer
+
+# M1 ingestion utilities (T019-T022)
+from .chunking import ChunkConfig, ChunkResult, ContentChunker, create_chunker
+from .ids import (
+    ArtifactIDGenerator,
+    ContentHashGenerator,
+    ULIDGenerator,
+    create_artifact_id_generator,
+    create_content_hash_generator,
+    generate_run_id,
+)
 from .models import (
     AdviceRequest,
     AnswerResponse,
@@ -37,15 +49,7 @@ from .models import (
     SearchType,
     Snippet,
 )
-
-# M1 ingestion utilities (T019-T022)
-from .chunking import ContentChunker, ChunkConfig, ChunkResult, create_chunker
-from .ids import (
-    ArtifactIDGenerator, ContentHashGenerator, ULIDGenerator,
-    create_artifact_id_generator, create_content_hash_generator, generate_run_id
-)
 from .normalize import ContentNormalizer, create_normalizer, normalize_for_hashing
-from .bq_writer import BigQueryWriter, WriteResult, BatchConfig, create_bigquery_writer
 
 __version__ = "1.0.0"
 __all__ = [
@@ -70,11 +74,22 @@ __all__ = [
     "AgentManifestGenerator",
     "MethodSchema",
     "ParameterSchema",
-
     # M1 ingestion utilities (T019-T022)
-    "ContentChunker", "ChunkConfig", "ChunkResult", "create_chunker",
-    "ArtifactIDGenerator", "ContentHashGenerator", "ULIDGenerator",
-    "create_artifact_id_generator", "create_content_hash_generator", "generate_run_id",
-    "ContentNormalizer", "create_normalizer", "normalize_for_hashing",
-    "BigQueryWriter", "WriteResult", "BatchConfig", "create_bigquery_writer"
+    "ContentChunker",
+    "ChunkConfig",
+    "ChunkResult",
+    "create_chunker",
+    "ArtifactIDGenerator",
+    "ContentHashGenerator",
+    "ULIDGenerator",
+    "create_artifact_id_generator",
+    "create_content_hash_generator",
+    "generate_run_id",
+    "ContentNormalizer",
+    "create_normalizer",
+    "normalize_for_hashing",
+    "BigQueryWriter",
+    "WriteResult",
+    "BatchConfig",
+    "create_bigquery_writer",
 ]

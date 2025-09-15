@@ -7,14 +7,15 @@ Creates dataset and tables from DDL schema
 import os
 import sys
 from pathlib import Path
+
 from google.cloud import bigquery
 from google.cloud.exceptions import Conflict
 
 
 def get_env_vars():
     """Get required environment variables"""
-    project_id = os.getenv('BQ_PROJECT', 'konveyn2ai')
-    dataset_id = os.getenv('BQ_DATASET', 'source_ingestion')
+    project_id = os.getenv("BQ_PROJECT", "konveyn2ai")
+    dataset_id = os.getenv("BQ_DATASET", "source_ingestion")
 
     if not project_id:
         raise ValueError("BQ_PROJECT environment variable is required")
@@ -24,7 +25,9 @@ def get_env_vars():
     return project_id, dataset_id
 
 
-def create_dataset_if_not_exists(client: bigquery.Client, dataset_id: str, project_id: str):
+def create_dataset_if_not_exists(
+    client: bigquery.Client, dataset_id: str, project_id: str
+):
     """Create BigQuery dataset if it doesn't exist"""
     dataset_ref = bigquery.DatasetReference(project_id, dataset_id)
 
@@ -42,7 +45,7 @@ def create_dataset_if_not_exists(client: bigquery.Client, dataset_id: str, proje
     dataset.labels = {
         "environment": "hackathon",
         "milestone": "m1",
-        "purpose": "ingestion"
+        "purpose": "ingestion",
     }
 
     try:
@@ -56,12 +59,18 @@ def create_dataset_if_not_exists(client: bigquery.Client, dataset_id: str, proje
 
 def load_ddl_from_file():
     """Load DDL SQL from contracts file"""
-    ddl_path = Path(__file__).parent / "specs" / "002-m1-parse-and" / "contracts" / "bigquery-ddl.sql"
+    ddl_path = (
+        Path(__file__).parent
+        / "specs"
+        / "002-m1-parse-and"
+        / "contracts"
+        / "bigquery-ddl.sql"
+    )
 
     if not ddl_path.exists():
         raise FileNotFoundError(f"DDL file not found: {ddl_path}")
 
-    with open(ddl_path, 'r') as f:
+    with open(ddl_path) as f:
         ddl_content = f.read()
 
     return ddl_content
@@ -69,8 +78,8 @@ def load_ddl_from_file():
 
 def substitute_variables(ddl_content: str, project_id: str, dataset_id: str):
     """Substitute environment variables in DDL"""
-    ddl_content = ddl_content.replace('${BQ_PROJECT}', project_id)
-    ddl_content = ddl_content.replace('${BQ_DATASET}', dataset_id)
+    ddl_content = ddl_content.replace("${BQ_PROJECT}", project_id)
+    ddl_content = ddl_content.replace("${BQ_DATASET}", dataset_id)
     return ddl_content
 
 
@@ -80,18 +89,18 @@ def execute_ddl_statements(client: bigquery.Client, ddl_content: str):
     statements = []
     current_statement = []
 
-    for line in ddl_content.split('\n'):
+    for line in ddl_content.split("\n"):
         line = line.strip()
 
         # Skip comments and empty lines
-        if not line or line.startswith('--'):
+        if not line or line.startswith("--"):
             continue
 
         current_statement.append(line)
 
         # End of statement
-        if line.endswith(';'):
-            statement = ' '.join(current_statement).rstrip(';')
+        if line.endswith(";"):
+            statement = " ".join(current_statement).rstrip(";")
             if statement.strip():
                 statements.append(statement)
             current_statement = []
@@ -99,22 +108,30 @@ def execute_ddl_statements(client: bigquery.Client, ddl_content: str):
     # Execute each statement
     for i, statement in enumerate(statements):
         try:
-            if statement.strip().startswith('CREATE TABLE'):
+            if statement.strip().startswith("CREATE TABLE"):
                 # Extract table name for better error reporting
-                table_name = statement.split('`')[1].split('`')[0] if '`' in statement else "unknown"
+                table_name = (
+                    statement.split("`")[1].split("`")[0]
+                    if "`" in statement
+                    else "unknown"
+                )
                 print(f"Creating table {table_name}...")
 
             query_job = client.query(statement)
             query_job.result()  # Wait for completion
 
-            if 'CREATE TABLE' in statement:
-                print(f"✓ Table created successfully")
-            elif 'ALTER SCHEMA' in statement:
-                print(f"✓ Schema metadata updated")
+            if "CREATE TABLE" in statement:
+                print("✓ Table created successfully")
+            elif "ALTER SCHEMA" in statement:
+                print("✓ Schema metadata updated")
 
         except Conflict as e:
-            if 'already exists' in str(e).lower():
-                table_name = statement.split('`')[1].split('`')[0] if '`' in statement else "table"
+            if "already exists" in str(e).lower():
+                table_name = (
+                    statement.split("`")[1].split("`")[0]
+                    if "`" in statement
+                    else "table"
+                )
                 print(f"✓ Table {table_name} already exists")
             else:
                 print(f"✗ Error creating table: {e}")
@@ -127,11 +144,7 @@ def execute_ddl_statements(client: bigquery.Client, ddl_content: str):
 
 def verify_tables(client: bigquery.Client, project_id: str, dataset_id: str):
     """Verify that all required tables exist"""
-    expected_tables = [
-        'source_metadata',
-        'source_metadata_errors',
-        'ingestion_log'
-    ]
+    expected_tables = ["source_metadata", "source_metadata_errors", "ingestion_log"]
 
     dataset_ref = bigquery.DatasetReference(project_id, dataset_id)
 
@@ -143,7 +156,7 @@ def verify_tables(client: bigquery.Client, project_id: str, dataset_id: str):
         print(f"✗ Error listing tables: {e}")
         return False
 
-    print(f"\nTable verification:")
+    print("\nTable verification:")
     all_exist = True
     for table_name in expected_tables:
         if table_name in existing_tables:
@@ -167,7 +180,7 @@ def main():
 
         # Initialize BigQuery client
         client = bigquery.Client(project=project_id)
-        print(f"✓ Connected to BigQuery")
+        print("✓ Connected to BigQuery")
 
         # Create dataset
         create_dataset_if_not_exists(client, dataset_id, project_id)
@@ -183,11 +196,11 @@ def main():
 
         # Verify tables
         if verify_tables(client, project_id, dataset_id):
-            print(f"\n✅ BigQuery setup completed successfully!")
+            print("\n✅ BigQuery setup completed successfully!")
             print(f"Dataset: {project_id}.{dataset_id}")
             print(f"Access via: bq ls {dataset_id}")
         else:
-            print(f"\n⚠️  Setup completed with some missing tables")
+            print("\n⚠️  Setup completed with some missing tables")
             return 1
 
     except Exception as e:

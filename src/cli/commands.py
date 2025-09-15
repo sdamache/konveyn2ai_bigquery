@@ -3,30 +3,24 @@ CLI command implementations for M1 multi-source ingestion
 Implements the actual command logic called by main.py
 """
 
-import os
-import sys
-import time
-from typing import Dict, Any, Optional
-from pathlib import Path
 import argparse
+from pathlib import Path
+from typing import Any
 
-from common.logging import get_logger, LogCategory, create_error_handler
 from common import (
     create_bigquery_writer,
-    generate_run_id,
-    create_artifact_id_generator,
-    create_content_hash_generator
 )
+from common.logging import LogCategory, create_error_handler, get_logger
+from ingest.cobol.parser import COBOLParserImpl
+from ingest.fastapi.parser import FastAPIParserImpl
+from ingest.irs.parser import IRSParserImpl
 
 # Import parsers
 from ingest.k8s.parser import KubernetesParserImpl
-from ingest.fastapi.parser import FastAPIParserImpl
-from ingest.cobol.parser import COBOLParserImpl
-from ingest.irs.parser import IRSParserImpl
 from ingest.mumps.parser import MUMPSParserImpl
 
 
-def setup_environment(args: argparse.Namespace) -> Dict[str, Any]:
+def setup_environment(args: argparse.Namespace) -> dict[str, Any]:
     """Setup environment and create BigQuery tables"""
     logger = get_logger()
     error_handler = create_error_handler(logger)
@@ -36,8 +30,7 @@ def setup_environment(args: argparse.Namespace) -> Dict[str, Any]:
     try:
         # Create BigQuery writer and setup tables
         writer = create_bigquery_writer(
-            project_id=args.project,
-            dataset_id=args.dataset
+            project_id=args.project, dataset_id=args.dataset
         )
 
         # Create dataset if it doesn't exist
@@ -48,17 +41,18 @@ def setup_environment(args: argparse.Namespace) -> Dict[str, Any]:
 
         # Test connection
         stats = {}
-        for table_name in ["source_metadata", "source_metadata_errors", "ingestion_log"]:
+        for table_name in [
+            "source_metadata",
+            "source_metadata_errors",
+            "ingestion_log",
+        ]:
             table_stats = writer.get_table_stats(table_name)
             stats[table_name] = table_stats
 
         logger.info(
             "Environment setup completed successfully",
             category=LogCategory.SYSTEM,
-            metadata={
-                "tables_created": tables_created,
-                "table_stats": stats
-            }
+            metadata={"tables_created": tables_created, "table_stats": stats},
         )
 
         return {
@@ -67,24 +61,23 @@ def setup_environment(args: argparse.Namespace) -> Dict[str, Any]:
             "tables_created": tables_created,
             "table_stats": stats,
             "project": args.project,
-            "dataset": args.dataset
+            "dataset": args.dataset,
         }
 
     except Exception as e:
-        error_handler.handle_system_error("unknown", "setup", e, {
-            "project": args.project,
-            "dataset": args.dataset
-        })
+        error_handler.handle_system_error(
+            "unknown", "setup", e, {"project": args.project, "dataset": args.dataset}
+        )
 
         return {
             "success": False,
             "error": str(e),
             "project": args.project,
-            "dataset": args.dataset
+            "dataset": args.dataset,
         }
 
 
-def ingest_kubernetes(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
+def ingest_kubernetes(args: argparse.Namespace, run_id: str) -> dict[str, Any]:
     """Ingest Kubernetes manifests"""
     logger = get_logger()
     error_handler = create_error_handler(logger)
@@ -108,28 +101,31 @@ def ingest_kubernetes(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
 
         # Apply max rows limit
         if args.max_rows and len(result.chunks) > args.max_rows:
-            result.chunks = result.chunks[:args.max_rows]
+            result.chunks = result.chunks[: args.max_rows]
 
         # Output handling
         if args.output == "bigquery":
             # Write to BigQuery with enhanced run tracking (T031-T033)
             writer = create_bigquery_writer(
-                project_id=args.project,
-                dataset_id=args.dataset
+                project_id=args.project, dataset_id=args.dataset
             )
 
             config_used = {
                 "source_path": str(source_path),
                 "dry_run": args.dry_run,
                 "max_rows": args.max_rows,
-                "namespace": getattr(args, 'namespace', None),
-                "live_cluster": getattr(args, 'live_cluster', False)
+                "namespace": getattr(args, "namespace", None),
+                "live_cluster": getattr(args, "live_cluster", False),
             }
 
             # Use comprehensive run tracking context (T033)
-            with writer.ingestion_run_context(run_id, "kubernetes", str(source_path), config_used) as run_stats:
+            with writer.ingestion_run_context(
+                run_id, "kubernetes", str(source_path), config_used
+            ) as run_stats:
                 # Write chunks with idempotent upsert logic (T032)
-                chunk_result = writer.write_chunks(result.chunks, run_id, enable_upsert=True)
+                chunk_result = writer.write_chunks(
+                    result.chunks, run_id, enable_upsert=True
+                )
                 error_result = writer.write_errors(result.errors, run_id)
 
                 # Update run statistics for tracking
@@ -138,8 +134,11 @@ def ingest_kubernetes(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
                 run_stats["errors_encountered"] = len(result.errors)
 
             logger.log_ingestion_complete(
-                run_id, "kubernetes", str(source_path),
-                len(result.chunks), result.processing_duration_ms
+                run_id,
+                "kubernetes",
+                str(source_path),
+                len(result.chunks),
+                result.processing_duration_ms,
             )
 
             return {
@@ -150,7 +149,7 @@ def ingest_kubernetes(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
                 "errors_encountered": len(result.errors),
                 "bigquery_rows": chunk_result.rows_written,
                 "processing_duration_ms": result.processing_duration_ms,
-                "duplicates_skipped": len(result.chunks) - chunk_result.rows_written
+                "duplicates_skipped": len(result.chunks) - chunk_result.rows_written,
             }
 
         else:
@@ -161,8 +160,14 @@ def ingest_kubernetes(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
                 "files_processed": result.files_processed,
                 "chunks_created": len(result.chunks),
                 "errors_encountered": len(result.errors),
-                "chunks": [{"artifact_id": c.artifact_id, "content_length": len(c.content_text)} for c in result.chunks],
-                "processing_duration_ms": result.processing_duration_ms
+                "chunks": [
+                    {
+                        "artifact_id": c.artifact_id,
+                        "content_length": len(c.content_text),
+                    }
+                    for c in result.chunks
+                ],
+                "processing_duration_ms": result.processing_duration_ms,
             }
 
     except Exception as e:
@@ -172,11 +177,11 @@ def ingest_kubernetes(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
             "success": False,
             "run_id": run_id,
             "error": str(e),
-            "source": str(source_path)
+            "source": str(source_path),
         }
 
 
-def ingest_fastapi(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
+def ingest_fastapi(args: argparse.Namespace, run_id: str) -> dict[str, Any]:
     """Ingest FastAPI source code and specs"""
     logger = get_logger()
     error_handler = create_error_handler(logger)
@@ -200,27 +205,30 @@ def ingest_fastapi(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
 
         # Apply max rows limit
         if args.max_rows and len(result.chunks) > args.max_rows:
-            result.chunks = result.chunks[:args.max_rows]
+            result.chunks = result.chunks[: args.max_rows]
 
         # Output handling
         if args.output == "bigquery":
             # Write to BigQuery with enhanced run tracking (T031-T033)
             writer = create_bigquery_writer(
-                project_id=args.project,
-                dataset_id=args.dataset
+                project_id=args.project, dataset_id=args.dataset
             )
 
             config_used = {
                 "source_path": str(source_path),
                 "dry_run": args.dry_run,
                 "max_rows": args.max_rows,
-                "include_tests": getattr(args, 'include_tests', False)
+                "include_tests": getattr(args, "include_tests", False),
             }
 
             # Use comprehensive run tracking context (T033)
-            with writer.ingestion_run_context(run_id, "fastapi", str(source_path), config_used) as run_stats:
+            with writer.ingestion_run_context(
+                run_id, "fastapi", str(source_path), config_used
+            ) as run_stats:
                 # Write chunks with idempotent upsert logic (T032)
-                chunk_result = writer.write_chunks(result.chunks, run_id, enable_upsert=True)
+                chunk_result = writer.write_chunks(
+                    result.chunks, run_id, enable_upsert=True
+                )
                 error_result = writer.write_errors(result.errors, run_id)
 
                 # Update run statistics for tracking
@@ -229,8 +237,11 @@ def ingest_fastapi(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
                 run_stats["errors_encountered"] = len(result.errors)
 
             logger.log_ingestion_complete(
-                run_id, "fastapi", str(source_path),
-                len(result.chunks), result.processing_duration_ms
+                run_id,
+                "fastapi",
+                str(source_path),
+                len(result.chunks),
+                result.processing_duration_ms,
             )
 
             return {
@@ -241,7 +252,7 @@ def ingest_fastapi(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
                 "errors_encountered": len(result.errors),
                 "bigquery_rows": chunk_result.rows_written,
                 "processing_duration_ms": result.processing_duration_ms,
-                "duplicates_skipped": len(result.chunks) - chunk_result.rows_written
+                "duplicates_skipped": len(result.chunks) - chunk_result.rows_written,
             }
 
         else:
@@ -252,8 +263,14 @@ def ingest_fastapi(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
                 "files_processed": result.files_processed,
                 "chunks_created": len(result.chunks),
                 "errors_encountered": len(result.errors),
-                "chunks": [{"artifact_id": c.artifact_id, "content_length": len(c.content_text)} for c in result.chunks],
-                "processing_duration_ms": result.processing_duration_ms
+                "chunks": [
+                    {
+                        "artifact_id": c.artifact_id,
+                        "content_length": len(c.content_text),
+                    }
+                    for c in result.chunks
+                ],
+                "processing_duration_ms": result.processing_duration_ms,
             }
 
     except Exception as e:
@@ -263,11 +280,11 @@ def ingest_fastapi(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
             "success": False,
             "run_id": run_id,
             "error": str(e),
-            "source": str(source_path)
+            "source": str(source_path),
         }
 
 
-def ingest_cobol(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
+def ingest_cobol(args: argparse.Namespace, run_id: str) -> dict[str, Any]:
     """Ingest COBOL copybooks"""
     logger = get_logger()
     error_handler = create_error_handler(logger)
@@ -291,27 +308,30 @@ def ingest_cobol(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
 
         # Apply max rows limit
         if args.max_rows and len(result.chunks) > args.max_rows:
-            result.chunks = result.chunks[:args.max_rows]
+            result.chunks = result.chunks[: args.max_rows]
 
         # Output handling
         if args.output == "bigquery":
             # Write to BigQuery with enhanced run tracking (T031-T033)
             writer = create_bigquery_writer(
-                project_id=args.project,
-                dataset_id=args.dataset
+                project_id=args.project, dataset_id=args.dataset
             )
 
             config_used = {
                 "source_path": str(source_path),
                 "dry_run": args.dry_run,
                 "max_rows": args.max_rows,
-                "encoding": getattr(args, 'encoding', 'utf-8')
+                "encoding": getattr(args, "encoding", "utf-8"),
             }
 
             # Use comprehensive run tracking context (T033)
-            with writer.ingestion_run_context(run_id, "cobol", str(source_path), config_used) as run_stats:
+            with writer.ingestion_run_context(
+                run_id, "cobol", str(source_path), config_used
+            ) as run_stats:
                 # Write chunks with idempotent upsert logic (T032)
-                chunk_result = writer.write_chunks(result.chunks, run_id, enable_upsert=True)
+                chunk_result = writer.write_chunks(
+                    result.chunks, run_id, enable_upsert=True
+                )
                 error_result = writer.write_errors(result.errors, run_id)
 
                 # Update run statistics for tracking
@@ -320,8 +340,11 @@ def ingest_cobol(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
                 run_stats["errors_encountered"] = len(result.errors)
 
             logger.log_ingestion_complete(
-                run_id, "cobol", str(source_path),
-                len(result.chunks), result.processing_duration_ms
+                run_id,
+                "cobol",
+                str(source_path),
+                len(result.chunks),
+                result.processing_duration_ms,
             )
 
             return {
@@ -332,7 +355,7 @@ def ingest_cobol(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
                 "errors_encountered": len(result.errors),
                 "bigquery_rows": chunk_result.rows_written,
                 "processing_duration_ms": result.processing_duration_ms,
-                "duplicates_skipped": len(result.chunks) - chunk_result.rows_written
+                "duplicates_skipped": len(result.chunks) - chunk_result.rows_written,
             }
 
         else:
@@ -343,8 +366,14 @@ def ingest_cobol(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
                 "files_processed": result.files_processed,
                 "chunks_created": len(result.chunks),
                 "errors_encountered": len(result.errors),
-                "chunks": [{"artifact_id": c.artifact_id, "content_length": len(c.content_text)} for c in result.chunks],
-                "processing_duration_ms": result.processing_duration_ms
+                "chunks": [
+                    {
+                        "artifact_id": c.artifact_id,
+                        "content_length": len(c.content_text),
+                    }
+                    for c in result.chunks
+                ],
+                "processing_duration_ms": result.processing_duration_ms,
             }
 
     except Exception as e:
@@ -354,11 +383,11 @@ def ingest_cobol(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
             "success": False,
             "run_id": run_id,
             "error": str(e),
-            "source": str(source_path)
+            "source": str(source_path),
         }
 
 
-def ingest_irs(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
+def ingest_irs(args: argparse.Namespace, run_id: str) -> dict[str, Any]:
     """Ingest IRS record layouts"""
     logger = get_logger()
     error_handler = create_error_handler(logger)
@@ -382,27 +411,30 @@ def ingest_irs(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
 
         # Apply max rows limit
         if args.max_rows and len(result.chunks) > args.max_rows:
-            result.chunks = result.chunks[:args.max_rows]
+            result.chunks = result.chunks[: args.max_rows]
 
         # Output handling
         if args.output == "bigquery":
             # Write to BigQuery with enhanced run tracking (T031-T033)
             writer = create_bigquery_writer(
-                project_id=args.project,
-                dataset_id=args.dataset
+                project_id=args.project, dataset_id=args.dataset
             )
 
             config_used = {
                 "source_path": str(source_path),
                 "dry_run": args.dry_run,
                 "max_rows": args.max_rows,
-                "layout_version": getattr(args, 'layout_version', None)
+                "layout_version": getattr(args, "layout_version", None),
             }
 
             # Use comprehensive run tracking context (T033)
-            with writer.ingestion_run_context(run_id, "irs", str(source_path), config_used) as run_stats:
+            with writer.ingestion_run_context(
+                run_id, "irs", str(source_path), config_used
+            ) as run_stats:
                 # Write chunks with idempotent upsert logic (T032)
-                chunk_result = writer.write_chunks(result.chunks, run_id, enable_upsert=True)
+                chunk_result = writer.write_chunks(
+                    result.chunks, run_id, enable_upsert=True
+                )
                 error_result = writer.write_errors(result.errors, run_id)
 
                 # Update run statistics for tracking
@@ -411,8 +443,11 @@ def ingest_irs(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
                 run_stats["errors_encountered"] = len(result.errors)
 
             logger.log_ingestion_complete(
-                run_id, "irs", str(source_path),
-                len(result.chunks), result.processing_duration_ms
+                run_id,
+                "irs",
+                str(source_path),
+                len(result.chunks),
+                result.processing_duration_ms,
             )
 
             return {
@@ -423,7 +458,7 @@ def ingest_irs(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
                 "errors_encountered": len(result.errors),
                 "bigquery_rows": chunk_result.rows_written,
                 "processing_duration_ms": result.processing_duration_ms,
-                "duplicates_skipped": len(result.chunks) - chunk_result.rows_written
+                "duplicates_skipped": len(result.chunks) - chunk_result.rows_written,
             }
 
         else:
@@ -434,8 +469,14 @@ def ingest_irs(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
                 "files_processed": result.files_processed,
                 "chunks_created": len(result.chunks),
                 "errors_encountered": len(result.errors),
-                "chunks": [{"artifact_id": c.artifact_id, "content_length": len(c.content_text)} for c in result.chunks],
-                "processing_duration_ms": result.processing_duration_ms
+                "chunks": [
+                    {
+                        "artifact_id": c.artifact_id,
+                        "content_length": len(c.content_text),
+                    }
+                    for c in result.chunks
+                ],
+                "processing_duration_ms": result.processing_duration_ms,
             }
 
     except Exception as e:
@@ -445,11 +486,11 @@ def ingest_irs(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
             "success": False,
             "run_id": run_id,
             "error": str(e),
-            "source": str(source_path)
+            "source": str(source_path),
         }
 
 
-def ingest_mumps(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
+def ingest_mumps(args: argparse.Namespace, run_id: str) -> dict[str, Any]:
     """Ingest MUMPS/VistA dictionaries"""
     logger = get_logger()
     error_handler = create_error_handler(logger)
@@ -473,27 +514,30 @@ def ingest_mumps(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
 
         # Apply max rows limit
         if args.max_rows and len(result.chunks) > args.max_rows:
-            result.chunks = result.chunks[:args.max_rows]
+            result.chunks = result.chunks[: args.max_rows]
 
         # Output handling
         if args.output == "bigquery":
             # Write to BigQuery with enhanced run tracking (T031-T033)
             writer = create_bigquery_writer(
-                project_id=args.project,
-                dataset_id=args.dataset
+                project_id=args.project, dataset_id=args.dataset
             )
 
             config_used = {
                 "source_path": str(source_path),
                 "dry_run": args.dry_run,
                 "max_rows": args.max_rows,
-                "fileman_only": getattr(args, 'fileman_only', False)
+                "fileman_only": getattr(args, "fileman_only", False),
             }
 
             # Use comprehensive run tracking context (T033)
-            with writer.ingestion_run_context(run_id, "mumps", str(source_path), config_used) as run_stats:
+            with writer.ingestion_run_context(
+                run_id, "mumps", str(source_path), config_used
+            ) as run_stats:
                 # Write chunks with idempotent upsert logic (T032)
-                chunk_result = writer.write_chunks(result.chunks, run_id, enable_upsert=True)
+                chunk_result = writer.write_chunks(
+                    result.chunks, run_id, enable_upsert=True
+                )
                 error_result = writer.write_errors(result.errors, run_id)
 
                 # Update run statistics for tracking
@@ -502,8 +546,11 @@ def ingest_mumps(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
                 run_stats["errors_encountered"] = len(result.errors)
 
             logger.log_ingestion_complete(
-                run_id, "mumps", str(source_path),
-                len(result.chunks), result.processing_duration_ms
+                run_id,
+                "mumps",
+                str(source_path),
+                len(result.chunks),
+                result.processing_duration_ms,
             )
 
             return {
@@ -514,7 +561,7 @@ def ingest_mumps(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
                 "errors_encountered": len(result.errors),
                 "bigquery_rows": chunk_result.rows_written,
                 "processing_duration_ms": result.processing_duration_ms,
-                "duplicates_skipped": len(result.chunks) - chunk_result.rows_written
+                "duplicates_skipped": len(result.chunks) - chunk_result.rows_written,
             }
 
         else:
@@ -525,8 +572,14 @@ def ingest_mumps(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
                 "files_processed": result.files_processed,
                 "chunks_created": len(result.chunks),
                 "errors_encountered": len(result.errors),
-                "chunks": [{"artifact_id": c.artifact_id, "content_length": len(c.content_text)} for c in result.chunks],
-                "processing_duration_ms": result.processing_duration_ms
+                "chunks": [
+                    {
+                        "artifact_id": c.artifact_id,
+                        "content_length": len(c.content_text),
+                    }
+                    for c in result.chunks
+                ],
+                "processing_duration_ms": result.processing_duration_ms,
             }
 
     except Exception as e:
@@ -536,16 +589,21 @@ def ingest_mumps(args: argparse.Namespace, run_id: str) -> Dict[str, Any]:
             "success": False,
             "run_id": run_id,
             "error": str(e),
-            "source": str(source_path)
+            "source": str(source_path),
         }
 
 
-def _dry_run_analysis(parser, source_path: Path, source_type: str, run_id: str) -> Dict[str, Any]:
+def _dry_run_analysis(
+    parser, source_path: Path, source_type: str, run_id: str
+) -> dict[str, Any]:
     """Perform dry run analysis without actual ingestion"""
     logger = get_logger()
 
-    logger.info(f"Performing dry run analysis for {source_type}",
-                category=LogCategory.CLI, run_id=run_id)
+    logger.info(
+        f"Performing dry run analysis for {source_type}",
+        category=LogCategory.CLI,
+        run_id=run_id,
+    )
 
     try:
         files_to_process = []
@@ -575,17 +633,21 @@ def _dry_run_analysis(parser, source_path: Path, source_type: str, run_id: str) 
             "estimated_chunks": len(files_to_process) * 2,  # Rough estimate
             "total_size_bytes": total_size,
             "files": files_to_process[:10],  # Show first 10 files
-            "source_type": source_type
+            "source_type": source_type,
         }
 
     except Exception as e:
-        logger.error(f"Dry run analysis failed for {source_type}",
-                    category=LogCategory.CLI, run_id=run_id, error=e)
+        logger.error(
+            f"Dry run analysis failed for {source_type}",
+            category=LogCategory.CLI,
+            run_id=run_id,
+            error=e,
+        )
 
         return {
             "success": False,
             "run_id": run_id,
             "dry_run": True,
             "error": str(e),
-            "source_type": source_type
+            "source_type": source_type,
         }

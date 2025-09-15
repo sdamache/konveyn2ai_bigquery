@@ -5,32 +5,33 @@ These tests MUST FAIL initially (TDD requirement) until the FastAPI parser is im
 Tests the contract defined in specs/002-m1-parse-and/contracts/parser-interfaces.py
 """
 
-import pytest
 import json
-import ast
 from datetime import datetime
-from typing import Dict, List, Any
-from unittest.mock import patch, MagicMock
+
+import pytest
 
 # Register custom markers to avoid warnings
 pytest_plugins = []
 
+
 def pytest_configure(config):
     """Configure pytest markers"""
-    config.addinivalue_line("markers", "contract: Contract tests for interface compliance (TDD)")
+    config.addinivalue_line(
+        "markers", "contract: Contract tests for interface compliance (TDD)"
+    )
     config.addinivalue_line("markers", "unit: Unit tests for individual components")
+
 
 # Import the parser interface contracts via shared module
 try:
     from src.common.parser_interfaces import (
         BaseParser,
-        FastAPIParser,
-        SourceType,
         ChunkMetadata,
+        FastAPIParser,
         ParseResult,
-        ParseError,
-        ErrorClass,
+        SourceType,
     )
+
     PARSER_INTERFACES_AVAILABLE = True
 except Exception as e:
     PARSER_INTERFACES_AVAILABLE = False
@@ -39,6 +40,7 @@ except Exception as e:
 # Try to import the actual implementation (expected to fail initially)
 try:
     from src.ingest.fastapi.parser import FastAPIParserImpl
+
     FASTAPI_PARSER_AVAILABLE = True
 except ImportError:
     FASTAPI_PARSER_AVAILABLE = False
@@ -317,7 +319,7 @@ INVALID_JSON_SPEC = """
 }
 """
 
-INVALID_PYTHON_SOURCE = '''
+INVALID_PYTHON_SOURCE = """
 from fastapi import FastAPI
 
 app = FastAPI()
@@ -329,7 +331,7 @@ async def test_endpoint():  # Missing closing parenthesis
 # Syntax error - missing colon
 def invalid_function()
     pass
-'''
+"""
 
 MALFORMED_OPENAPI_SPEC = """
 {
@@ -398,47 +400,61 @@ class TestFastAPIParserContract:
 
     def test_parser_interfaces_available(self):
         """Test that parser interface contracts are available"""
-        assert PARSER_INTERFACES_AVAILABLE, "Parser interface contracts should be available"
+        assert (
+            PARSER_INTERFACES_AVAILABLE
+        ), "Parser interface contracts should be available"
 
-    @pytest.mark.skipif(not PARSER_INTERFACES_AVAILABLE, reason="Parser interfaces not available")
+    @pytest.mark.skipif(
+        not PARSER_INTERFACES_AVAILABLE, reason="Parser interfaces not available"
+    )
     def test_fastapi_parser_interface_exists(self):
         """Test that FastAPIParser abstract class exists with required methods"""
         # Verify FastAPIParser exists and inherits from BaseParser
         assert issubclass(FastAPIParser, BaseParser)
 
         # Verify required abstract methods exist
-        abstract_methods = getattr(FastAPIParser, '__abstractmethods__', set())
+        abstract_methods = getattr(FastAPIParser, "__abstractmethods__", set())
         required_methods = {
-            'parse_file',
-            'parse_directory',
-            'validate_content',
-            'parse_openapi_spec',
-            'parse_source_code'
+            "parse_file",
+            "parse_directory",
+            "validate_content",
+            "parse_openapi_spec",
+            "parse_source_code",
         }
 
         # Check that all required methods are declared as abstract
         for method in required_methods:
             assert hasattr(FastAPIParser, method), f"Method {method} should exist"
 
-    @pytest.mark.skipif(FASTAPI_PARSER_AVAILABLE, reason="Skip when implementation exists")
+    @pytest.mark.skipif(
+        FASTAPI_PARSER_AVAILABLE, reason="Skip when implementation exists"
+    )
     def test_fastapi_parser_not_implemented_yet(self):
         """Test that the actual implementation doesn't exist yet (TDD requirement)"""
-        assert not FASTAPI_PARSER_AVAILABLE, "FastAPIParserImpl should not exist yet (TDD)"
+        assert (
+            not FASTAPI_PARSER_AVAILABLE
+        ), "FastAPIParserImpl should not exist yet (TDD)"
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_fastapi_parser_inheritance(self):
         """Test that FastAPIParserImpl properly inherits from FastAPIParser"""
         assert issubclass(FastAPIParserImpl, FastAPIParser)
         assert issubclass(FastAPIParserImpl, BaseParser)
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_fastapi_parser_source_type(self):
         """Test that parser returns correct source type"""
         parser = FastAPIParserImpl()
         assert parser.source_type == SourceType.FASTAPI
         assert parser._get_source_type() == SourceType.FASTAPI
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_valid_openapi_spec(self):
         """Test parsing a valid OpenAPI specification"""
         parser = FastAPIParserImpl()
@@ -457,69 +473,89 @@ class TestFastAPIParserContract:
 
         # Verify FastAPI-specific metadata
         fastapi_metadata = chunk.source_metadata
-        assert fastapi_metadata['http_method'] in ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
-        assert 'route_path' in fastapi_metadata
-        assert 'operation_id' in fastapi_metadata
-        assert 'status_codes' in fastapi_metadata
-        assert isinstance(fastapi_metadata['status_codes'], list)
+        assert fastapi_metadata["http_method"] in [
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE",
+            "PATCH",
+        ]
+        assert "route_path" in fastapi_metadata
+        assert "operation_id" in fastapi_metadata
+        assert "status_codes" in fastapi_metadata
+        assert isinstance(fastapi_metadata["status_codes"], list)
 
         # Verify content fields
         assert chunk.content_text.strip() != ""
         assert chunk.content_hash != ""
         assert isinstance(chunk.collected_at, datetime)
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_openapi_spec_with_multiple_endpoints(self):
         """Test parsing OpenAPI spec with multiple endpoints"""
         parser = FastAPIParserImpl()
         chunks = parser.parse_openapi_spec(VALID_OPENAPI_SPEC_JSON)
 
         # Should generate chunks for all endpoints
-        assert len(chunks) >= 4  # GET /users, POST /users, GET /users/{user_id}, GET /health
+        assert (
+            len(chunks) >= 4
+        )  # GET /users, POST /users, GET /users/{user_id}, GET /health
 
         # Verify we got expected HTTP methods and paths (filter for route chunks only)
-        route_chunks = [chunk for chunk in chunks if 'http_method' in chunk.source_metadata]
-        endpoints = [(chunk.source_metadata['http_method'], chunk.source_metadata['route_path'])
-                    for chunk in route_chunks]
+        route_chunks = [
+            chunk for chunk in chunks if "http_method" in chunk.source_metadata
+        ]
+        endpoints = [
+            (chunk.source_metadata["http_method"], chunk.source_metadata["route_path"])
+            for chunk in route_chunks
+        ]
 
         expected_endpoints = [
-            ('GET', '/users'),
-            ('POST', '/users'),
-            ('GET', '/users/{user_id}'),
-            ('GET', '/health')
+            ("GET", "/users"),
+            ("POST", "/users"),
+            ("GET", "/users/{user_id}"),
+            ("GET", "/health"),
         ]
 
         for expected in expected_endpoints:
             assert expected in endpoints, f"Expected endpoint {expected} not found"
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_openapi_spec_metadata_fields(self):
         """Test that all required FastAPI metadata fields are present"""
         parser = FastAPIParserImpl()
         chunks = parser.parse_openapi_spec(VALID_OPENAPI_SPEC_JSON)
 
         # Filter for route chunks only (not schema chunks)
-        route_chunks = [chunk for chunk in chunks if 'http_method' in chunk.source_metadata]
+        route_chunks = [
+            chunk for chunk in chunks if "http_method" in chunk.source_metadata
+        ]
         assert len(route_chunks) > 0, "Should have at least one route chunk"
 
         for chunk in route_chunks:
             metadata = chunk.source_metadata
 
             # Required FastAPI fields according to the specification
-            assert 'http_method' in metadata
-            assert 'route_path' in metadata
-            assert 'operation_id' in metadata
-            assert 'status_codes' in metadata
+            assert "http_method" in metadata
+            assert "route_path" in metadata
+            assert "operation_id" in metadata
+            assert "status_codes" in metadata
 
             # Optional but expected fields
-            if 'request_model' in metadata:
-                assert isinstance(metadata['request_model'], (str, type(None)))
-            if 'response_model' in metadata:
-                assert isinstance(metadata['response_model'], (str, type(None)))
-            if 'dependencies' in metadata:
-                assert isinstance(metadata['dependencies'], list)
+            if "request_model" in metadata:
+                assert isinstance(metadata["request_model"], (str, type(None)))
+            if "response_model" in metadata:
+                assert isinstance(metadata["response_model"], (str, type(None)))
+            if "dependencies" in metadata:
+                assert isinstance(metadata["dependencies"], list)
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_valid_fastapi_source_code(self):
         """Test parsing valid FastAPI Python source code"""
         parser = FastAPIParserImpl()
@@ -529,41 +565,58 @@ class TestFastAPIParserContract:
         assert len(chunks) > 0
 
         # Should find route decorators
-        route_chunks = [chunk for chunk in chunks
-                       if 'route_path' in chunk.source_metadata]
+        route_chunks = [
+            chunk for chunk in chunks if "route_path" in chunk.source_metadata
+        ]
         assert len(route_chunks) > 0
 
         # Check a specific route chunk
-        get_users_chunk = next((chunk for chunk in route_chunks
-                               if chunk.source_metadata.get('route_path') == '/users'
-                               and chunk.source_metadata.get('http_method') == 'GET'), None)
+        get_users_chunk = next(
+            (
+                chunk
+                for chunk in route_chunks
+                if chunk.source_metadata.get("route_path") == "/users"
+                and chunk.source_metadata.get("http_method") == "GET"
+            ),
+            None,
+        )
         assert get_users_chunk is not None
 
         metadata = get_users_chunk.source_metadata
-        assert metadata['http_method'] == 'GET'
-        assert metadata['route_path'] == '/users'
-        assert 'get_users' in metadata.get('operation_id', '')
+        assert metadata["http_method"] == "GET"
+        assert metadata["route_path"] == "/users"
+        assert "get_users" in metadata.get("operation_id", "")
 
         # Verify artifact_id format includes line numbers
         assert "#" in get_users_chunk.artifact_id
         assert "-" in get_users_chunk.artifact_id.split("#")[1]
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_source_code_with_dependencies(self):
         """Test parsing source code with FastAPI dependencies"""
         parser = FastAPIParserImpl()
         chunks = parser.parse_source_code(VALID_FASTAPI_SOURCE_CODE)
 
         # Find chunk with dependencies
-        profile_chunk = next((chunk for chunk in chunks
-                             if chunk.source_metadata.get('route_path') == '/profile'), None)
+        profile_chunk = next(
+            (
+                chunk
+                for chunk in chunks
+                if chunk.source_metadata.get("route_path") == "/profile"
+            ),
+            None,
+        )
 
         if profile_chunk:  # May not be present in simple test case
             metadata = profile_chunk.source_metadata
-            assert 'dependencies' in metadata
-            assert isinstance(metadata['dependencies'], list)
+            assert "dependencies" in metadata
+            assert isinstance(metadata["dependencies"], list)
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_complex_fastapi_source(self):
         """Test parsing complex FastAPI source with advanced features"""
         parser = FastAPIParserImpl()
@@ -572,20 +625,36 @@ class TestFastAPIParserContract:
         assert len(chunks) > 0
 
         # Check for bulk endpoint (filter for route chunks only)
-        route_chunks = [chunk for chunk in chunks if 'http_method' in chunk.source_metadata]
+        route_chunks = [
+            chunk for chunk in chunks if "http_method" in chunk.source_metadata
+        ]
 
-        bulk_chunk = next((chunk for chunk in route_chunks
-                          if chunk.source_metadata.get('route_path') == '/api/v1/users/bulk'), None)
+        bulk_chunk = next(
+            (
+                chunk
+                for chunk in route_chunks
+                if chunk.source_metadata.get("route_path") == "/api/v1/users/bulk"
+            ),
+            None,
+        )
         assert bulk_chunk is not None
-        assert bulk_chunk.source_metadata['http_method'] == 'POST'
-        assert 202 in bulk_chunk.source_metadata['status_codes']
+        assert bulk_chunk.source_metadata["http_method"] == "POST"
+        assert 202 in bulk_chunk.source_metadata["status_codes"]
 
         # Check for search endpoint with query parameters
-        search_chunk = next((chunk for chunk in chunks
-                            if chunk.source_metadata.get('route_path') == '/api/v1/users/search'), None)
+        search_chunk = next(
+            (
+                chunk
+                for chunk in chunks
+                if chunk.source_metadata.get("route_path") == "/api/v1/users/search"
+            ),
+            None,
+        )
         assert search_chunk is not None
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_invalid_json_spec(self):
         """Test error handling for invalid JSON in OpenAPI spec"""
         parser = FastAPIParserImpl()
@@ -593,7 +662,9 @@ class TestFastAPIParserContract:
         with pytest.raises((json.JSONDecodeError, ValueError)):
             parser.parse_openapi_spec(INVALID_JSON_SPEC)
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_invalid_python_source(self):
         """Test error handling for invalid Python source code"""
         parser = FastAPIParserImpl()
@@ -601,7 +672,9 @@ class TestFastAPIParserContract:
         with pytest.raises((SyntaxError, ValueError)):
             parser.parse_source_code(INVALID_PYTHON_SOURCE)
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_malformed_openapi_spec(self):
         """Test handling of malformed but valid JSON OpenAPI spec"""
         parser = FastAPIParserImpl()
@@ -611,21 +684,27 @@ class TestFastAPIParserContract:
         assert isinstance(chunks, list)
         # May be empty for malformed spec with no paths
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_validate_content_valid_json(self):
         """Test content validation for valid JSON OpenAPI spec"""
         parser = FastAPIParserImpl()
 
         assert parser.validate_content(VALID_OPENAPI_SPEC_JSON) is True
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_validate_content_valid_python(self):
         """Test content validation for valid Python source code"""
         parser = FastAPIParserImpl()
 
         assert parser.validate_content(VALID_FASTAPI_SOURCE_CODE) is True
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_validate_content_invalid(self):
         """Test content validation for invalid content"""
         parser = FastAPIParserImpl()
@@ -635,7 +714,9 @@ class TestFastAPIParserContract:
         assert parser.validate_content("") is False
         assert parser.validate_content("not json or python") is False
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_file_openapi_spec(self, tmp_path):
         """Test parsing a file containing OpenAPI specification"""
         parser = FastAPIParserImpl()
@@ -656,7 +737,9 @@ class TestFastAPIParserContract:
         chunk = result.chunks[0]
         assert chunk.source_uri == str(spec_file)
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_file_python_source(self, tmp_path):
         """Test parsing a Python file with FastAPI routes"""
         parser = FastAPIParserImpl()
@@ -675,7 +758,9 @@ class TestFastAPIParserContract:
         chunk = result.chunks[0]
         assert chunk.source_uri == str(python_file)
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_directory_mixed_files(self, tmp_path):
         """Test parsing a directory with both OpenAPI specs and Python files"""
         parser = FastAPIParserImpl()
@@ -694,13 +779,15 @@ class TestFastAPIParserContract:
 
         # Verify we got chunks from different file types
         source_uris = [chunk.source_uri for chunk in result.chunks]
-        json_files = [uri for uri in source_uris if uri.endswith('.json')]
-        py_files = [uri for uri in source_uris if uri.endswith('.py')]
+        json_files = [uri for uri in source_uris if uri.endswith(".json")]
+        py_files = [uri for uri in source_uris if uri.endswith(".py")]
 
         assert len(json_files) > 0
         assert len(py_files) > 0
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_artifact_id_generation_source_code(self):
         """Test artifact ID generation for Python source code with line numbers"""
         parser = FastAPIParserImpl()
@@ -722,7 +809,9 @@ class TestFastAPIParserContract:
             assert end_line.isdigit()
             assert int(start_line) <= int(end_line)
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_artifact_id_generation_openapi_spec(self):
         """Test artifact ID generation for OpenAPI specifications"""
         parser = FastAPIParserImpl()
@@ -738,45 +827,63 @@ class TestFastAPIParserContract:
             # For OpenAPI specs, line numbers may be derived differently
             # but should still contain the # format
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_status_codes_extraction(self):
         """Test that status codes are correctly extracted from endpoints"""
         parser = FastAPIParserImpl()
         chunks = parser.parse_openapi_spec(VALID_OPENAPI_SPEC_JSON)
 
         # Find the POST /users endpoint
-        post_users_chunk = next((chunk for chunk in chunks
-                                if chunk.source_metadata.get('route_path') == '/users'
-                                and chunk.source_metadata.get('http_method') == 'POST'), None)
+        post_users_chunk = next(
+            (
+                chunk
+                for chunk in chunks
+                if chunk.source_metadata.get("route_path") == "/users"
+                and chunk.source_metadata.get("http_method") == "POST"
+            ),
+            None,
+        )
 
         assert post_users_chunk is not None
-        status_codes = post_users_chunk.source_metadata['status_codes']
+        status_codes = post_users_chunk.source_metadata["status_codes"]
         assert 201 in status_codes  # Created
         assert 422 in status_codes  # Validation error
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_request_response_model_extraction(self):
         """Test extraction of request and response models"""
         parser = FastAPIParserImpl()
         chunks = parser.parse_openapi_spec(VALID_OPENAPI_SPEC_JSON)
 
         # Find the POST /users endpoint
-        post_users_chunk = next((chunk for chunk in chunks
-                                if chunk.source_metadata.get('route_path') == '/users'
-                                and chunk.source_metadata.get('http_method') == 'POST'), None)
+        post_users_chunk = next(
+            (
+                chunk
+                for chunk in chunks
+                if chunk.source_metadata.get("route_path") == "/users"
+                and chunk.source_metadata.get("http_method") == "POST"
+            ),
+            None,
+        )
 
         assert post_users_chunk is not None
         metadata = post_users_chunk.source_metadata
 
         # Should have request and response models
-        assert 'request_model' in metadata
-        assert 'response_model' in metadata
+        assert "request_model" in metadata
+        assert "response_model" in metadata
 
         # Values should reference the schema components
-        assert 'UserCreate' in str(metadata.get('request_model', ''))
-        assert 'User' in str(metadata.get('response_model', ''))
+        assert "UserCreate" in str(metadata.get("request_model", ""))
+        assert "User" in str(metadata.get("response_model", ""))
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_content_hash_generation(self):
         """Test that content hash is generated correctly"""
         parser = FastAPIParserImpl()
@@ -791,7 +898,9 @@ class TestFastAPIParserContract:
         chunks2 = parser.parse_openapi_spec(VALID_OPENAPI_SPEC_JSON)
         assert chunks[0].content_hash == chunks2[0].content_hash
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_parse_result_structure(self):
         """Test that ParseResult has the correct structure"""
         parser = FastAPIParserImpl()
@@ -803,20 +912,29 @@ class TestFastAPIParserContract:
         chunk = chunks[0]
 
         # Required ChunkMetadata fields
-        assert hasattr(chunk, 'source_type')
-        assert hasattr(chunk, 'artifact_id')
-        assert hasattr(chunk, 'content_text')
-        assert hasattr(chunk, 'content_hash')
-        assert hasattr(chunk, 'source_metadata')
-        assert hasattr(chunk, 'collected_at')
+        assert hasattr(chunk, "source_type")
+        assert hasattr(chunk, "artifact_id")
+        assert hasattr(chunk, "content_text")
+        assert hasattr(chunk, "content_hash")
+        assert hasattr(chunk, "source_metadata")
+        assert hasattr(chunk, "collected_at")
 
         # FastAPI-specific metadata fields
         fastapi_metadata = chunk.source_metadata
-        required_fastapi_fields = ['http_method', 'route_path', 'operation_id', 'status_codes']
+        required_fastapi_fields = [
+            "http_method",
+            "route_path",
+            "operation_id",
+            "status_codes",
+        ]
         for field in required_fastapi_fields:
-            assert field in fastapi_metadata, f"Missing required FastAPI metadata field: {field}"
+            assert (
+                field in fastapi_metadata
+            ), f"Missing required FastAPI metadata field: {field}"
 
-    @pytest.mark.skipif(not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet")
+    @pytest.mark.skipif(
+        not FASTAPI_PARSER_AVAILABLE, reason="Implementation not available yet"
+    )
     def test_chunk_content_large_spec(self):
         """Test chunking behavior for large OpenAPI specifications"""
         parser = FastAPIParserImpl()
@@ -826,15 +944,11 @@ class TestFastAPIParserContract:
 
         # Add many more endpoints
         for i in range(50):
-            large_spec['paths'][f'/endpoint_{i}'] = {
-                'get': {
-                    'summary': f'Endpoint {i}',
-                    'operationId': f'endpoint_{i}',
-                    'responses': {
-                        '200': {
-                            'description': 'Success'
-                        }
-                    }
+            large_spec["paths"][f"/endpoint_{i}"] = {
+                "get": {
+                    "summary": f"Endpoint {i}",
+                    "operationId": f"endpoint_{i}",
+                    "responses": {"200": {"description": "Success"}},
                 }
             }
 
@@ -845,8 +959,12 @@ class TestFastAPIParserContract:
         assert len(chunks) >= 50
 
         # Verify all chunks have content and proper metadata
-        route_chunks = [chunk for chunk in chunks if 'http_method' in chunk.source_metadata]
-        assert len(route_chunks) >= 25, "Should have at least 25 route chunks from 50+ endpoints"
+        route_chunks = [
+            chunk for chunk in chunks if "http_method" in chunk.source_metadata
+        ]
+        assert (
+            len(route_chunks) >= 25
+        ), "Should have at least 25 route chunks from 50+ endpoints"
 
         for chunk in chunks:
             assert chunk.content_text.strip() != ""
@@ -854,7 +972,13 @@ class TestFastAPIParserContract:
 
         # Verify route chunks have HTTP method metadata
         for chunk in route_chunks:
-            assert chunk.source_metadata['http_method'] in ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
+            assert chunk.source_metadata["http_method"] in [
+                "GET",
+                "POST",
+                "PUT",
+                "DELETE",
+                "PATCH",
+            ]
 
 
 @pytest.mark.contract
@@ -868,7 +992,10 @@ class TestFastAPIParserContractFailure:
         # This test should pass initially, then fail once implementation exists
         try:
             from src.parsers.fastapi_parser import FastAPIParserImpl
-            pytest.fail("FastAPIParserImpl should not be implemented yet (TDD requirement)")
+
+            pytest.fail(
+                "FastAPIParserImpl should not be implemented yet (TDD requirement)"
+            )
         except ImportError:
             # This is expected in TDD mode
             pass

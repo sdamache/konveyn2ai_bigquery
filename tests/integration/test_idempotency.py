@@ -11,19 +11,19 @@ This test ensures:
 
 import os
 import tempfile
-import pytest
-from datetime import datetime, timedelta
-from google.cloud import bigquery
-from typing import Dict, Any, List
+from datetime import datetime
 
+import pytest
+from google.cloud import bigquery
 
 # TDD RED Phase: These imports will fail initially - this is expected and correct
 try:
-    from src.parsers.kubernetes_parser import KubernetesParserImpl
-    from src.parsers.fastapi_parser import FastAPIParserImpl
-    from src.parsers.cobol_parser import COBOLParserImpl
     from src.bigquery.writer import BigQueryWriterImpl
     from src.ingestion.orchestrator import IngestionOrchestrator
+    from src.parsers.cobol_parser import COBOLParserImpl
+    from src.parsers.fastapi_parser import FastAPIParserImpl
+    from src.parsers.kubernetes_parser import KubernetesParserImpl
+
     PARSERS_AVAILABLE = True
 except ImportError:
     PARSERS_AVAILABLE = False
@@ -50,7 +50,9 @@ def temp_bigquery_dataset(bigquery_client):
         dataset = bigquery_client.create_dataset(dataset, timeout=30)
         yield dataset_id
     finally:
-        bigquery_client.delete_dataset(dataset_ref, delete_contents=True, not_found_ok=True)
+        bigquery_client.delete_dataset(
+            dataset_ref, delete_contents=True, not_found_ok=True
+        )
 
 
 @pytest.fixture
@@ -60,7 +62,7 @@ def create_test_tables(bigquery_client, temp_bigquery_dataset):
 
     # Read DDL from contract
     ddl_path = "specs/002-m1-parse-and/contracts/bigquery-ddl.sql"
-    with open(ddl_path, "r") as f:
+    with open(ddl_path) as f:
         ddl_content = f.read()
 
     # Replace placeholders
@@ -136,11 +138,7 @@ def temp_test_files(sample_k8s_manifest, sample_fastapi_code):
         with open(fastapi_file, "w") as f:
             f.write(sample_fastapi_code)
 
-        yield {
-            "k8s_file": k8s_file,
-            "fastapi_file": fastapi_file,
-            "temp_dir": temp_dir
-        }
+        yield {"k8s_file": k8s_file, "fastapi_file": fastapi_file, "temp_dir": temp_dir}
 
 
 class TestIdempotencyIntegration:
@@ -157,8 +155,12 @@ class TestIdempotencyIntegration:
 
     @pytest.mark.integration
     @pytest.mark.bigquery
-    @pytest.mark.skipif(not PARSERS_AVAILABLE, reason="Parser implementations not available")
-    def test_kubernetes_idempotent_ingestion(self, bigquery_client, create_test_tables, temp_test_files):
+    @pytest.mark.skipif(
+        not PARSERS_AVAILABLE, reason="Parser implementations not available"
+    )
+    def test_kubernetes_idempotent_ingestion(
+        self, bigquery_client, create_test_tables, temp_test_files
+    ):
         """Test that repeated K8s ingestion produces consistent results"""
         dataset_id = create_test_tables
         k8s_file = temp_test_files["k8s_file"]
@@ -189,14 +191,18 @@ class TestIdempotencyIntegration:
         assert run_id1 != run_id2, "Each ingestion should get unique run_id"
 
         metadata_rows2 = list(bigquery_client.query(metadata_query).result())
-        assert len(metadata_rows2) == len(metadata_rows1), (
-            "Repeated ingestion should not create duplicate metadata rows"
-        )
+        assert len(metadata_rows2) == len(
+            metadata_rows1
+        ), "Repeated ingestion should not create duplicate metadata rows"
 
         # Compare content hashes - should be identical
         for row1, row2 in zip(metadata_rows1, metadata_rows2):
-            assert row1.artifact_id == row2.artifact_id, "Artifact IDs should be consistent"
-            assert row1.content_hash == row2.content_hash, "Content hashes should be identical"
+            assert (
+                row1.artifact_id == row2.artifact_id
+            ), "Artifact IDs should be consistent"
+            assert (
+                row1.content_hash == row2.content_hash
+            ), "Content hashes should be identical"
             assert row1.content_text == row2.content_text, "Content should be identical"
 
         # Verify ingestion_log has both runs
@@ -213,8 +219,12 @@ class TestIdempotencyIntegration:
 
     @pytest.mark.integration
     @pytest.mark.bigquery
-    @pytest.mark.skipif(not PARSERS_AVAILABLE, reason="Parser implementations not available")
-    def test_fastapi_idempotent_ingestion(self, bigquery_client, create_test_tables, temp_test_files):
+    @pytest.mark.skipif(
+        not PARSERS_AVAILABLE, reason="Parser implementations not available"
+    )
+    def test_fastapi_idempotent_ingestion(
+        self, bigquery_client, create_test_tables, temp_test_files
+    ):
         """Test that repeated FastAPI ingestion produces consistent results"""
         dataset_id = create_test_tables
         fastapi_file = temp_test_files["fastapi_file"]
@@ -242,18 +252,22 @@ class TestIdempotencyIntegration:
         assert len(duplicate_rows) == 0, "No duplicate metadata rows should exist"
 
         # Verify both runs logged but metadata deduplicated
-        total_metadata = bigquery_client.query(f"""
+        total_metadata = bigquery_client.query(
+            f"""
         SELECT COUNT(*) as count
         FROM `{bigquery_client.project}.{dataset_id}.source_metadata`
         WHERE source_type = 'fastapi'
-        """).result()
+        """
+        ).result()
         metadata_count = list(total_metadata)[0].count
 
-        total_runs = bigquery_client.query(f"""
+        total_runs = bigquery_client.query(
+            f"""
         SELECT COUNT(*) as count
         FROM `{bigquery_client.project}.{dataset_id}.ingestion_log`
         WHERE source_type = 'fastapi'
-        """).result()
+        """
+        ).result()
         run_count = list(total_runs)[0].count
 
         assert run_count == 2, "Both ingestion runs should be logged"
@@ -261,8 +275,12 @@ class TestIdempotencyIntegration:
 
     @pytest.mark.integration
     @pytest.mark.bigquery
-    @pytest.mark.skipif(not PARSERS_AVAILABLE, reason="Parser implementations not available")
-    def test_modified_file_creates_new_hash(self, bigquery_client, create_test_tables, temp_test_files):
+    @pytest.mark.skipif(
+        not PARSERS_AVAILABLE, reason="Parser implementations not available"
+    )
+    def test_modified_file_creates_new_hash(
+        self, bigquery_client, create_test_tables, temp_test_files
+    ):
         """Test that modified files create new content hashes"""
         dataset_id = create_test_tables
         k8s_file = temp_test_files["k8s_file"]
@@ -293,11 +311,14 @@ class TestIdempotencyIntegration:
 
     @pytest.mark.integration
     @pytest.mark.bigquery
-    @pytest.mark.skipif(not PARSERS_AVAILABLE, reason="Parser implementations not available")
-    def test_concurrent_ingestion_safety(self, bigquery_client, create_test_tables, temp_test_files):
+    @pytest.mark.skipif(
+        not PARSERS_AVAILABLE, reason="Parser implementations not available"
+    )
+    def test_concurrent_ingestion_safety(
+        self, bigquery_client, create_test_tables, temp_test_files
+    ):
         """Test that concurrent ingestion of same file is safe"""
         import concurrent.futures
-        import threading
 
         dataset_id = create_test_tables
         k8s_file = temp_test_files["k8s_file"]
@@ -331,7 +352,9 @@ class TestIdempotencyIntegration:
         HAVING COUNT(*) > 1
         """
         duplicate_rows = list(bigquery_client.query(metadata_query).result())
-        assert len(duplicate_rows) == 0, "Concurrent ingestion should not create duplicates"
+        assert (
+            len(duplicate_rows) == 0
+        ), "Concurrent ingestion should not create duplicates"
 
         # Verify all runs logged
         log_count_query = f"""
@@ -344,8 +367,12 @@ class TestIdempotencyIntegration:
 
     @pytest.mark.integration
     @pytest.mark.bigquery
-    @pytest.mark.skipif(not PARSERS_AVAILABLE, reason="Parser implementations not available")
-    def test_cross_parser_artifact_id_uniqueness(self, bigquery_client, create_test_tables, temp_test_files):
+    @pytest.mark.skipif(
+        not PARSERS_AVAILABLE, reason="Parser implementations not available"
+    )
+    def test_cross_parser_artifact_id_uniqueness(
+        self, bigquery_client, create_test_tables, temp_test_files
+    ):
         """Test that artifact IDs are unique across different parser types"""
         dataset_id = create_test_tables
 
@@ -359,7 +386,9 @@ class TestIdempotencyIntegration:
 
         # Ingest files with same name but different parsers
         k8s_result = k8s_orchestrator.ingest_file(temp_test_files["k8s_file"])
-        fastapi_result = fastapi_orchestrator.ingest_file(temp_test_files["fastapi_file"])
+        fastapi_result = fastapi_orchestrator.ingest_file(
+            temp_test_files["fastapi_file"]
+        )
 
         # Verify artifact IDs are unique across parsers
         artifact_query = f"""
@@ -369,7 +398,9 @@ class TestIdempotencyIntegration:
         HAVING COUNT(*) > 1
         """
         duplicate_artifacts = list(bigquery_client.query(artifact_query).result())
-        assert len(duplicate_artifacts) == 0, "Artifact IDs should be unique across parsers"
+        assert (
+            len(duplicate_artifacts) == 0
+        ), "Artifact IDs should be unique across parsers"
 
         # Verify source types are correctly set
         source_types_query = f"""
@@ -377,14 +408,21 @@ class TestIdempotencyIntegration:
         FROM `{bigquery_client.project}.{dataset_id}.source_metadata`
         ORDER BY source_type
         """
-        source_types = [row.source_type for row in bigquery_client.query(source_types_query).result()]
+        source_types = [
+            row.source_type
+            for row in bigquery_client.query(source_types_query).result()
+        ]
         assert "kubernetes" in source_types
         assert "fastapi" in source_types
 
     @pytest.mark.integration
     @pytest.mark.bigquery
-    @pytest.mark.skipif(not PARSERS_AVAILABLE, reason="Parser implementations not available")
-    def test_error_logging_idempotency(self, bigquery_client, create_test_tables, temp_test_files):
+    @pytest.mark.skipif(
+        not PARSERS_AVAILABLE, reason="Parser implementations not available"
+    )
+    def test_error_logging_idempotency(
+        self, bigquery_client, create_test_tables, temp_test_files
+    ):
         """Test that error logging is also idempotent"""
         dataset_id = create_test_tables
 
@@ -428,8 +466,9 @@ class TestIdempotencyIntegration:
     @pytest.mark.bigquery
     def test_sample_files_are_valid(self, sample_k8s_manifest, sample_fastapi_code):
         """Verify test sample files are syntactically valid"""
-        import yaml
         import ast
+
+        import yaml
 
         # Validate K8s YAML
         try:
@@ -457,7 +496,9 @@ class TestIdempotencyIntegration:
             table_ref = bigquery_client.dataset(dataset_id).table(table_name)
             table = bigquery_client.get_table(table_ref)
             assert table.table_id == table_name
-            assert len(table.schema) > 0, f"Table {table_name} should have schema fields"
+            assert (
+                len(table.schema) > 0
+            ), f"Table {table_name} should have schema fields"
 
 
 if __name__ == "__main__":
