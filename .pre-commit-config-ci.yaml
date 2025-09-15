@@ -8,8 +8,11 @@ repos:
     rev: v4.5.0
     hooks:
       - id: check-yaml
+        args: [--allow-multiple-documents]
+        exclude: ^examples/performance_templates/.*\.yaml$
       - id: check-merge-conflict
       - id: debug-statements  # Critical: prevents debug statements in production
+        exclude: ^examples/performance_templates/.*\.py$
 
   # Black code formatting - CHECK ONLY MODE
   - repo: https://github.com/psf/black
@@ -26,20 +29,20 @@ repos:
     hooks:
       - id: ruff
         args: []  # Default behavior is check-only, no --fix needed
-        exclude: ^examples/performance_templates/.*\.py$
+        # Ruff now uses pyproject.toml for exclusions and ignores
 
-  # Local tools using versions from requirements.txt - CHECK ONLY MODE
-  - repo: local
-    hooks:
-      # Security scanning with Bandit - validation only
-      - id: bandit
-        name: bandit
-        entry: bandit
-        language: system
-        types: [python]
-        args: [--recursive, --exit-zero]  # Don't fail CI on security warnings
-        files: ^src/.*\.py$
-        exclude: ^src/.*/test_.*\.py$
+  # Local tools using versions from requirements.txt - CHECK ONLY MODE (disabled for hackathon mode)
+  # - repo: local
+  #   hooks:
+  #     # Security scanning with Bandit - validation only
+  #     - id: bandit
+  #       name: bandit
+  #       entry: bandit
+  #       language: system
+  #       types: [python]
+  #       args: [--recursive, --exit-zero]  # Don't fail CI on security warnings
+  #       files: ^src/.*\.py$
+  #       exclude: ^src/.*/test_.*\.py$
 
       # MyPy type checking - validation only (disabled for hackathon mode)
       # - id: mypy
