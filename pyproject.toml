@@ -102,6 +102,9 @@ ignore = [
 "src/*/test_*.py" = ["E402"]
 "tests/utils/service_imports.py" = ["B904"]  # Exception chaining not needed for utility functions
 "tests/utils/test_helpers.py" = ["B904"]  # Exception chaining not needed for test helpers
+# M1 Ingestion specific ignores
+"src/ingest/*/parser.py" = ["C901"]  # Complex parsers allowed
+"tests/**/*" = ["B011"]  # Test fixtures can modify arguments
 
 [tool.mypy]
 python_version = "3.9"
@@ -112,10 +115,37 @@ disallow_untyped_defs = true
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
+warn_return_any = true
+strict_equality = true
+
+# M1 Ingestion specific overrides
+[[tool.mypy.overrides]]
+module = [
+    "google.cloud.*",
+    "kubernetes.*",
+    "libcst.*",
+    "ulid.*",
+    "cobol.*",
+    "pygtm.*"
+]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short"
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--strict-config",
+    "--tb=short"
+]
+# M1 Ingestion test markers
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests (requires BigQuery)",
+    "contract: Contract tests (schema validation)",
+    "slow: Slow running tests",
+    "bigquery: Tests that require BigQuery access"
+]
