@@ -9,7 +9,7 @@ import logging
 import os
 import time
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
@@ -282,6 +282,7 @@ class KubernetesParserImpl(KubernetesParser):
                     else:
                         chunk_artifact_id = f"{artifact_id}#chunk-{chunk_index}"
 
+                    timestamp = datetime.now(timezone.utc)
                     chunk_metadata = ChunkMetadata(
                         source_type=self.source_type,
                         artifact_id=chunk_artifact_id,
@@ -291,17 +292,18 @@ class KubernetesParserImpl(KubernetesParser):
                         content_tokens=self._estimate_tokens(chunk_text),
                         content_hash=self.generate_content_hash(chunk_text),
                         source_uri="",  # Will be updated by caller
-                        collected_at=datetime.utcnow(),
+                        collected_at=timestamp,
+                        created_at=timestamp,
+                        updated_at=timestamp,
+                        tool_version=self.version,
                         source_metadata={
                             "kind": kind,
-                            "api_version": api_version,  # Use snake_case for consistency
+                            "api_version": api_version,
                             "namespace": namespace,
-                            "resource_name": name,  # Use resource_name as expected by tests
+                            "resource_name": name,
                             "labels": metadata.get("labels", {}),
                             "annotations": metadata.get("annotations", {}),
-                            "resource_version": metadata.get(
-                                "resourceVersion"
-                            ),  # snake_case
+                            "resource_version": metadata.get("resourceVersion"),
                             "uid": metadata.get("uid"),
                             "chunk_index": chunk_index,
                             "total_chunks": len(chunk_texts),

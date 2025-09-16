@@ -273,6 +273,7 @@ class MUMPSParserImpl(MUMPSParser):
             # Update source_uri for all chunks
             for chunk in chunks:
                 chunk.source_uri = file_path
+                chunk.tool_version = self.version
 
         except Exception as e:
             errors.append(
@@ -413,6 +414,7 @@ class MUMPSParserImpl(MUMPSParser):
                 f"{global_name}.gbl", metadata
             )
 
+            timestamp = datetime.now(UTC)
             chunk = ChunkMetadata(
                 source_type=SourceType.MUMPS,
                 artifact_id=artifact_id,
@@ -422,7 +424,10 @@ class MUMPSParserImpl(MUMPSParser):
                 ),
                 source_uri="",  # Will be set by caller
                 content_tokens=self._estimate_tokens(chunk_content),
-                collected_at=datetime.now(UTC),
+                collected_at=timestamp,
+                created_at=timestamp,
+                updated_at=timestamp,
+                tool_version=self.version,
                 source_metadata=metadata,
             )
 
@@ -525,6 +530,7 @@ class MUMPSParserImpl(MUMPSParser):
                 f"DD_{file_num}.m", metadata
             )
 
+            timestamp = datetime.now(UTC)
             chunk = ChunkMetadata(
                 source_type=SourceType.MUMPS,
                 artifact_id=artifact_id,
@@ -534,7 +540,10 @@ class MUMPSParserImpl(MUMPSParser):
                 ),
                 source_uri="",
                 content_tokens=self._estimate_tokens(chunk_content),
-                collected_at=datetime.now(UTC),
+                collected_at=timestamp,
+                created_at=timestamp,
+                updated_at=timestamp,
+                tool_version=self.version,
                 source_metadata=metadata,
             )
 
@@ -571,6 +580,7 @@ class MUMPSParserImpl(MUMPSParser):
                 f"DDD_{file_num}.m", metadata
             )
 
+            timestamp = datetime.now(UTC)
             chunk = ChunkMetadata(
                 source_type=SourceType.MUMPS,
                 artifact_id=artifact_id,
@@ -580,7 +590,10 @@ class MUMPSParserImpl(MUMPSParser):
                 ),
                 source_uri="",
                 content_tokens=self._estimate_tokens(chunk_content),
-                collected_at=datetime.now(UTC),
+                collected_at=timestamp,
+                created_at=timestamp,
+                updated_at=timestamp,
+                tool_version=self.version,
                 source_metadata=metadata,
             )
 

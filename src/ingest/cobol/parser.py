@@ -183,6 +183,7 @@ class COBOLParserImpl(COBOLParser):
                 # Update source_uri for all chunks
                 for chunk in file_chunks:
                     chunk.source_uri = file_path
+                    chunk.tool_version = self.version
                 chunks.extend(file_chunks)
 
             except Exception as e:
@@ -206,7 +207,7 @@ class COBOLParserImpl(COBOLParser):
                     error_class=ErrorClass.PARSING,
                     error_msg=f"Unexpected error processing file: {e}",
                     stack_trace=traceback.format_exc(),
-                    collected_at=datetime.utcnow(),
+                    collected_at=datetime.now(timezone.utc),
                 )
             )
 
@@ -283,7 +284,7 @@ class COBOLParserImpl(COBOLParser):
                     error_class=ErrorClass.PARSING,
                     error_msg=f"Error scanning directory: {e}",
                     stack_trace=traceback.format_exc(),
-                    collected_at=datetime.utcnow(),
+                    collected_at=datetime.now(timezone.utc),
                 )
             )
 
@@ -527,6 +528,8 @@ class COBOLParserImpl(COBOLParser):
         content_text = chunk_results[0].content if chunk_results else structure_content
         content_tokens = chunk_results[0].token_count if chunk_results else None
 
+        timestamp = datetime.now(timezone.utc)
+
         return ChunkMetadata(
             source_type=self.source_type,
             artifact_id=artifact_id,
@@ -534,7 +537,10 @@ class COBOLParserImpl(COBOLParser):
             content_tokens=content_tokens,
             content_hash=content_hash,
             source_uri="",  # Will be set by caller
-            collected_at=datetime.now(timezone.utc),
+            collected_at=timestamp,
+            created_at=timestamp,
+            updated_at=timestamp,
+            tool_version=self.version,
             source_metadata=cobol_metadata,
         )
 

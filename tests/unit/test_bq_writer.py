@@ -4,12 +4,20 @@ Unit tests for BigQuery writer functionality
 T036: Comprehensive test coverage for BigQuery integration, schema handling, and data operations
 Tests batch writing, error handling, schema validation, and context managers
 """
-
+import os
 import json
+import sys
 from datetime import datetime, timezone
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+
+# Ensure src/ is on sys.path so packages like `common` resolve
+ROOT_DIR = Path(__file__).resolve().parents[2]
+SRC_DIR = ROOT_DIR / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
 # Import test dependencies
 try:
@@ -20,7 +28,7 @@ except ImportError:
     pytest.skip("Google Cloud BigQuery not available", allow_module_level=True)
 
 # Import modules under test
-from common.bq_writer import (
+from src.common.bq_writer import (
     BatchConfig,
     BigQueryWriter,
     ChunkMetadata,
@@ -108,7 +116,7 @@ class TestBigQueryWriter:
         mock_client = Mock()
         mock_client_class.return_value = mock_client
 
-        writer = BigQueryWriter()
+        writer = BigQueryWriter(tool_version="test-tool")
 
         assert writer.project_id == "konveyn2ai"
         assert writer.dataset_id == "source_ingestion"
@@ -146,7 +154,7 @@ class TestBigQueryWriter:
         mock_client = Mock()
         mock_client_class.return_value = mock_client
 
-        writer = BigQueryWriter()
+        writer = BigQueryWriter(tool_version="test-tool")
 
         assert writer.project_id == "env-project"
         assert writer.dataset_id == "env_dataset"
@@ -157,7 +165,7 @@ class TestBigQueryWriter:
         mock_client = Mock()
         mock_client_class.return_value = mock_client
 
-        writer = BigQueryWriter()
+        writer = BigQueryWriter(tool_version="test-tool")
 
         # Check that schemas are set up correctly
         assert "source_metadata" in writer.schemas
@@ -168,22 +176,26 @@ class TestBigQueryWriter:
         source_metadata_schema = writer.schemas["source_metadata"]
         field_names = [field.name for field in source_metadata_schema]
 
-        expected_fields = [
+        required_core_fields = {
             "source_type",
             "artifact_id",
-            "parent_id",
-            "parent_type",
             "content_text",
-            "content_tokens",
             "content_hash",
-            "source_uri",
-            "repo_ref",
+            "created_at",
+            "updated_at",
             "collected_at",
-            "source_metadata",
-        ]
+            "tool_version",
+        }
 
-        for field in expected_fields:
+        for field in required_core_fields:
             assert field in field_names
+
+        # Spot check parser-specific fields
+        assert "k8s_labels" in field_names
+        assert "fastapi_route_path" in field_names
+        assert "cobol_field_names" in field_names
+        assert "irs_record_type" in field_names
+        assert "mumps_xrefs" in field_names
 
     @patch("common.bq_writer.bigquery.Client")
     def test_create_dataset_if_not_exists_new(self, mock_client_class):
@@ -231,7 +243,7 @@ class TestBigQueryWriter:
         mock_table = Mock()
         mock_client.create_table.return_value = mock_table
 
-        writer = BigQueryWriter()
+        writer = BigQueryWriter(tool_version="test-tool")
         result = writer.create_tables_if_not_exist()
 
         assert "source_metadata" in result
@@ -248,7 +260,7 @@ class TestBigQueryWriter:
         mock_client = Mock()
         mock_client_class.return_value = mock_client
 
-        writer = BigQueryWriter()
+        writer = BigQueryWriter(tool_version="test-tool")
 
         chunk = ChunkMetadata(
             source_type=SourceType.KUBERNETES,
@@ -261,7 +273,10 @@ class TestBigQueryWriter:
             source_uri="file:///manifests/deployment.yaml",
             repo_ref="main",
             collected_at=datetime(2024, 1, 15, 10, 30, 45, tzinfo=timezone.utc),
-            source_metadata={"namespace": "production", "labels": {"app": "web"}},
+            source_metadata={
+                "namespace": "production",
+                "labels": {"app": "web", "tier": "backend"},
+            },
         )
 
         row = writer._chunk_to_row(chunk)
@@ -273,15 +288,17 @@ class TestBigQueryWriter:
         assert row["content_hash"] == "abc123def456"
         assert row["source_uri"] == "file:///manifests/deployment.yaml"
         assert row["repo_ref"] == "main"
+        assert row["tool_version"] == "test-tool"
 
-        # Check collected_at is ISO format string
-        assert isinstance(row["collected_at"], str)
-        assert "2024-01-15T10:30:45" in row["collected_at"]
+        # Timestamp fields should be timezone-aware datetime objects
+        assert isinstance(row["collected_at"], datetime)
+        assert row["collected_at"].tzinfo is not None
+        assert row["created_at"] <= row["updated_at"]
 
-        # Check source_metadata is JSON string
-        source_metadata = json.loads(row["source_metadata"])
-        assert source_metadata["namespace"] == "production"
-        assert source_metadata["labels"]["app"] == "web"
+        # Kubernetes metadata mapped to explicit columns
+        assert row["k8s_namespace"] == "production"
+        assert row["k8s_labels"]["app"] == "web"
+        assert row["k8s_labels"]["tier"] == "backend"
 
     @patch("common.bq_writer.bigquery.Client")
     def test_error_to_row_conversion(self, mock_client_class):
@@ -289,7 +306,7 @@ class TestBigQueryWriter:
         mock_client = Mock()
         mock_client_class.return_value = mock_client
 
-        writer = BigQueryWriter()
+        writer = BigQueryWriter(tool_version="test-tool")
 
         error = ParseError(
             source_type=SourceType.FASTAPI,
@@ -320,7 +337,7 @@ class TestBigQueryWriter:
         mock_client = Mock()
         mock_client_class.return_value = mock_client
 
-        writer = BigQueryWriter()
+        writer = BigQueryWriter(tool_version="test-tool")
 
         run_info = {
             "run_id": "01H8XY2K3MNBQJFGASDFGHJKLQ",
@@ -342,8 +359,8 @@ class TestBigQueryWriter:
         assert row["source_type"] == "kubernetes"
         assert row["status"] == "completed"
         assert row["files_processed"] == 25
-        assert row["chunks_created"] == 150
-        assert row["errors_encountered"] == 2
+        assert row["rows_written"] == 150
+        assert row["errors_count"] == 2
         assert row["processing_duration_ms"] == 300000
 
         # Check timestamps are ISO format strings
@@ -352,9 +369,9 @@ class TestBigQueryWriter:
         assert "2024-01-15T10:30:00" in row["started_at"]
         assert "2024-01-15T10:35:00" in row["completed_at"]
 
-        # Check config_used is JSON string
-        config = json.loads(row["config_used"])
-        assert config["batch_size"] == 1000
+        # Config params should stay as dict for JSON column insert
+        assert row["config_params"]["batch_size"] == 1000
+        assert row["tool_version"] == "test-tool"
 
     @patch("common.bq_writer.bigquery.Client")
     def test_batch_iterator(self, mock_client_class):
@@ -385,11 +402,11 @@ class TestBigQueryWriter:
 
         # Test source_metadata clustering
         clustering = writer._get_clustering_fields("source_metadata")
-        assert clustering == ["source_type", "content_hash"]
+        assert clustering == ["source_type", "artifact_id"]
 
         # Test source_metadata_errors clustering
         clustering = writer._get_clustering_fields("source_metadata_errors")
-        assert clustering == ["source_type", "error_class"]
+        assert clustering == ["error_class", "source_type"]
 
         # Test ingestion_log clustering
         clustering = writer._get_clustering_fields("ingestion_log")
@@ -682,7 +699,11 @@ class TestBigQueryWriterEdgeCases:
         assert row["parent_type"] is None
         assert row["content_tokens"] is None
         assert row["repo_ref"] is None
-        assert row["source_metadata"] is None
+        assert row["mumps_global_name"] is None
+        assert row["fastapi_route_path"] is None
+        # timestamps should still be populated
+        assert isinstance(row["created_at"], datetime)
+        assert isinstance(row["updated_at"], datetime)
 
     @patch("common.bq_writer.bigquery.Client")
     def test_error_with_none_values(self, mock_client_class):

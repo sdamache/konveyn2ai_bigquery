@@ -133,12 +133,49 @@ class BigQueryWriter:
                 bigquery.SchemaField("parent_id", "STRING", mode="NULLABLE"),
                 bigquery.SchemaField("parent_type", "STRING", mode="NULLABLE"),
                 bigquery.SchemaField("content_text", "STRING", mode="REQUIRED"),
-                bigquery.SchemaField("content_tokens", "INTEGER", mode="NULLABLE"),
+                bigquery.SchemaField("content_tokens", "INT64", mode="NULLABLE"),
                 bigquery.SchemaField("content_hash", "STRING", mode="REQUIRED"),
+                bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED"),
+                bigquery.SchemaField("updated_at", "TIMESTAMP", mode="REQUIRED"),
+                bigquery.SchemaField("collected_at", "TIMESTAMP", mode="REQUIRED"),
                 bigquery.SchemaField("source_uri", "STRING", mode="REQUIRED"),
                 bigquery.SchemaField("repo_ref", "STRING", mode="NULLABLE"),
-                bigquery.SchemaField("collected_at", "TIMESTAMP", mode="REQUIRED"),
-                bigquery.SchemaField("source_metadata", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("tool_version", "STRING", mode="REQUIRED"),
+                bigquery.SchemaField("k8s_api_version", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("k8s_kind", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("k8s_namespace", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("k8s_resource_name", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("k8s_labels", "JSON", mode="NULLABLE"),
+                bigquery.SchemaField("k8s_annotations", "JSON", mode="NULLABLE"),
+                bigquery.SchemaField("k8s_resource_version", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("fastapi_http_method", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("fastapi_route_path", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("fastapi_operation_id", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("fastapi_request_model", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("fastapi_response_model", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("fastapi_status_codes", "JSON", mode="NULLABLE"),
+                bigquery.SchemaField("fastapi_dependencies", "JSON", mode="NULLABLE"),
+                bigquery.SchemaField("fastapi_src_path", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("fastapi_start_line", "INT64", mode="NULLABLE"),
+                bigquery.SchemaField("fastapi_end_line", "INT64", mode="NULLABLE"),
+                bigquery.SchemaField("cobol_structure_level", "INT64", mode="NULLABLE"),
+                bigquery.SchemaField("cobol_field_names", "JSON", mode="NULLABLE"),
+                bigquery.SchemaField("cobol_pic_clauses", "JSON", mode="NULLABLE"),
+                bigquery.SchemaField("cobol_occurs_count", "INT64", mode="NULLABLE"),
+                bigquery.SchemaField("cobol_redefines", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("cobol_usage", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("irs_record_type", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("irs_layout_version", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("irs_start_position", "INT64", mode="NULLABLE"),
+                bigquery.SchemaField("irs_field_length", "INT64", mode="NULLABLE"),
+                bigquery.SchemaField("irs_data_type", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("irs_section", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("mumps_global_name", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("mumps_node_path", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField("mumps_file_no", "INT64", mode="NULLABLE"),
+                bigquery.SchemaField("mumps_field_no", "FLOAT64", mode="NULLABLE"),
+                bigquery.SchemaField("mumps_xrefs", "JSON", mode="NULLABLE"),
+                bigquery.SchemaField("mumps_input_transform", "STRING", mode="NULLABLE"),
             ],
             "source_metadata_errors": [
                 bigquery.SchemaField("error_id", "STRING", mode="REQUIRED"),
@@ -247,7 +284,7 @@ class BigQueryWriter:
     def _get_clustering_fields(self, table_name: str) -> Optional[list[str]]:
         """Get clustering fields for table optimization"""
         clustering_config = {
-            "source_metadata": ["source_type", "content_hash"],
+            "source_metadata": ["source_type", "artifact_id"],
             "source_metadata_errors": ["error_class", "source_type"],
             "ingestion_log": ["source_type", "status"],
         }
@@ -555,13 +592,42 @@ class BigQueryWriter:
         else:
             source_type_str = str(chunk.source_type).lower()
 
-        # Convert source_metadata to JSON string for BigQuery STRING field
-        source_metadata_dict = chunk.source_metadata or {}
-        source_metadata_json = (
-            json.dumps(source_metadata_dict) if source_metadata_dict else None
-        )
+        metadata = chunk.source_metadata or {}
 
-        return {
+        def _coerce_int(value):
+            if value is None:
+                return None
+            if isinstance(value, (int, float)):
+                return int(value)
+            try:
+                return int(str(value))
+            except (ValueError, TypeError):
+                return None
+
+        def _coerce_float(value):
+            if value is None:
+                return None
+            if isinstance(value, (int, float)):
+                return float(value)
+            try:
+                return float(str(value))
+            except (ValueError, TypeError):
+                return None
+
+        def _coerce_timestamp(value):
+            if isinstance(value, datetime):
+                if value.tzinfo is None:
+                    return value.replace(tzinfo=timezone.utc)
+                return value.astimezone(timezone.utc)
+            if value:
+                return value
+            return None
+
+        created_at = getattr(chunk, "created_at", None) or metadata.get("created_at")
+        updated_at = getattr(chunk, "updated_at", None) or metadata.get("updated_at")
+        collected_at = chunk.collected_at or metadata.get("collected_at")
+
+        row = {
             "source_type": source_type_str,
             "artifact_id": chunk.artifact_id,
             "parent_id": chunk.parent_id,
@@ -569,15 +635,54 @@ class BigQueryWriter:
             "content_text": chunk.content_text,
             "content_tokens": chunk.content_tokens,
             "content_hash": chunk.content_hash,
+            "created_at": _coerce_timestamp(created_at)
+            or datetime.now(timezone.utc),
+            "updated_at": _coerce_timestamp(updated_at)
+            or _coerce_timestamp(created_at)
+            or datetime.now(timezone.utc),
+            "collected_at": _coerce_timestamp(collected_at)
+            or datetime.now(timezone.utc),
             "source_uri": chunk.source_uri,
             "repo_ref": chunk.repo_ref,
-            "collected_at": (
-                chunk.collected_at.isoformat()
-                if chunk.collected_at
-                else datetime.now(timezone.utc).isoformat()
-            ),
-            "source_metadata": source_metadata_json,
+            "tool_version": self.tool_version,
+            "k8s_api_version": metadata.get("api_version"),
+            "k8s_kind": metadata.get("kind"),
+            "k8s_namespace": metadata.get("namespace"),
+            "k8s_resource_name": metadata.get("resource_name"),
+            "k8s_labels": metadata.get("labels"),
+            "k8s_annotations": metadata.get("annotations"),
+            "k8s_resource_version": metadata.get("resource_version"),
+            "fastapi_http_method": metadata.get("http_method"),
+            "fastapi_route_path": metadata.get("route_path"),
+            "fastapi_operation_id": metadata.get("operation_id"),
+            "fastapi_request_model": metadata.get("request_model"),
+            "fastapi_response_model": metadata.get("response_model"),
+            "fastapi_status_codes": metadata.get("status_codes"),
+            "fastapi_dependencies": metadata.get("dependencies"),
+            "fastapi_src_path": metadata.get("src_path") or chunk.source_uri,
+            "fastapi_start_line": _coerce_int(metadata.get("start_line")),
+            "fastapi_end_line": _coerce_int(metadata.get("end_line")),
+            "cobol_structure_level": _coerce_int(metadata.get("structure_level")),
+            "cobol_field_names": metadata.get("field_names"),
+            "cobol_pic_clauses": metadata.get("pic_clauses"),
+            "cobol_occurs_count": _coerce_int(metadata.get("occurs_count")),
+            "cobol_redefines": metadata.get("redefines"),
+            "cobol_usage": metadata.get("usage"),
+            "irs_record_type": metadata.get("record_type"),
+            "irs_layout_version": metadata.get("layout_version"),
+            "irs_start_position": _coerce_int(metadata.get("start_position")),
+            "irs_field_length": _coerce_int(metadata.get("field_length")),
+            "irs_data_type": metadata.get("data_type"),
+            "irs_section": metadata.get("section"),
+            "mumps_global_name": metadata.get("global_name"),
+            "mumps_node_path": metadata.get("node_path"),
+            "mumps_file_no": _coerce_int(metadata.get("file_no")),
+            "mumps_field_no": _coerce_float(metadata.get("field_no")),
+            "mumps_xrefs": metadata.get("xrefs"),
+            "mumps_input_transform": metadata.get("input_transform"),
         }
+
+        return row
 
     def _error_to_row(self, error: ParseError) -> dict[str, Any]:
         """Convert ParseError to BigQuery row"""
