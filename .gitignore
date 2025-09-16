@@ -118,7 +118,6 @@ ipython_config.py
 
 # Claude Code
 .claude/
-CLAUDE.md
 
 # MCP configuration (development tooling)
 .mcp.json
