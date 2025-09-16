@@ -4,6 +4,7 @@ Unit tests for BigQuery writer functionality
 T036: Comprehensive test coverage for BigQuery integration, schema handling, and data operations
 Tests batch writing, error handling, schema validation, and context managers
 """
+
 import os
 import json
 import sys

@@ -149,7 +149,7 @@ class IRSParserImpl(IRSParser):
             for chunk in chunks:
                 chunk.source_uri = file_path
                 chunk.tool_version = self.version
-            
+
             duration_ms = max(1, int((time.time() - start_time) * 1000))
             return ParseResult(
                 chunks=chunks,

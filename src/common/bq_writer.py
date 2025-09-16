@@ -151,8 +151,12 @@ class BigQueryWriter:
                 bigquery.SchemaField("fastapi_http_method", "STRING", mode="NULLABLE"),
                 bigquery.SchemaField("fastapi_route_path", "STRING", mode="NULLABLE"),
                 bigquery.SchemaField("fastapi_operation_id", "STRING", mode="NULLABLE"),
-                bigquery.SchemaField("fastapi_request_model", "STRING", mode="NULLABLE"),
-                bigquery.SchemaField("fastapi_response_model", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField(
+                    "fastapi_request_model", "STRING", mode="NULLABLE"
+                ),
+                bigquery.SchemaField(
+                    "fastapi_response_model", "STRING", mode="NULLABLE"
+                ),
                 bigquery.SchemaField("fastapi_status_codes", "JSON", mode="NULLABLE"),
                 bigquery.SchemaField("fastapi_dependencies", "JSON", mode="NULLABLE"),
                 bigquery.SchemaField("fastapi_src_path", "STRING", mode="NULLABLE"),
@@ -175,7 +179,9 @@ class BigQueryWriter:
                 bigquery.SchemaField("mumps_file_no", "INT64", mode="NULLABLE"),
                 bigquery.SchemaField("mumps_field_no", "FLOAT64", mode="NULLABLE"),
                 bigquery.SchemaField("mumps_xrefs", "JSON", mode="NULLABLE"),
-                bigquery.SchemaField("mumps_input_transform", "STRING", mode="NULLABLE"),
+                bigquery.SchemaField(
+                    "mumps_input_transform", "STRING", mode="NULLABLE"
+                ),
             ],
             "source_metadata_errors": [
                 bigquery.SchemaField("error_id", "STRING", mode="REQUIRED"),
@@ -635,8 +641,7 @@ class BigQueryWriter:
             "content_text": chunk.content_text,
             "content_tokens": chunk.content_tokens,
             "content_hash": chunk.content_hash,
-            "created_at": _coerce_timestamp(created_at)
-            or datetime.now(timezone.utc),
+            "created_at": _coerce_timestamp(created_at) or datetime.now(timezone.utc),
             "updated_at": _coerce_timestamp(updated_at)
             or _coerce_timestamp(created_at)
             or datetime.now(timezone.utc),
@@ -768,15 +773,15 @@ class BigQueryWriter:
 
         # Log start of run
         self.log_ingestion_run(
-                {
-                    "run_id": run_id,
-                    "source_type": source_type,
-                    "started_at": start_time,
-                    "status": "started",
-                    "config_used": config_used or {},
-                    "tool_version": self.tool_version,
-                }
-            )
+            {
+                "run_id": run_id,
+                "source_type": source_type,
+                "started_at": start_time,
+                "status": "started",
+                "config_used": config_used or {},
+                "tool_version": self.tool_version,
+            }
+        )
 
         run_stats = {
             "files_processed": 0,
