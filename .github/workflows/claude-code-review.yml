@@ -37,14 +37,14 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
-          # Configure Claude using claude_args (newer format)
+          # Configure Claude using claude_args (v1 format)
           claude_args: |
             --model claude-sonnet-4-20250514
             --max-turns 5
-            --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"
+            --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh api:*)"
 
-          # Direct prompt for automated review (no @claude mention needed)
-          direct_prompt: |
+          # Prompt for automated review (no @claude mention needed)
+          prompt: |
             Review this PR for the BigQuery AI Hackathon project following CLAUDE.md protocols:
 
             **🔥 MANDATORY FILE EDITING POLICY:**
@@ -70,5 +70,5 @@ jobs:
 
             Focus on functional implementation over perfect code style. Be constructive and hackathon-speed oriented.
 
-            Use `gh pr comment` with your Bash tool to leave your review as a comment on the PR.
+            Use `gh pr comment` to leave your review as a comment on the PR.
 

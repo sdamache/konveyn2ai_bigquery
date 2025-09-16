@@ -40,13 +40,14 @@ jobs:
           additional_permissions: |
             actions: read
           
-          # Configure Claude using claude_args (newer format)
+          # Configure Claude using claude_args (v1 format)
           claude_args: |
             --model claude-sonnet-4-20250514
             --max-turns 10
+            --allowed-tools "Bash(make:*),Bash(pytest:*),Bash(python:*),Bash(pre-commit run:*),Bash(gh pr:*),Bash(gh issue:*),Bash(gh api:*),Bash(black:*)"
 
-          # Custom instructions for project-specific guidance (supplements Anthropic's system prompt)
-          custom_instructions: |
+          # Use prompt parameter to provide project-specific guidance
+          prompt: |
             This is a BigQuery AI Hackathon project. Key project guidelines:
             - Follow instructions in CLAUDE.md for project-specific protocols
             - Prefer editing existing files over creating new ones
@@ -54,14 +55,13 @@ jobs:
             - Use make commands for BigQuery operations when needed
             - This is a Python/FastAPI backend with BigQuery integration
 
+            When working with GitHub issues and PRs, use gh commands to fetch information.
+
           # Optional: Customize the trigger phrase (default: @claude)
           # trigger_phrase: "/claude"
 
           # Optional: Trigger when specific user is assigned to an issue
           # assignee_trigger: "claude-bot"
-
-          # Allow Claude to run specific commands based on project permissions
-          allowed_tools: "Bash(make:*),Bash(pytest:*),Bash(python:*),Bash(pre-commit run:*),Bash(gh pr:*),Bash(gh issue:*),Bash(black:*),WebSearch,WebFetch(domain:github.com)"
           
           # Optional: Custom environment variables for Claude
           # claude_env: |
