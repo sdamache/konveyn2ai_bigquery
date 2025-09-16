@@ -107,11 +107,13 @@ class BigQueryWriter:
         dataset_id: Optional[str] = None,
         location: str = "US",
         batch_config: Optional[BatchConfig] = None,
+        tool_version: Optional[str] = None,
     ):
         self.project_id = project_id or os.getenv("BQ_PROJECT", "konveyn2ai")
         self.dataset_id = dataset_id or os.getenv("BQ_DATASET", "source_ingestion")
         self.location = location
         self.batch_config = batch_config or BatchConfig()
+        self.tool_version = tool_version or os.getenv("KONVEYN_TOOL_VERSION", "1.0.0")
 
         # Initialize BigQuery client
         self.client = bigquery.Client(project=self.project_id)
@@ -145,8 +147,9 @@ class BigQueryWriter:
                 bigquery.SchemaField("error_class", "STRING", mode="REQUIRED"),
                 bigquery.SchemaField("error_msg", "STRING", mode="REQUIRED"),
                 bigquery.SchemaField("sample_text", "STRING", mode="NULLABLE"),
-                bigquery.SchemaField("stack_trace", "STRING", mode="NULLABLE"),
                 bigquery.SchemaField("collected_at", "TIMESTAMP", mode="REQUIRED"),
+                bigquery.SchemaField("tool_version", "STRING", mode="REQUIRED"),
+                bigquery.SchemaField("stack_trace", "STRING", mode="NULLABLE"),
             ],
             "ingestion_log": [
                 bigquery.SchemaField("run_id", "STRING", mode="REQUIRED"),
@@ -245,7 +248,7 @@ class BigQueryWriter:
         """Get clustering fields for table optimization"""
         clustering_config = {
             "source_metadata": ["source_type", "content_hash"],
-            "source_metadata_errors": ["source_type", "error_class"],
+            "source_metadata_errors": ["error_class", "source_type"],
             "ingestion_log": ["source_type", "status"],
         }
         return clustering_config.get(table_name)
@@ -605,6 +608,7 @@ class BigQueryWriter:
                 if error.collected_at
                 else datetime.now(timezone.utc).isoformat()
             ),
+            "tool_version": self.tool_version,
         }
 
     def _run_info_to_row(self, run_info: dict[str, Any]) -> dict[str, Any]:
@@ -642,7 +646,7 @@ class BigQueryWriter:
             "bytes_written": run_info.get("bytes_written", 0),
             "processing_duration_ms": run_info.get("processing_duration_ms"),
             "avg_chunk_size_tokens": avg_chunk_tokens,
-            "tool_version": run_info.get("tool_version", "1.0.0"),
+            "tool_version": run_info.get("tool_version", self.tool_version),
             "config_params": config_params,
         }
 
@@ -659,14 +663,15 @@ class BigQueryWriter:
 
         # Log start of run
         self.log_ingestion_run(
-            {
-                "run_id": run_id,
-                "source_type": source_type,
-                "started_at": start_time,
-                "status": "started",
-                "config_used": config_used or {},
-            }
-        )
+                {
+                    "run_id": run_id,
+                    "source_type": source_type,
+                    "started_at": start_time,
+                    "status": "started",
+                    "config_used": config_used or {},
+                    "tool_version": self.tool_version,
+                }
+            )
 
         run_stats = {
             "files_processed": 0,
@@ -701,7 +706,7 @@ class BigQueryWriter:
                     "bytes_written": run_stats.get("bytes_written"),
                     "processing_duration_ms": duration_ms,
                     "total_tokens": run_stats.get("total_tokens"),
-                    "tool_version": "1.0.0",
+                    "tool_version": self.tool_version,
                     "config_params": config_used or {},
                 }
             )
@@ -727,7 +732,7 @@ class BigQueryWriter:
                     "bytes_written": run_stats.get("bytes_written"),
                     "processing_duration_ms": duration_ms,
                     "total_tokens": run_stats.get("total_tokens"),
-                    "tool_version": "1.0.0",
+                    "tool_version": self.tool_version,
                     "config_params": config_used or {},
                     "error_summary": str(e),
                 }
@@ -750,6 +755,7 @@ class BigQueryWriter:
                     "started_at": start_time,
                     "completed_at": datetime.now(timezone.utc),
                     "status": "failed",
+                    "tool_version": self.tool_version,
                     "error_summary": str(e),
                 }
             )
@@ -763,6 +769,7 @@ class BigQueryWriter:
                     "started_at": start_time,
                     "completed_at": datetime.now(timezone.utc),
                     "status": "completed",
+                    "tool_version": self.tool_version,
                 }
             )
 
@@ -969,10 +976,16 @@ def create_bigquery_writer(
     project_id: Optional[str] = None,
     dataset_id: Optional[str] = None,
     batch_size: int = 1000,
+    tool_version: Optional[str] = None,
 ) -> BigQueryWriter:
     """Create BigQuery writer with specified configuration"""
     batch_config = BatchConfig(batch_size=batch_size)
-    return BigQueryWriter(project_id, dataset_id, batch_config=batch_config)
+    return BigQueryWriter(
+        project_id,
+        dataset_id,
+        batch_config=batch_config,
+        tool_version=tool_version,
+    )
 
 
 # Utility functions
