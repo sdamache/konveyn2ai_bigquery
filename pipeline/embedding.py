@@ -163,8 +163,8 @@ class EmbeddingGenerator:
                 self.stats["total_latency_ms"] += latency_ms
                 self.stats["api_calls"] += 1
 
-                if response and hasattr(response, "embedding") and response.embedding:
-                    embedding = response.embedding
+                if response and "embedding" in response and response["embedding"]:
+                    embedding = response["embedding"]
                     # Cache the result
                     self.cache.set(normalized_content, self.model, embedding)
                     return embedding
