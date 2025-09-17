@@ -73,6 +73,11 @@
 
 **Command**: `make test-contract` to verify TDD foundation
 
+### Contract Stabilization Notes (Hackathon Sprint)
+
+See [`Contract Stabilization`](docs/contract_stabilization_notes.md) for the full remediation checklist, testing loop, and post-hackathon backlog.
+
+
 ## 🧠 Embedding Generation Pipeline
 
 KonveyN2AI implements a production-ready embedding generation pipeline that creates 768-dimensional vectors for semantic search using Google Gemini API.
