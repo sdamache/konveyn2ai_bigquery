@@ -120,12 +120,16 @@ class FastAPIParserImpl(FastAPIParser):
                 file_chunks = self.parse_openapi_spec(content)
                 for chunk in file_chunks:
                     chunk.source_uri = file_path
+                    chunk.tool_version = self.version
+                    chunk.source_metadata.setdefault("src_path", file_path)
                 chunks.extend(file_chunks)
             elif file_path.endswith(".py"):
                 # Python source code
                 file_chunks = self.parse_source_code(content)
                 for chunk in file_chunks:
                     chunk.source_uri = file_path
+                    chunk.tool_version = self.version
+                    chunk.source_metadata.setdefault("src_path", file_path)
                 chunks.extend(file_chunks)
             else:
                 # Try to validate as either
@@ -137,6 +141,8 @@ class FastAPIParserImpl(FastAPIParser):
 
                     for chunk in file_chunks:
                         chunk.source_uri = file_path
+                        chunk.tool_version = self.version
+                        chunk.source_metadata.setdefault("src_path", file_path)
                     chunks.extend(file_chunks)
 
         except Exception as e:
@@ -147,7 +153,7 @@ class FastAPIParserImpl(FastAPIParser):
                     error_class=ErrorClass.PARSING,
                     error_msg=str(e),
                     stack_trace=str(e),
-                    collected_at=datetime.now(datetime.timezone.utc),
+                    collected_at=datetime.now(timezone.utc),
                 )
             )
 
@@ -210,7 +216,7 @@ class FastAPIParserImpl(FastAPIParser):
                     source_uri=directory_path,
                     error_class=ErrorClass.PARSING,
                     error_msg=f"Error processing directory: {str(e)}",
-                    collected_at=datetime.now(datetime.timezone.utc),
+                    collected_at=datetime.now(timezone.utc),
                 )
             )
 
@@ -402,6 +408,8 @@ class FastAPIParserImpl(FastAPIParser):
             {"start_line": start_line, "end_line": end_line},
         )
 
+        timestamp = datetime.now(timezone.utc)
+
         return ChunkMetadata(
             source_type=self.source_type,
             artifact_id=artifact_id,
@@ -409,7 +417,10 @@ class FastAPIParserImpl(FastAPIParser):
             content_hash=self.hash_generator.generate_content_hash(
                 chunk_content, "fastapi"
             ),
-            collected_at=datetime.now(timezone.utc),
+            collected_at=timestamp,
+            created_at=timestamp,
+            updated_at=timestamp,
+            tool_version=self.version,
             source_metadata={
                 "http_method": method,
                 "route_path": path,
@@ -443,6 +454,8 @@ class FastAPIParserImpl(FastAPIParser):
         properties = schema_def.get("properties", {})
         required_fields = schema_def.get("required", [])
 
+        timestamp = datetime.now(timezone.utc)
+
         return ChunkMetadata(
             source_type=self.source_type,
             artifact_id=artifact_id,
@@ -450,7 +463,10 @@ class FastAPIParserImpl(FastAPIParser):
             content_hash=self.hash_generator.generate_content_hash(
                 chunk_content, "fastapi"
             ),
-            collected_at=datetime.now(timezone.utc),
+            collected_at=timestamp,
+            created_at=timestamp,
+            updated_at=timestamp,
+            tool_version=self.version,
             source_metadata={
                 "openapi_schema": schema_name,
                 "schema_type": schema_def.get("type", "object"),
@@ -643,6 +659,8 @@ class FastAPIParserImpl(FastAPIParser):
             f"route_{func_node.name}", {"start_line": start_line, "end_line": end_line}
         )
 
+        timestamp = datetime.now(timezone.utc)
+
         return ChunkMetadata(
             source_type=self.source_type,
             artifact_id=artifact_id,
@@ -650,7 +668,10 @@ class FastAPIParserImpl(FastAPIParser):
             content_hash=self.hash_generator.generate_content_hash(
                 chunk_content, "fastapi"
             ),
-            collected_at=datetime.now(timezone.utc),
+            collected_at=timestamp,
+            created_at=timestamp,
+            updated_at=timestamp,
+            tool_version=self.version,
             source_metadata={
                 "http_method": route_info["http_method"],
                 "route_path": route_info["route_path"],
@@ -704,6 +725,8 @@ class FastAPIParserImpl(FastAPIParser):
             f"model_{class_node.name}", {"start_line": start_line, "end_line": end_line}
         )
 
+        timestamp = datetime.now(timezone.utc)
+
         return ChunkMetadata(
             source_type=self.source_type,
             artifact_id=artifact_id,
@@ -711,7 +734,10 @@ class FastAPIParserImpl(FastAPIParser):
             content_hash=self.hash_generator.generate_content_hash(
                 chunk_content, "fastapi"
             ),
-            collected_at=datetime.now(timezone.utc),
+            collected_at=timestamp,
+            created_at=timestamp,
+            updated_at=timestamp,
+            tool_version=self.version,
             source_metadata={
                 "fastapi_model_type": "pydantic",
                 "fastapi_model_name": class_node.name,

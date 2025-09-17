@@ -5,7 +5,7 @@ T026: Implements IRS Individual Master File (IMF) fixed-width record layout pars
 
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -133,7 +133,7 @@ class IRSParserImpl(IRSParser):
                     error_class=ErrorClass.VALIDATION,
                     error_msg="Invalid IRS IMF layout format",
                     sample_text=content[:200] if content else "Empty file",
-                    collected_at=datetime.utcnow(),
+                    collected_at=datetime.now(timezone.utc),
                 )
                 return ParseResult(
                     chunks=[],
@@ -148,6 +148,7 @@ class IRSParserImpl(IRSParser):
             # Set source URI for all chunks
             for chunk in chunks:
                 chunk.source_uri = file_path
+                chunk.tool_version = self.version
 
             duration_ms = max(1, int((time.time() - start_time) * 1000))
             return ParseResult(
@@ -165,7 +166,7 @@ class IRSParserImpl(IRSParser):
                 error_msg=f"Error parsing file: {str(e)}",
                 sample_text=None,
                 stack_trace=str(e),
-                collected_at=datetime.utcnow(),
+                collected_at=datetime.now(timezone.utc),
             )
             return ParseResult(
                 chunks=[],
@@ -190,7 +191,7 @@ class IRSParserImpl(IRSParser):
                     source_uri=directory_path,
                     error_class=ErrorClass.PARSING,
                     error_msg="Directory does not exist or is not a directory",
-                    collected_at=datetime.utcnow(),
+                    collected_at=datetime.now(timezone.utc),
                 )
                 return ParseResult(
                     chunks=[],
@@ -228,7 +229,7 @@ class IRSParserImpl(IRSParser):
                 error_class=ErrorClass.PARSING,
                 error_msg=f"Error parsing directory: {str(e)}",
                 stack_trace=str(e),
-                collected_at=datetime.utcnow(),
+                collected_at=datetime.now(timezone.utc),
             )
             return ParseResult(
                 chunks=all_chunks,
@@ -490,6 +491,8 @@ class IRSParserImpl(IRSParser):
             "fields": fields,
         }
 
+        timestamp = datetime.now(timezone.utc)
+
         return ChunkMetadata(
             source_type=SourceType.IRS,
             artifact_id=artifact_id,
@@ -497,7 +500,10 @@ class IRSParserImpl(IRSParser):
             content_tokens=content_tokens,
             content_hash=content_hash,
             source_uri="",  # Will be set by parse_file
-            collected_at=datetime.utcnow(),
+            collected_at=timestamp,
+            created_at=timestamp,
+            updated_at=timestamp,
+            tool_version=self.version,
             source_metadata=source_metadata,
         )
 

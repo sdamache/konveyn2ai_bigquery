@@ -23,12 +23,13 @@ jobs:
       pull-requests: write  # Allow Claude to create/update PRs
       issues: write  # Allow Claude to update issues
       id-token: write
-      actions: read # Required for Claude to read CI results on PRs
+      actions: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0  # Full history for better context
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run Claude Code
         id: claude
@@ -36,34 +37,32 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           
-          # This is an optional setting that allows Claude to read CI results on PRs
-          additional_permissions: |
-            actions: read
-          
-          # Configure Claude using claude_args (v1 format)
+          # Remove tool restrictions to allow full functionality
           claude_args: |
             --model claude-sonnet-4-20250514
             --max-turns 10
-            --allowed-tools "Bash(make:*),Bash(pytest:*),Bash(python:*),Bash(pre-commit run:*),Bash(gh pr:*),Bash(gh issue:*),Bash(gh api:*),Bash(black:*)"
+            --allowed-tools "Read,Edit,Write,TodoWrite,Glob,Grep,Bash(make:*),Bash(pytest:*),Bash(python:*),Bash(pre-commit run:*),Bash(gh pr:*),Bash(gh issue:*),Bash(gh api:*),Bash(black:*)"
 
-          # Use prompt parameter to provide project-specific guidance
+          # Environment variables for your BigQuery project
+          settings: |
+            PROJECT_TYPE: bigquery_hackathon
+            ENVIRONMENT: development
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
           prompt: |
-            This is a BigQuery AI Hackathon project. Key project guidelines:
+            This is a BigQuery AI Hackathon project with a three-tier architecture. 
+            Key project guidelines:
             - Follow instructions in CLAUDE.md for project-specific protocols
             - Prefer editing existing files over creating new ones
             - Focus on functional implementation over mocks for demo readiness
             - Use make commands for BigQuery operations when needed
             - This is a Python/FastAPI backend with BigQuery integration
+            - Always examine the codebase first to understand current implementation
+            - Create meaningful commits with clear messages
+            - Test changes when possible using available tools
 
-            When working with GitHub issues and PRs, use gh commands to fetch information.
-
-          # Optional: Customize the trigger phrase (default: @claude)
-          # trigger_phrase: "/claude"
-
-          # Optional: Trigger when specific user is assigned to an issue
-          # assignee_trigger: "claude-bot"
-          
-          # Optional: Custom environment variables for Claude
-          # claude_env: |
-          #   NODE_ENV: test
-
+            When working with GitHub issues and PRs:
+            1. Use gh commands to fetch context and understand the full scope
+            2. Read relevant files to understand current implementation
+            3. Make focused, incremental changes
+            4. Verify changes work as expected

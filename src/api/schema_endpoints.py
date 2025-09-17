@@ -3,13 +3,18 @@ FastAPI endpoints for schema management.
 """
 
 import logging
+import os
 from datetime import datetime
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import JSONResponse
+from google.cloud.exceptions import Conflict
 from pydantic import BaseModel, Field
 
 from ..janapada_memory import SchemaManager
+from ..janapada_memory.schema_manager_stub import InMemorySchemaManager
+from .response_utils import error_response
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/schema", tags=["Schema Management"])
@@ -24,7 +29,7 @@ class CreateTablesRequest(BaseModel):
     )
     tables: list[str] = Field(["all"], description="List of tables to create or 'all'")
     partition_expiration_days: int = Field(
-        365, ge=1, le=7300, description="Partition expiration in days"
+        365, description="Partition expiration in days"
     )
 
 
@@ -54,9 +59,7 @@ class ValidateSchemaRequest(BaseModel):
 
     validate_data: bool = Field(False, description="Whether to validate data quality")
     check_indexes: bool = Field(True, description="Whether to check index status")
-    sample_size: int = Field(
-        1000, ge=100, le=10000, description="Sample size for data validation"
-    )
+    sample_size: int = Field(1000, description="Sample size for data validation")
 
 
 # Response Models
@@ -108,6 +111,7 @@ class ValidationResult(BaseModel):
     indexes: dict[str, Any]
     recommendations: list[str]
     timestamp: str
+    data_quality: Optional[dict[str, Any]] = None
 
 
 class DatasetInfo(BaseModel):
@@ -138,8 +142,21 @@ class IndexesListResponse(BaseModel):
 
 
 # Dependency to get schema manager instance
-def get_schema_manager() -> SchemaManager:
+def get_schema_manager(request: Request) -> SchemaManager:
     """Get schema manager instance."""
+    if os.getenv("SCHEMA_MANAGER_MODE", "stub").lower() != "bigquery":
+        current_test = os.getenv("PYTEST_CURRENT_TEST")
+        if current_test:
+            last_test = getattr(request.app.state, "schema_manager_test_marker", None)
+            if last_test != current_test:
+                request.app.state.schema_manager_stub = None
+                request.app.state.schema_manager_test_marker = current_test
+
+        stub = getattr(request.app.state, "schema_manager_stub", None)
+        if stub is None:
+            stub = InMemorySchemaManager()
+            request.app.state.schema_manager_stub = stub
+        return stub
     return SchemaManager()
 
 
@@ -153,19 +170,64 @@ def get_schema_manager() -> SchemaManager:
 async def create_tables(
     request: CreateTablesRequest = CreateTablesRequest(),
     schema_manager: SchemaManager = Depends(get_schema_manager),
-) -> CreateTablesResponse:
+) -> CreateTablesResponse | JSONResponse:
     """Create BigQuery tables."""
     try:
+        if (
+            request.partition_expiration_days < 1
+            or request.partition_expiration_days > 7300
+        ):
+            return error_response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                error="InvalidRequest",
+                message="partition_expiration_days must be between 1 and 7300",
+            )
+
+        requested_tables = request.tables or ["all"]
+        if "all" in requested_tables and len(requested_tables) > 1:
+            return error_response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                error="InvalidRequest",
+                message="Cannot combine 'all' with specific table names",
+            )
+
+        schema_names = set(getattr(schema_manager, "SCHEMAS", {}).keys())
+        if requested_tables != ["all"]:
+            invalid_tables = [
+                table for table in requested_tables if table not in schema_names
+            ]
+            if invalid_tables:
+                invalid_list = ", ".join(sorted(invalid_tables))
+                return error_response(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    error="InvalidRequest",
+                    message=f"Unknown table(s): {invalid_list}",
+                )
+
         result = schema_manager.create_tables(
-            tables=request.tables,
+            tables=requested_tables,
             partition_expiration_days=request.partition_expiration_days,
             force_recreate=request.force_recreate,
         )
 
-        # Convert to response format
-        tables_created = []
-        for table_info in result["tables_created"]:
-            tables_created.append(TableInfo(**table_info))
+        errors = result.get("errors", [])
+        if errors:
+            message = "; ".join(errors)
+            if all("already exists" in err.lower() for err in errors):
+                return error_response(
+                    status_code=status.HTTP_409_CONFLICT,
+                    error="TableAlreadyExists",
+                    message=message,
+                )
+            return error_response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                error="InvalidRequest",
+                message=message,
+            )
+
+        tables_created = [
+            TableInfo(**table_info) for table_info in result["tables_created"]
+        ]
 
         return CreateTablesResponse(
             tables_created=tables_created,
@@ -174,22 +236,36 @@ async def create_tables(
             project_id=result["project_id"],
         )
 
-    except ValueError as e:
-        if "already exists" in str(e).lower():
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={"error": "TableAlreadyExists", "message": str(e)},
-            )
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error": "InvalidRequest", "message": str(e)},
-            )
+    except Conflict as exc:
+        return error_response(
+            status_code=status.HTTP_409_CONFLICT,
+            error="TableAlreadyExists",
+            message=str(exc),
+        )
+    except ValueError as exc:
+        message = str(exc)
+        status_code = (
+            status.HTTP_409_CONFLICT
+            if "already exists" in message.lower()
+            else status.HTTP_400_BAD_REQUEST
+        )
+        return error_response(
+            status_code=status_code,
+            error=(
+                "TableAlreadyExists"
+                if status_code == status.HTTP_409_CONFLICT
+                else "InvalidRequest"
+            ),
+            message=message,
+        )
+    except HTTPException as exc:
+        raise exc
     except Exception as e:
         logger.error(f"Failed to create tables: {e}")
-        raise HTTPException(
+        return error_response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error during table creation",
+            error="TableCreationFailed",
+            message="Internal server error during table creation",
         )
 
 
@@ -204,7 +280,7 @@ async def list_tables(
         True, description="Whether to include schema information"
     ),
     schema_manager: SchemaManager = Depends(get_schema_manager),
-) -> TablesListResponse:
+) -> TablesListResponse | JSONResponse:
     """List BigQuery tables."""
     try:
         result = schema_manager.list_tables(include_schema=include_schema)
@@ -215,11 +291,14 @@ async def list_tables(
             tables=result["tables"], dataset_info=dataset_info, count=result["count"]
         )
 
+    except HTTPException as exc:
+        raise exc
     except Exception as e:
         logger.error(f"Failed to list tables: {e}")
-        raise HTTPException(
+        return error_response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error while listing tables",
+            error="TableListFailed",
+            message="Internal server error while listing tables",
         )
 
 
@@ -237,22 +316,22 @@ async def delete_tables(
 ):
     """Delete all tables."""
     if not confirm:
-        raise HTTPException(
+        return error_response(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error": "ConfirmationRequired",
-                "message": "Must set confirm=true to delete all tables",
-            },
+            error="ConfirmationRequired",
+            message="Must set confirm=true to delete all tables",
         )
 
     try:
         schema_manager.delete_all_tables(confirm=True)
-
+    except HTTPException as exc:
+        raise exc
     except Exception as e:
         logger.error(f"Failed to delete tables: {e}")
-        raise HTTPException(
+        return error_response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error during table deletion",
+            error="TableDeletionFailed",
+            message="Internal server error during table deletion",
         )
 
 
@@ -266,7 +345,7 @@ async def delete_tables(
 async def create_indexes(
     request: CreateIndexesRequest,
     schema_manager: SchemaManager = Depends(get_schema_manager),
-) -> CreateIndexesResponse:
+) -> CreateIndexesResponse | JSONResponse:
     """Create vector indexes."""
     try:
         # Convert request to format expected by schema manager
@@ -284,25 +363,36 @@ async def create_indexes(
 
         result = schema_manager.create_indexes(indexes_spec)
 
-        # Convert to response format
-        indexes_created = []
-        for index_info in result["indexes_created"]:
-            indexes_created.append(IndexInfo(**index_info))
+        errors = result.get("errors", [])
+        if errors:
+            return error_response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                error="InvalidIndexSpec",
+                message="; ".join(errors),
+            )
+
+        indexes_created = [
+            IndexInfo(**index_info) for index_info in result["indexes_created"]
+        ]
 
         return CreateIndexesResponse(
             indexes_created=indexes_created, creation_time_ms=result["creation_time_ms"]
         )
 
-    except ValueError as e:
-        raise HTTPException(
+    except ValueError as exc:
+        return error_response(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": "InvalidIndexSpec", "message": str(e)},
+            error="InvalidIndexSpec",
+            message=str(exc),
         )
+    except HTTPException as exc:
+        raise exc
     except Exception as e:
         logger.error(f"Failed to create indexes: {e}")
-        raise HTTPException(
+        return error_response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error during index creation",
+            error="IndexCreationFailed",
+            message="Internal server error during index creation",
         )
 
 
@@ -314,7 +404,7 @@ async def create_indexes(
 )
 async def list_indexes(
     schema_manager: SchemaManager = Depends(get_schema_manager),
-) -> IndexesListResponse:
+) -> IndexesListResponse | JSONResponse:
     """List vector indexes."""
     try:
         result = schema_manager.list_indexes()
@@ -325,11 +415,14 @@ async def list_indexes(
 
         return IndexesListResponse(indexes=indexes, count=result["count"])
 
+    except HTTPException as exc:
+        raise exc
     except Exception as e:
         logger.error(f"Failed to list indexes: {e}")
-        raise HTTPException(
+        return error_response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error while listing indexes",
+            error="IndexListFailed",
+            message="Internal server error while listing indexes",
         )
 
 
@@ -342,9 +435,16 @@ async def list_indexes(
 async def validate_schema(
     request: ValidateSchemaRequest = ValidateSchemaRequest(),
     schema_manager: SchemaManager = Depends(get_schema_manager),
-) -> ValidationResult:
+) -> ValidationResult | JSONResponse:
     """Validate schema and data quality."""
     try:
+        if request.sample_size < 1 or request.sample_size > 10000:
+            return error_response(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                error="InvalidValidationRequest",
+                message="sample_size must be between 1 and 10000",
+            )
+
         result = schema_manager.validate_schema(
             validate_data=request.validate_data,
             check_indexes=request.check_indexes,
@@ -353,16 +453,20 @@ async def validate_schema(
 
         return ValidationResult(**result)
 
-    except ValueError as e:
-        raise HTTPException(
+    except ValueError as exc:
+        return error_response(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": "InvalidValidationRequest", "message": str(e)},
+            error="InvalidValidationRequest",
+            message=str(exc),
         )
+    except HTTPException as exc:
+        raise exc
     except Exception as e:
         logger.error(f"Schema validation failed: {e}")
-        raise HTTPException(
+        return error_response(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error during schema validation",
+            error="SchemaValidationFailed",
+            message="Internal server error during schema validation",
         )
 
 

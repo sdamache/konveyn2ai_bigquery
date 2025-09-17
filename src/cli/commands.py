@@ -107,7 +107,9 @@ def ingest_kubernetes(args: argparse.Namespace, run_id: str) -> dict[str, Any]:
         if args.output == "bigquery":
             # Write to BigQuery with enhanced run tracking (T031-T033)
             writer = create_bigquery_writer(
-                project_id=args.project, dataset_id=args.dataset
+                project_id=args.project,
+                dataset_id=args.dataset,
+                tool_version=getattr(parser, "version", None),
             )
 
             config_used = {
@@ -211,7 +213,9 @@ def ingest_fastapi(args: argparse.Namespace, run_id: str) -> dict[str, Any]:
         if args.output == "bigquery":
             # Write to BigQuery with enhanced run tracking (T031-T033)
             writer = create_bigquery_writer(
-                project_id=args.project, dataset_id=args.dataset
+                project_id=args.project,
+                dataset_id=args.dataset,
+                tool_version=getattr(parser, "version", None),
             )
 
             config_used = {
@@ -314,7 +318,9 @@ def ingest_cobol(args: argparse.Namespace, run_id: str) -> dict[str, Any]:
         if args.output == "bigquery":
             # Write to BigQuery with enhanced run tracking (T031-T033)
             writer = create_bigquery_writer(
-                project_id=args.project, dataset_id=args.dataset
+                project_id=args.project,
+                dataset_id=args.dataset,
+                tool_version=getattr(parser, "version", None),
             )
 
             config_used = {
@@ -417,7 +423,9 @@ def ingest_irs(args: argparse.Namespace, run_id: str) -> dict[str, Any]:
         if args.output == "bigquery":
             # Write to BigQuery with enhanced run tracking (T031-T033)
             writer = create_bigquery_writer(
-                project_id=args.project, dataset_id=args.dataset
+                project_id=args.project,
+                dataset_id=args.dataset,
+                tool_version=getattr(parser, "version", None),
             )
 
             config_used = {
@@ -520,7 +528,9 @@ def ingest_mumps(args: argparse.Namespace, run_id: str) -> dict[str, Any]:
         if args.output == "bigquery":
             # Write to BigQuery with enhanced run tracking (T031-T033)
             writer = create_bigquery_writer(
-                project_id=args.project, dataset_id=args.dataset
+                project_id=args.project,
+                dataset_id=args.dataset,
+                tool_version=getattr(parser, "version", None),
             )
 
             config_used = {

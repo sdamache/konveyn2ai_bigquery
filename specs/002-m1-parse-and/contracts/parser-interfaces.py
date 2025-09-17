@@ -43,6 +43,9 @@ class ChunkMetadata:
     source_uri: str = ""
     repo_ref: Optional[str] = None
     collected_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    tool_version: Optional[str] = None
 
     # Source-specific metadata stored as dict
     source_metadata: dict[str, Any] = None
@@ -52,6 +55,10 @@ class ChunkMetadata:
             self.source_metadata = {}
         if self.collected_at is None:
             self.collected_at = datetime.utcnow()
+        if self.created_at is None:
+            self.created_at = self.collected_at
+        if self.updated_at is None:
+            self.updated_at = self.collected_at
 
 
 @dataclass

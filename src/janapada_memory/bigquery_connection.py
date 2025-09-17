@@ -41,6 +41,8 @@ class BigQueryConnection:
             max_retries: Maximum number of retry attempts
             retry_delay: Delay between retries in seconds
         """
+        # NOTE: default to hackathon project/dataset only when env vars are unset to
+        # keep local tooling runnable; production deploys must supply explicit values.
         self.project_id = project_id or os.getenv("GOOGLE_CLOUD_PROJECT")
         self.dataset_id = dataset_id or os.getenv(
             "BIGQUERY_DATASET_ID", "semantic_gap_detector"

@@ -36,9 +36,12 @@ class SchemaManager:
         ],
         "source_embeddings": [
             bigquery.SchemaField("chunk_id", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("model", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("content_hash", "STRING", mode="REQUIRED"),
             bigquery.SchemaField("embedding", "FLOAT64", mode="REPEATED"),
-            bigquery.SchemaField("embedding_model", "STRING", mode="REQUIRED"),
             bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED"),
+            bigquery.SchemaField("source_type", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("artifact_id", "STRING", mode="NULLABLE"),
             bigquery.SchemaField("partition_date", "DATE", mode="REQUIRED"),
         ],
         "gap_metrics": [
@@ -55,7 +58,7 @@ class SchemaManager:
     # Clustering configuration
     CLUSTERING_CONFIG = {
         "source_metadata": ["artifact_type", "source", "chunk_id"],
-        "source_embeddings": ["chunk_id"],
+        "source_embeddings": ["chunk_id", "model", "content_hash"],
         "gap_metrics": ["analysis_id", "metric_type", "chunk_id"],
     }
 
@@ -76,6 +79,8 @@ class SchemaManager:
         if connection:
             self.connection = connection
         else:
+            # Use same environment-driven fallbacks as BigQueryConnection so CLI/tests
+            # can run locally without hardcoding production credentials.
             self.connection = BigQueryConnection(
                 project_id=project_id, dataset_id=dataset_id
             )
