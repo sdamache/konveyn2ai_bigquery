@@ -284,7 +284,10 @@ class InMemorySchemaManager:
             exists = table_name in self._tables
             schema_valid = exists
             if exists:
-                stored = {field.name: field.field_type for field in self._tables[table_name]["schema"]}
+                stored = {
+                    field.name: field.field_type
+                    for field in self._tables[table_name]["schema"]
+                }
                 expected = {field.name: field.field_type for field in schema}
                 schema_valid = stored == expected
 

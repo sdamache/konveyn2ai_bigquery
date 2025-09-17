@@ -84,11 +84,7 @@ class InMemoryVectorStore:
             records = [r for r in records if r["artifact_type"] == artifact_type]
 
         if created_since:
-            records = [
-                r
-                for r in records
-                if r["created_at"] >= created_since
-            ]
+            records = [r for r in records if r["created_at"] >= created_since]
 
         total = len(records)
         page = records[offset : offset + limit]
@@ -136,7 +132,9 @@ class InMemoryVectorStore:
 
             if similarity >= similarity_threshold:
                 cleaned = self._clean_record(record)
-                cleaned.update({"chunk_id": record["chunk_id"], "similarity_score": similarity})
+                cleaned.update(
+                    {"chunk_id": record["chunk_id"], "similarity_score": similarity}
+                )
                 results.append(cleaned)
 
         results.sort(key=lambda item: item["similarity_score"], reverse=True)
@@ -162,7 +160,9 @@ class InMemoryVectorStore:
             sources,
         )
 
-    def batch_insert_embeddings(self, embeddings_data: List[dict[str, Any]]) -> list[dict[str, Any]]:
+    def batch_insert_embeddings(
+        self, embeddings_data: List[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         results = []
         for entry in embeddings_data:
             chunk_data = {
@@ -175,7 +175,9 @@ class InMemoryVectorStore:
                 "record_name": entry.get("record_name"),
             }
             try:
-                result = self.insert_embedding(chunk_data, entry["embedding"], entry.get("metadata"))
+                result = self.insert_embedding(
+                    chunk_data, entry["embedding"], entry.get("metadata")
+                )
                 results.append(result)
             except Conflict as conflict_error:
                 results.append(
@@ -201,7 +203,9 @@ class InMemoryVectorStore:
     def count_embeddings(self, artifact_types: Optional[List[str]] = None) -> int:
         if not artifact_types:
             return len(self._metadata)
-        return sum(1 for r in self._metadata.values() if r["artifact_type"] in artifact_types)
+        return sum(
+            1 for r in self._metadata.values() if r["artifact_type"] in artifact_types
+        )
 
     def health_check(self) -> dict[str, Any]:
         return {

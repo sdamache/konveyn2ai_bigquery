@@ -11,43 +11,29 @@ from pydantic import BaseModel, Field
 class EmbeddingInsertRequest(BaseModel):
     """Request model for embedding insertion."""
 
-    chunk_id: Optional[str] = Field(
-        None, description="Unique chunk identifier"
-    )
-    source: Optional[str] = Field(
-        None, description="Source file or location"
-    )
+    chunk_id: Optional[str] = Field(None, description="Unique chunk identifier")
+    source: Optional[str] = Field(None, description="Source file or location")
     artifact_type: Optional[str] = Field(
         None, description="Type of artifact (code, documentation, etc.)"
     )
-    text_content: Optional[str] = Field(
-        None, description="Text content of the chunk"
-    )
+    text_content: Optional[str] = Field(None, description="Text content of the chunk")
     kind: Optional[str] = Field(
         None, description="Kind of artifact (function, class, etc.)"
     )
     api_path: Optional[str] = Field(None, description="API path if applicable")
     record_name: Optional[str] = Field(None, description="Record name")
-    embedding: Optional[list[float]] = Field(
-        None, description="Vector embedding"
-    )
-    metadata: Optional[Any] = Field(
-        None, description="Additional metadata"
-    )
+    embedding: Optional[list[float]] = Field(None, description="Vector embedding")
+    metadata: Optional[Any] = Field(None, description="Additional metadata")
 
 
 class VectorSearchRequest(BaseModel):
     """Request model for vector similarity search."""
 
-    query_embedding: Optional[list[float]] = Field(
-        None, description="Query vector"
-    )
+    query_embedding: Optional[list[float]] = Field(None, description="Query vector")
     query_text: Optional[str] = Field(
         None, description="Text query for similarity search"
     )
-    limit: Optional[int] = Field(
-        None, description="Maximum number of results"
-    )
+    limit: Optional[int] = Field(None, description="Maximum number of results")
     similarity_threshold: Optional[float] = Field(
         None, description="Minimum similarity score"
     )
@@ -63,9 +49,7 @@ class TextSearchRequest(BaseModel):
     """Request model for text-based similarity search."""
 
     query_text: Optional[str] = Field(None, description="Query text")
-    limit: Optional[int] = Field(
-        None, description="Maximum number of results"
-    )
+    limit: Optional[int] = Field(None, description="Maximum number of results")
     similarity_threshold: Optional[float] = Field(
         None, description="Minimum similarity score"
     )

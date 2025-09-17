@@ -251,9 +251,11 @@ async def create_tables(
         )
         return error_response(
             status_code=status_code,
-            error="TableAlreadyExists"
-            if status_code == status.HTTP_409_CONFLICT
-            else "InvalidRequest",
+            error=(
+                "TableAlreadyExists"
+                if status_code == status.HTTP_409_CONFLICT
+                else "InvalidRequest"
+            ),
             message=message,
         )
     except HTTPException as exc:

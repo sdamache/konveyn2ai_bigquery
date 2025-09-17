@@ -34,6 +34,7 @@ router = APIRouter(prefix="/vector-store", tags=["Vector Operations"])
 ALLOWED_ARTIFACT_TYPES = ["code", "documentation", "api", "schema", "test"]
 TARGET_DIMENSIONS = 768
 
+
 def _ensure_metadata_dict(metadata: Optional[Any]) -> dict[str, Any]:
     """Validate and normalize metadata payloads."""
 
@@ -160,7 +161,9 @@ def _parse_int_query(
     return value_int
 
 
-def _coerce_limit(value: Optional[int], *, default: int, minimum: int, maximum: int) -> int:
+def _coerce_limit(
+    value: Optional[int], *, default: int, minimum: int, maximum: int
+) -> int:
     if value is None:
         return default
     if not isinstance(value, int):
@@ -170,9 +173,7 @@ def _coerce_limit(value: Optional[int], *, default: int, minimum: int, maximum: 
     return value
 
 
-def _coerce_similarity_threshold(
-    value: Optional[float], *, default: float
-) -> float:
+def _coerce_similarity_threshold(value: Optional[float], *, default: float) -> float:
     if value is None:
         return default
     try:
@@ -193,7 +194,6 @@ def _text_to_embedding(query_text: str) -> List[float]:
     embedding = [0.0] * TARGET_DIMENSIONS
     embedding[seed] = 1.0
     return embedding
-
 
 
 # Dependency to get vector store instance
@@ -325,15 +325,11 @@ async def insert_embedding(
 async def list_embeddings(
     limit: Optional[str] = Query(None, description="Maximum number of results"),
     offset: Optional[str] = Query(None, description="Offset for pagination"),
-    artifact_type: Optional[str] = Query(
-        None, description="Filter by artifact type"
-    ),
+    artifact_type: Optional[str] = Query(None, description="Filter by artifact type"),
     include_embeddings: bool = Query(
         False, description="Whether to include embedding vectors"
     ),
-    created_since: Optional[str] = Query(
-        None, description="Filter by ISO timestamp"
-    ),
+    created_since: Optional[str] = Query(None, description="Filter by ISO timestamp"),
     vector_store: BigQueryVectorStore = Depends(get_vector_store),
 ) -> EmbeddingListResponse | JSONResponse:
     """List embeddings with pagination."""
@@ -509,7 +505,9 @@ async def search_similar_vectors(
             raise ValueError("Either query_embedding or query_text must be provided")
 
         if has_embedding:
-            query_embedding = _validate_vector(request.query_embedding, "query_embedding")
+            query_embedding = _validate_vector(
+                request.query_embedding, "query_embedding"
+            )
             results = vector_store.search_similar_vectors(
                 query_embedding=query_embedding,
                 limit=limit,

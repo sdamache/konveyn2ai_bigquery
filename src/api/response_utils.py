@@ -31,4 +31,3 @@ def error_response(
     if details:
         payload["details"] = details
     return JSONResponse(status_code=status_code, content=payload)
-

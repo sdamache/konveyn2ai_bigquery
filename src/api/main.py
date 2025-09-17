@@ -56,6 +56,7 @@ async def clear_stubs_on_shutdown() -> None:  # pragma: no cover - exercised via
     app.state.schema_manager_stub = None
     app.state.vector_store_stub = None
 
+
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
