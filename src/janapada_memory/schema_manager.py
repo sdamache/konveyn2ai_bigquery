@@ -79,6 +79,8 @@ class SchemaManager:
         if connection:
             self.connection = connection
         else:
+            # Use same environment-driven fallbacks as BigQueryConnection so CLI/tests
+            # can run locally without hardcoding production credentials.
             self.connection = BigQueryConnection(
                 project_id=project_id, dataset_id=dataset_id
             )

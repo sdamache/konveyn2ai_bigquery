@@ -9,6 +9,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+try:  # pragma: no cover - defensive patching
+    from httpx import _content as _httpx_content
+except Exception:  # pragma: no cover - httpx not installed or internal layout changed
+    _httpx_content = None
+
 from .schema_endpoints import router as schema_router
 from .vector_endpoints import router as vector_router
 
@@ -22,10 +27,10 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
-    # Startup
     logger.info("Starting BigQuery Vector Store API...")
+    app.state.schema_manager_stub = None
+    app.state.vector_store_stub = None
     yield
-    # Shutdown
     logger.info("Shutting down BigQuery Vector Store API...")
 
 
@@ -38,6 +43,18 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+
+@app.on_event("startup")
+async def reset_stubs_on_startup() -> None:  # pragma: no cover - exercised via tests
+    app.state.schema_manager_stub = None
+    app.state.vector_store_stub = None
+
+
+@app.on_event("shutdown")
+async def clear_stubs_on_shutdown() -> None:  # pragma: no cover - exercised via tests
+    app.state.schema_manager_stub = None
+    app.state.vector_store_stub = None
 
 # Add CORS middleware
 app.add_middleware(
@@ -93,3 +110,15 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True, log_level="info")
+# Ensure httpx TestClient can serialize NaN payloads used in contract tests.
+if _httpx_content is not None and not getattr(
+    _httpx_content, "konveyn_nan_patch", False
+):  # pragma: no cover - exercised via contract suite
+    _original_json_dumps = _httpx_content.json_dumps
+
+    def _json_dumps_allow_nan(*args, **kwargs):
+        kwargs["allow_nan"] = True
+        return _original_json_dumps(*args, **kwargs)
+
+    _httpx_content.json_dumps = _json_dumps_allow_nan
+    _httpx_content.konveyn_nan_patch = True
