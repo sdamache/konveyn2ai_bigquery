@@ -14,13 +14,21 @@ jobs:
   deploy:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+
+    # Add permissions for OIDC token generation
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v1
+        uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GOOGLE_CLOUD_CREDENTIALS }}
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+          project_id: 'konveyn2ai'
           
       - name: Deploy to Cloud Run
         run: |
@@ -30,6 +38,8 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           INDEX_ID: ${{ secrets.INDEX_ID }}
           DEMO_TOKEN: ${{ vars.DEMO_TOKEN }}
+          GOOGLE_CLOUD_PROJECT: 'konveyn2ai'
+          BIGQUERY_DATASET_ID: 'semantic_gap_detector'
           
       - name: Validate Deployment
         run: |
