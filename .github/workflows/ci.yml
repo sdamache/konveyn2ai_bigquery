@@ -83,8 +83,6 @@ jobs:
       env:
         GOOGLE_CLOUD_PROJECT: 'konveyn2ai'
         BIGQUERY_DATASET_ID: 'semantic_gap_detector'
-        # Use ADC authentication - no key file needed with WIF
-        GOOGLE_APPLICATION_CREDENTIALS: ''
       run: |
         echo "🧪 Running tests with 70% pass rate threshold for hackathon mode"
         # Run tests and calculate pass rate - CI passes if >= 70% tests pass
