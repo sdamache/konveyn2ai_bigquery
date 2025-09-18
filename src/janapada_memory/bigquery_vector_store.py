@@ -47,9 +47,10 @@ class BigQueryVectorStore:
             self.connection = connection
         else:
             from .config import BigQueryConfig
+
             config = BigQueryConfig(
                 project_id=project_id or "konveyn2ai",
-                dataset_id=dataset_id or "semantic_gap_detector"
+                dataset_id=dataset_id or "semantic_gap_detector",
             )
             self.connection = BigQueryConnectionManager(config=config)
 

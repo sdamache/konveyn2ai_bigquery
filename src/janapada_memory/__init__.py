@@ -28,19 +28,19 @@ except ImportError as e:
     class BigQueryConnection:
         def __init__(self, *args, **kwargs):
             raise ImportError("google-cloud-bigquery not installed")
-    
+
     class BigQueryConnectionManager:
         def __init__(self, *args, **kwargs):
             raise ImportError("google-cloud-bigquery not installed")
-    
+
     class BigQueryVectorIndex:
         def __init__(self, *args, **kwargs):
             raise ImportError("google-cloud-bigquery not installed")
-    
+
     class JanapadaMemoryService:
         def __init__(self, *args, **kwargs):
             raise ImportError("google-cloud-bigquery not installed")
-    
+
     def create_memory_service(*args, **kwargs):
         raise ImportError("google-cloud-bigquery not installed")
 
