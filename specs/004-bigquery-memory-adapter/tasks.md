@@ -31,28 +31,28 @@
 
 ## Phase 3.1: Setup & Environment
 
-- [ ] T001 Create BigQuery configuration module in `src/janapada_memory/config/bigquery_config.py`
+- [x] T001 Create BigQuery configuration module in `src/janapada_memory/config/bigquery_config.py`
   **Acceptance**: Configuration loads from environment variables (GOOGLE_CLOUD_PROJECT, BIGQUERY_DATASET_ID) with defaults, validates required fields, handles missing credentials gracefully.
 
-- [ ] T002 [P] Update project requirements in `requirements.txt` to include `google-cloud-bigquery>=3.0.0`
+- [x] T002 [P] Update project requirements in `requirements.txt` to include `google-cloud-bigquery>=3.0.0`
   **Acceptance**: `pip install -r requirements.txt` succeeds, `import google.cloud.bigquery` works in Python shell.
 
-- [ ] T003 [P] Extend `.env.example` with BigQuery configuration variables
+- [x] T003 [P] Extend `.env.example` with BigQuery configuration variables
   **Acceptance**: File contains GOOGLE_CLOUD_PROJECT, BIGQUERY_DATASET_ID, BIGQUERY_TABLE_PREFIX with example values and documentation comments.
 
 ## Phase 3.2: Contract Tests First (TDD) ⚠️ MUST COMPLETE BEFORE 3.3
 **CRITICAL: These tests MUST be written and MUST FAIL before ANY implementation**
 
-- [ ] T004 [P] Verify vector_index_contract.py tests FAIL in `tests/contract/test_bigquery_vector_index_contract.py`
+- [x] T004 [P] Verify vector_index_contract.py tests FAIL in `tests/contract/test_bigquery_vector_index_contract.py`
   **Acceptance**: `pytest specs/004-bigquery-memory-adapter/contracts/vector_index_contract.py -v` shows ImportError or NotImplementedError for BigQueryVectorIndex class.
 
-- [ ] T005 [P] Verify bigquery_integration_contract.py tests FAIL in `tests/integration/test_bigquery_integration.py`
+- [x] T005 [P] Verify bigquery_integration_contract.py tests FAIL in `tests/integration/test_bigquery_integration.py`
   **Acceptance**: `pytest specs/004-bigquery-memory-adapter/contracts/bigquery_integration_contract.py -v` shows table/connection failures or ImportError for implementation.
 
-- [ ] T006 [P] Create fallback behavior contract test in `tests/contract/test_fallback_contract.py`
+- [x] T006 [P] Create fallback behavior contract test in `tests/contract/test_fallback_contract.py`
   **Acceptance**: Test verifies similarity_search returns local results when BigQuery client raises NotFound/Forbidden exceptions. Test MUST FAIL initially.
 
-- [ ] T007 [P] Create performance contract test in `tests/contract/test_performance_contract.py`
+- [x] T007 [P] Create performance contract test in `tests/contract/test_performance_contract.py`
   **Acceptance**: Test verifies similarity_search completes within 500ms timeout. Test MUST FAIL initially due to missing implementation.
 
 ## Phase 3.3: Core Implementation (ONLY after tests are failing)

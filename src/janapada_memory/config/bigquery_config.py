@@ -69,6 +69,7 @@ class BigQueryConfig:
 
 class BigQueryConfigError(Exception):
     """Custom exception for BigQuery configuration errors."""
+
     pass
 
 
@@ -116,13 +117,13 @@ class BigQueryConfigManager:
                 project_id=project_id,
                 dataset_id=dataset_id,
                 table_prefix=table_prefix,
-                location=location
+                location=location,
             )
 
             logger.info(
                 "BigQuery configuration loaded successfully: %s.%s",
                 config.project_id,
-                config.dataset_id
+                config.dataset_id,
             )
 
             return config
@@ -165,7 +166,9 @@ class BigQueryConfigManager:
             from google.cloud import bigquery
             from google.cloud.exceptions import NotFound, Forbidden
 
-            client = bigquery.Client(project=config.project_id, location=config.location)
+            client = bigquery.Client(
+                project=config.project_id, location=config.location
+            )
             dataset_ref = f"{config.project_id}.{config.dataset_id}"
 
             # Try to access the dataset
@@ -176,13 +179,13 @@ class BigQueryConfigManager:
         except NotFound:
             logger.error(
                 "Dataset not found: %s. Please run 'make setup' to create tables.",
-                dataset_ref
+                dataset_ref,
             )
             return False
         except Forbidden:
             logger.error(
                 "Access denied to dataset: %s. Please check BigQuery permissions.",
-                dataset_ref
+                dataset_ref,
             )
             return False
         except Exception as e:
