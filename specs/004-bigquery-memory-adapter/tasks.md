@@ -57,14 +57,15 @@
 
 ## Phase 3.3: Core Implementation (ONLY after tests are failing)
 
-- [ ] T008 [P] Create VectorSearchConfig data class in `src/janapada_memory/models/vector_search_config.py`
+- [x] T008 [P] Create VectorSearchConfig data class in `src/janapada_memory/models/vector_search_config.py`
   **Acceptance**: Class validates project_id format, dataset_id accessibility, top_k bounds (1-1000), distance_type enum (COSINE, DOT_PRODUCT). Immutable dataclass with validation.
 
-- [ ] T009 [P] Create VectorSearchResult data class in `src/janapada_memory/models/vector_search_result.py`
+- [x] T009 [P] Create VectorSearchResult data class in `src/janapada_memory/models/vector_search_result.py`
   **Acceptance**: Class contains chunk_id (str), distance (float), metadata (Dict), source (str) fields. Implements comparison for distance ordering.
 
 - [ ] T010 Create BigQueryConnection manager in `src/janapada_memory/connections/bigquery_connection.py`
   **Acceptance**: Manages BigQuery client lifecycle, ADC authentication, connection health checks. Handles authentication failures gracefully with structured logging.
+  - Current status (2025-09-18): `BigQueryConnectionManager` exists, but the legacy `BigQueryConnection` in `src/janapada_memory/bigquery_connection.py` is still the class wired into `BigQueryVectorStore`, `SchemaManager`, `MigrationManager`, API endpoints, and tests. The manager lacks explicit handling for `DefaultCredentialsError`, never closes the client, and has no downstream consumers yet. Before marking T010 complete, migrate those call sites to the manager, add targeted auth failure guidance, and ensure `Client.close()` (or equivalent) runs during teardown.
 
 - [ ] T011 Create BigQueryAdapter SQL query builder in `src/janapada_memory/adapters/bigquery_adapter.py`
   **Acceptance**: Constructs parameterized VECTOR_SEARCH queries, handles vector encoding for BigQuery, parses result rows into VectorSearchResult objects.

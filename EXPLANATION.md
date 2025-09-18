@@ -65,7 +65,7 @@ async def answer_query(query: QueryRequest) -> AnswerResponse:
     return AnswerResponse(answer=advice, sources=sources, request_id=request_id)
 ```
 
-### Janapada Memory (`src/janapada-memory/main.py`)
+### Janapada Memory (`src/janapada_memory/main.py`)
 **Role**: Semantic search engine and knowledge repository
 
 **Core Capabilities**:

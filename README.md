@@ -776,7 +776,7 @@ curl http://localhost:8082/health  # Amatya Role Prompter
 #### Option 2: Local Development
 ```bash
 # Terminal 1: Start Janapada Memory Agent
-cd src/janapada-memory && python main.py
+cd src && python -m janapada_memory.main
 
 # Terminal 2: Start Amatya Role Prompter
 cd src/amatya-role-prompter && python main.py

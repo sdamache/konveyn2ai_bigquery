@@ -9,6 +9,8 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      TDD_PHASE: green
     strategy:
       matrix:
         python-version: ["3.11"]
@@ -20,6 +22,22 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Detect TDD phase
+      if: github.event_name == 'pull_request'
+      run: |
+        PHASE="$TDD_PHASE"
+        LABELS=$(echo '${{ toJSON(github.event.pull_request.labels) }}' | jq -r '.[].name' 2>/dev/null || true)
+        HEAD_REF="${{ github.head_ref }}"
+        if echo "$LABELS" | tr '[:upper:]' '[:lower:]' | grep -qx 'tdd-red-phase'; then
+          PHASE="red"
+        elif [[ "$HEAD_REF" == tdd-red/* ]]; then
+          PHASE="red"
+        fi
+        echo "Detected labels: $LABELS"
+        echo "Branch ref: $HEAD_REF"
+        echo "TDD phase: $PHASE"
+        echo "TDD_PHASE=$PHASE" >> $GITHUB_ENV
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
@@ -79,6 +97,13 @@ jobs:
         # Use CI-specific pre-commit config with --check flags only
         pre-commit run --config .pre-commit-config-ci.yaml --all-files
 
+    - name: Ensure contract tests exist
+      run: |
+        if ! find tests -path 'tests/contract/*.py' -print -quit | grep -q .; then
+          echo '::error::No contract tests found under tests/contract'
+          exit 1
+        fi
+
     - name: Setup test environment
       run: |
         # Create cache directory expected by some tests
@@ -92,12 +117,14 @@ jobs:
         BQ_DATASET: 'source_ingestion'
         BQ_PROJECT: 'konveyn2ai'
       run: |
-        echo "🧪 Running tests with 70% pass rate threshold for hackathon mode"
-        # Run tests and calculate pass rate - CI passes if >= 70% tests pass
+        echo "🧪 Running tests with TDD-aware evaluation"
         PYTHONPATH=src python -c "
         import subprocess
         import sys
         import re
+        import os
+
+        phase = os.environ.get('TDD_PHASE', 'green').lower()
 
         result = subprocess.run(['python', '-m', 'pytest', 'tests/', '-v', '--tb=short'],
                               capture_output=True, text=True, cwd='.')
@@ -105,22 +132,33 @@ jobs:
         output = result.stdout + result.stderr
         print(output)
 
-        # Extract test results
-        match = re.search(r'(\d+) failed.*?(\d+) passed', output)
+        match = re.search(r'(\d+) failed.*?(\d+) passed', output, re.DOTALL)
         if match:
             failed = int(match.group(1))
             passed = int(match.group(2))
             total = failed + passed
             pass_rate = (passed / total) * 100 if total > 0 else 0
 
-            print(f'\n📊 Test Results: {passed}/{total} passed ({pass_rate:.1f}%)')
+            print(f'\n📊 Test Results: {passed}/{total} passed ({pass_rate:.1f}%) — phase: {phase.upper()}')
 
-            if pass_rate >= 70:
-                print('✅ CI PASSED: Test pass rate >= 70%')
-                sys.exit(0)
-            else:
-                print('❌ CI FAILED: Test pass rate < 70%')
+            if total == 0:
+                print('❌ No tests executed; CI cannot proceed.')
                 sys.exit(1)
+
+            if phase == 'red':
+                if failed > 0:
+                    print('✅ RED phase detected: failing tests are expected before implementation.')
+                    sys.exit(0)
+                else:
+                    print('❌ RED phase indicated but no failing tests were detected.')
+                    sys.exit(1)
+            else:
+                if pass_rate >= 70:
+                    print('✅ GREEN phase: test pass rate meets threshold.')
+                    sys.exit(0)
+                else:
+                    print('❌ GREEN phase: test pass rate below threshold.')
+                    sys.exit(1)
         else:
             print('❌ Could not parse test results')
             sys.exit(1)
