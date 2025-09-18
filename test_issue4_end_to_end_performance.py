@@ -491,7 +491,7 @@ def test_issue4_end_to_end_performance():
 if __name__ == "__main__":
     results = test_issue4_end_to_end_performance()
     if results:
-        print(f"\n🎯 Test Status: SUCCESS")
+        print("\n🎯 Test Status: SUCCESS")
         print(f"📊 Documents: {results['document_loading']['documents_loaded']}")
         print(f"🔍 Searches: {results['search_performance']['successful_searches']}")
         print(
@@ -499,5 +499,5 @@ if __name__ == "__main__":
         )
         exit(0)
     else:
-        print(f"\n❌ Test Status: FAILED")
+        print("\n❌ Test Status: FAILED")
         exit(1)
