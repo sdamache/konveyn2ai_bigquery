@@ -34,6 +34,7 @@ class TestVectorIndexContract:
     def vector_index(self):
         """This will fail until BigQueryVectorIndex is implemented."""
         from src.janapada_memory.bigquery_vector_index import BigQueryVectorIndex
+
         return BigQueryVectorIndex()
 
     def test_similarity_search_returns_correct_type(self, vector_index):
@@ -46,10 +47,10 @@ class TestVectorIndexContract:
 
         for result in results:
             assert isinstance(result, dict)
-            assert 'chunk_id' in result
-            assert 'distance' in result
-            assert isinstance(result['chunk_id'], str)
-            assert isinstance(result['distance'], (int, float))
+            assert "chunk_id" in result
+            assert "distance" in result
+            assert isinstance(result["chunk_id"], str)
+            assert isinstance(result["distance"], (int, float))
 
     def test_similarity_search_orders_by_distance(self, vector_index):
         """Results must be ordered by ascending distance."""
@@ -57,8 +58,10 @@ class TestVectorIndexContract:
         results = vector_index.similarity_search(query_vector, top_k=10)
 
         if len(results) > 1:
-            distances = [r['distance'] for r in results]
-            assert distances == sorted(distances), "Results must be ordered by ascending distance"
+            distances = [r["distance"] for r in results]
+            assert distances == sorted(
+                distances
+            ), "Results must be ordered by ascending distance"
 
     def test_similarity_search_respects_top_k(self, vector_index):
         """Must not return more than top_k results."""
@@ -84,10 +87,7 @@ class TestVectorIndexContract:
 
     def test_add_vectors_interface(self, vector_index):
         """add_vectors must accept List[Tuple[str, List[float]]]."""
-        vectors = [
-            ("test_chunk_1", [0.1] * 3072),
-            ("test_chunk_2", [0.2] * 3072)
-        ]
+        vectors = [("test_chunk_1", [0.1] * 3072), ("test_chunk_2", [0.2] * 3072)]
 
         # Should not raise exception
         vector_index.add_vectors(vectors)
@@ -108,8 +108,8 @@ class TestVectorIndexContract:
         # Interface contract must be preserved regardless of backend
         assert isinstance(results, list)
         for result in results:
-            assert 'chunk_id' in result
-            assert 'distance' in result
+            assert "chunk_id" in result
+            assert "distance" in result
 
 
 class TestBigQuerySpecificContract:
@@ -119,12 +119,13 @@ class TestBigQuerySpecificContract:
     def bigquery_index(self):
         """This will fail until BigQueryVectorIndex is implemented."""
         from src.janapada_memory.bigquery_vector_index import BigQueryVectorIndex
+
         return BigQueryVectorIndex()
 
     def test_bigquery_configuration_loading(self, bigquery_index):
         """Must load configuration from environment variables."""
         # This will fail until configuration is implemented
-        assert hasattr(bigquery_index, 'config')
+        assert hasattr(bigquery_index, "config")
         assert bigquery_index.config.project_id is not None
         assert bigquery_index.config.dataset_id is not None
 
@@ -142,6 +143,6 @@ class TestBigQuerySpecificContract:
 
     def test_health_check_method(self, bigquery_index):
         """Must provide BigQuery health checking."""
-        assert hasattr(bigquery_index, 'check_bigquery_health')
+        assert hasattr(bigquery_index, "check_bigquery_health")
         health = bigquery_index.check_bigquery_health()
         assert isinstance(health, bool)

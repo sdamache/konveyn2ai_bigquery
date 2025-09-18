@@ -21,9 +21,9 @@ class TestBigQueryIntegrationContract:
     def test_dataset_config(self):
         """Test dataset configuration from environment."""
         return {
-            'project_id': os.getenv('GOOGLE_CLOUD_PROJECT', 'konveyn2ai'),
-            'dataset_id': os.getenv('BIGQUERY_DATASET_ID', 'source_ingestion'),
-            'table_name': 'source_embeddings'
+            "project_id": os.getenv("GOOGLE_CLOUD_PROJECT", "konveyn2ai"),
+            "dataset_id": os.getenv("BIGQUERY_DATASET_ID", "source_ingestion"),
+            "table_name": "source_embeddings",
         }
 
     def test_source_embeddings_table_exists(self, bigquery_client, test_dataset_config):
@@ -33,7 +33,7 @@ class TestBigQueryIntegrationContract:
         try:
             table = bigquery_client.get_table(table_ref)
             assert table is not None
-            assert table.table_type == 'TABLE'
+            assert table.table_type == "TABLE"
         except NotFound:
             pytest.fail(f"Table {table_ref} not found - run 'make setup' first")
         except Forbidden:
@@ -47,12 +47,14 @@ class TestBigQueryIntegrationContract:
         # Find embedding_vector column
         vector_column = None
         for field in table.schema:
-            if field.name == 'embedding_vector':
+            if field.name == "embedding_vector":
                 vector_column = field
                 break
 
         assert vector_column is not None, "embedding_vector column not found"
-        assert vector_column.field_type == 'VECTOR', f"Expected VECTOR type, got {vector_column.field_type}"
+        assert (
+            vector_column.field_type == "VECTOR"
+        ), f"Expected VECTOR type, got {vector_column.field_type}"
 
     def test_vector_search_query_syntax(self, bigquery_client, test_dataset_config):
         """VECTOR_SEARCH function must work with our table schema."""
@@ -78,7 +80,9 @@ class TestBigQueryIntegrationContract:
             # May return 0 results if table is empty, but should not error
         except Exception as e:
             if "dimension" in str(e).lower():
-                pytest.skip("Table exists but no embeddings data - expected for fresh setup")
+                pytest.skip(
+                    "Table exists but no embeddings data - expected for fresh setup"
+                )
             else:
                 pytest.fail(f"VECTOR_SEARCH query failed: {e}")
 
@@ -107,7 +111,9 @@ class TestBigQueryIntegrationContract:
 
     def test_bigquery_permissions(self, bigquery_client, test_dataset_config):
         """Must have required BigQuery permissions."""
-        dataset_ref = f"{test_dataset_config['project_id']}.{test_dataset_config['dataset_id']}"
+        dataset_ref = (
+            f"{test_dataset_config['project_id']}.{test_dataset_config['dataset_id']}"
+        )
 
         try:
             # Test BigQuery Data Viewer permission
@@ -115,7 +121,7 @@ class TestBigQueryIntegrationContract:
             assert dataset is not None
 
             # Test BigQuery Job User permission (ability to run queries)
-            query = f"SELECT 1 as test"
+            query = "SELECT 1 as test"
             query_job = bigquery_client.query(query)
             results = list(query_job)
             assert len(results) == 1
@@ -145,6 +151,7 @@ class TestBigQueryVectorIndexIntegration:
     def bigquery_vector_index(self):
         """This will fail until BigQueryVectorIndex is implemented."""
         from src.janapada_memory.bigquery_vector_index import BigQueryVectorIndex
+
         return BigQueryVectorIndex()
 
     def test_end_to_end_similarity_search(self, bigquery_vector_index):
@@ -158,11 +165,12 @@ class TestBigQueryVectorIndexIntegration:
 
         # Verify BigQuery-specific metadata
         for result in results:
-            assert 'source' in result
-            assert result['source'] in ['bigquery', 'local']
+            assert "source" in result
+            assert result["source"] in ["bigquery", "local"]
 
     def test_fallback_on_bigquery_failure(self, bigquery_vector_index, monkeypatch):
         """Must gracefully fallback when BigQuery fails."""
+
         # Mock BigQuery client to simulate failure
         def mock_bigquery_failure(*args, **kwargs):
             raise NotFound("Simulated BigQuery failure")
@@ -175,7 +183,7 @@ class TestBigQueryVectorIndexIntegration:
         assert isinstance(results, list)
         # Should use local fallback when BigQuery fails
         if results:
-            assert results[0].get('source') == 'local'
+            assert results[0].get("source") == "local"
 
     def test_performance_baseline(self, bigquery_vector_index):
         """Establish performance baseline for similarity search."""
