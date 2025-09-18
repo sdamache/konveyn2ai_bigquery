@@ -33,8 +33,11 @@ class VectorSearchResult:
 
     chunk_id: str
     distance: float
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    similarity_score: float = 0.0  # Similarity score (higher is more similar)
     source: str = "bigquery"
+    artifact_type: str = "unknown"
+    text_content: str = ""
+    metadata: Dict[str, Any] = field(default_factory=dict)
     content: Optional[str] = None
     embedding_vector: Optional[list] = None
     correlation_id: Optional[str] = None

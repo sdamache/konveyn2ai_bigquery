@@ -22,6 +22,7 @@ from google.cloud.exceptions import (
     Conflict,
 )
 from google.api_core import exceptions as api_exceptions
+from google.auth.exceptions import DefaultCredentialsError
 
 from ..config import BigQueryConfig, get_bigquery_config
 
@@ -130,6 +131,19 @@ class BigQueryConnectionManager:
             )
 
             return client
+
+        except DefaultCredentialsError as e:
+            error_msg = "Failed to authenticate with Google Cloud - no valid credentials found"
+            self.logger.error(
+                "BigQuery authentication failed - missing credentials",
+                extra={
+                    "connection_id": self.connection_id,
+                    "error": str(e),
+                    "remediation": "Set GOOGLE_APPLICATION_CREDENTIALS or run 'gcloud auth application-default login'",
+                    "documentation": "https://cloud.google.com/docs/authentication/application-default-credentials",
+                },
+            )
+            raise BigQueryConnectionError(error_msg, e)
 
         except api_exceptions.GoogleAPICallError as e:
             error_msg = f"Failed to create BigQuery client: {e}"
@@ -416,6 +430,103 @@ class BigQueryConnectionManager:
             )
             raise
 
+    def execute_query(
+        self,
+        query: str,
+        job_config: Optional[bigquery.QueryJobConfig] = None,
+        timeout: float = 30.0,
+    ) -> bigquery.table.RowIterator:
+        """
+        Execute a BigQuery query with structured logging and error handling.
+
+        Args:
+            query: SQL query to execute
+            job_config: Query job configuration
+            timeout: Query timeout in seconds
+
+        Returns:
+            Query results iterator
+
+        Raises:
+            BigQueryConnectionError: If query execution fails
+        """
+        with self.query_context(f"execute_query: {query[:50]}...") as context:
+            try:
+                query_job = self.client.query(query, job_config=job_config)
+                results = query_job.result(timeout=timeout)
+
+                # Add query job details to context
+                context.update({
+                    "job_id": query_job.job_id,
+                    "total_bytes_processed": query_job.total_bytes_processed,
+                    "total_bytes_billed": query_job.total_bytes_billed,
+                    "slot_ms": query_job.slot_millis,
+                })
+
+                return results
+
+            except Exception as e:
+                context["query_preview"] = query[:100]
+                raise BigQueryConnectionError(f"Query execution failed: {e}", e)
+
+    def insert_rows(
+        self,
+        table_ref: bigquery.TableReference,
+        rows: list,
+        ignore_unknown_values: bool = False,
+        skip_invalid_rows: bool = False,
+    ) -> list:
+        """
+        Insert rows into BigQuery table with error handling.
+
+        Args:
+            table_ref: Table reference
+            rows: List of row dictionaries to insert
+            ignore_unknown_values: Ignore unknown column values
+            skip_invalid_rows: Skip invalid rows
+
+        Returns:
+            List of errors (empty if successful)
+
+        Raises:
+            BigQueryConnectionError: If insertion fails
+        """
+        with self.query_context(f"insert_rows: {table_ref.table_id}") as context:
+            try:
+                table = self.client.get_table(table_ref)
+                errors = self.client.insert_rows_json(
+                    table,
+                    rows,
+                    ignore_unknown_values=ignore_unknown_values,
+                    skip_invalid_rows=skip_invalid_rows,
+                )
+
+                context.update({
+                    "table_id": table_ref.table_id,
+                    "rows_count": len(rows),
+                    "errors_count": len(errors),
+                })
+
+                if errors:
+                    error_msg = f"Row insertion errors: {errors}"
+                    self.logger.warning(error_msg, extra=context)
+
+                return errors
+
+            except Exception as e:
+                context.update({
+                    "table_id": table_ref.table_id,
+                    "rows_count": len(rows),
+                })
+                raise BigQueryConnectionError(f"Row insertion failed: {e}", e)
+
+    @property
+    def dataset_ref(self) -> bigquery.DatasetReference:
+        """Get dataset reference for compatibility with legacy interface."""
+        return bigquery.DatasetReference(
+            self.config.project_id, self.config.dataset_id
+        )
+
     def reset_connection(self) -> None:
         """Reset the BigQuery client connection."""
         correlation_id = str(uuid.uuid4())
@@ -460,12 +571,63 @@ class BigQueryConnectionManager:
 
         return info
 
+    def close(self) -> None:
+        """
+        Close the BigQuery client connection and cleanup resources.
+        
+        This method ensures proper cleanup of the BigQuery client connection,
+        which is important for resource management and avoiding connection leaks.
+        """
+        correlation_id = str(uuid.uuid4())
+        
+        if self._client is not None:
+            try:
+                # BigQuery client doesn't have an explicit close() method,
+                # but we can clean up our references to allow proper garbage collection
+                self.logger.info(
+                    "Closing BigQuery client connection",
+                    extra={
+                        "connection_id": self.connection_id,
+                        "correlation_id": correlation_id,
+                    },
+                )
+                
+                # Clear the client reference to allow garbage collection
+                self._client = None
+                self._health_status = None
+                
+                self.logger.info(
+                    "BigQuery client connection closed successfully",
+                    extra={
+                        "connection_id": self.connection_id,
+                        "correlation_id": correlation_id,
+                    },
+                )
+                
+            except Exception as e:
+                self.logger.warning(
+                    "Error during BigQuery client cleanup",
+                    extra={
+                        "connection_id": self.connection_id,
+                        "correlation_id": correlation_id,
+                        "error": str(e),
+                    },
+                )
+        else:
+            self.logger.debug(
+                "BigQuery client already closed or not initialized",
+                extra={
+                    "connection_id": self.connection_id,
+                    "correlation_id": correlation_id,
+                },
+            )
+
     def __enter__(self):
         """Context manager entry."""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit - cleanup if needed."""
+        """Context manager exit - cleanup resources."""
         if exc_type is not None:
             self.logger.error(
                 "BigQuery connection manager exiting due to error",
@@ -475,6 +637,9 @@ class BigQueryConnectionManager:
                     "error": str(exc_val) if exc_val else None,
                 },
             )
+        
+        # Always cleanup resources on exit
+        self.close()
 
     def __repr__(self) -> str:
         """String representation for debugging."""
