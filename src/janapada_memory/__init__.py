@@ -9,8 +9,11 @@ __version__ = "1.0.0"
 __author__ = "KonveyN2AI Team"
 
 try:
-    from .bigquery_connection import BigQueryConnection
+    from .bigquery_connection import BigQueryConnection  # Legacy - deprecated
+    from .connections.bigquery_connection import BigQueryConnectionManager
     from .bigquery_vector_store import BigQueryVectorStore
+    from .bigquery_vector_index import BigQueryVectorIndex
+    from .memory_service import JanapadaMemoryService, create_memory_service
     from .dimension_reducer import DimensionReducer
     from .migration_manager import MigrationManager
     from .schema_manager import SchemaManager
@@ -25,6 +28,21 @@ except ImportError as e:
     class BigQueryConnection:
         def __init__(self, *args, **kwargs):
             raise ImportError("google-cloud-bigquery not installed")
+    
+    class BigQueryConnectionManager:
+        def __init__(self, *args, **kwargs):
+            raise ImportError("google-cloud-bigquery not installed")
+    
+    class BigQueryVectorIndex:
+        def __init__(self, *args, **kwargs):
+            raise ImportError("google-cloud-bigquery not installed")
+    
+    class JanapadaMemoryService:
+        def __init__(self, *args, **kwargs):
+            raise ImportError("google-cloud-bigquery not installed")
+    
+    def create_memory_service(*args, **kwargs):
+        raise ImportError("google-cloud-bigquery not installed")
 
     class BigQueryVectorStore:
         def __init__(self, *args, **kwargs):
@@ -44,8 +62,12 @@ except ImportError as e:
 
 
 __all__ = [
-    "BigQueryConnection",
+    "BigQueryConnection",  # Legacy - deprecated
+    "BigQueryConnectionManager",  # New preferred connection manager
     "BigQueryVectorStore",
+    "BigQueryVectorIndex",  # Main vector index implementation
+    "JanapadaMemoryService",  # Primary service interface
+    "create_memory_service",  # Factory function
     "SchemaManager",
     "DimensionReducer",
     "MigrationManager",
