@@ -81,25 +81,24 @@ def test_main_requirements_exist():
     """Test that main requirements file exists and contains necessary dependencies."""
     # This project uses a single main requirements.txt file
     main_requirements = "requirements.txt"
-    
+
     full_path = project_root / main_requirements
-    assert full_path.exists(), f"Main requirements file {main_requirements} should exist"
+    assert full_path.exists(), (
+        f"Main requirements file {main_requirements} should exist"
+    )
     assert full_path.is_file(), f"{main_requirements} should be a file"
 
     # Check that file is not empty and contains key dependencies
     content = full_path.read_text()
     assert len(content.strip()) > 0, f"{main_requirements} should not be empty"
-    
+
     # Verify key dependencies are present
-    required_deps = [
-        "google-cloud-bigquery",
-        "numpy", 
-        "fastapi",
-        "streamlit"
-    ]
-    
+    required_deps = ["google-cloud-bigquery", "numpy", "fastapi", "streamlit"]
+
     for dep in required_deps:
-        assert dep in content, f"Required dependency {dep} should be in {main_requirements}"
+        assert dep in content, (
+            f"Required dependency {dep} should be in {main_requirements}"
+        )
 
 
 def test_poetry_configuration():
@@ -109,12 +108,12 @@ def test_poetry_configuration():
 
     content = pyproject_path.read_text()
     assert "[tool.poetry]" in content, "Poetry configuration should be present"
-    assert (
-        "[tool.poetry.dependencies]" in content
-    ), "Poetry dependencies should be configured"
-    assert (
-        "[tool.poetry.group.dev.dependencies]" in content
-    ), "Poetry dev dependencies should be configured"
+    assert "[tool.poetry.dependencies]" in content, (
+        "Poetry dependencies should be configured"
+    )
+    assert "[tool.poetry.group.dev.dependencies]" in content, (
+        "Poetry dev dependencies should be configured"
+    )
 
 
 def test_code_quality_tools():
@@ -131,9 +130,9 @@ def test_code_quality_tools():
     assert contributing_path.exists(), "CONTRIBUTING.md should exist"
 
     contributing_content = contributing_path.read_text()
-    assert (
-        "Code Style Guidelines" in contributing_content
-    ), "Code style guidelines should be documented"
+    assert "Code Style Guidelines" in contributing_content, (
+        "Code style guidelines should be documented"
+    )
     assert "pre-commit" in contributing_content, "Pre-commit should be documented"
 
 
@@ -144,15 +143,15 @@ def test_configuration_management():
     assert config_docs_path.exists(), "Configuration documentation should exist"
 
     config_docs_content = config_docs_path.read_text()
-    assert (
-        "Environment Variables" in config_docs_content
-    ), "Environment variables should be documented"
-    assert (
-        "GOOGLE_API_KEY" in config_docs_content
-    ), "Required API keys should be documented"
-    assert (
-        "Configuration Usage" in config_docs_content
-    ), "Usage examples should be provided"
+    assert "Environment Variables" in config_docs_content, (
+        "Environment variables should be documented"
+    )
+    assert "GOOGLE_API_KEY" in config_docs_content, (
+        "Required API keys should be documented"
+    )
+    assert "Configuration Usage" in config_docs_content, (
+        "Usage examples should be provided"
+    )
 
     # Test that config validation works
     from common.config import config
@@ -160,15 +159,15 @@ def test_configuration_management():
     # Test environment detection methods exist
     assert hasattr(config, "is_development"), "is_development method should exist"
     assert hasattr(config, "is_production"), "is_production method should exist"
-    assert hasattr(
-        config, "validate_required_keys"
-    ), "validate_required_keys method should exist"
+    assert hasattr(config, "validate_required_keys"), (
+        "validate_required_keys method should exist"
+    )
 
     # Test default values are set correctly
     assert config.GOOGLE_CLOUD_PROJECT == "konveyn2ai", "Default project should be set"
-    assert (
-        config.GOOGLE_CLOUD_LOCATION == "us-central1"
-    ), "Default location should be set"
+    assert config.GOOGLE_CLOUD_LOCATION == "us-central1", (
+        "Default location should be set"
+    )
     assert config.VECTOR_DIMENSIONS == 3072, "Default vector dimensions should be set"
 
 
@@ -187,9 +186,9 @@ def test_ci_cd_pipeline():
     assert "pre-commit run" in ci_content, "Pre-commit hooks should run in CI"
     assert "pytest" in ci_content, "Tests should run in CI"
     # Note: Code quality checks (black, ruff, mypy, bandit) are now handled by pre-commit
-    assert (
-        "code quality" in ci_content.lower()
-    ), "Code quality should be mentioned in CI"
+    assert "code quality" in ci_content.lower(), (
+        "Code quality should be mentioned in CI"
+    )
 
     # Test status badges in README
     readme_path = project_root / "README.md"
