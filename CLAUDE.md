@@ -11,6 +11,13 @@ This explanation helps you understand, guide, and steer better. Keep it concise 
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Operating Ground Rules
+
+- Before triggering `/specify`, `/plan`, `/tasks`, or making code changes, review the latest spec, plan, tasks, CLAUDE guidance, and open PR comments. 
+  Document how you will resolve any outstanding TODOs or unchecked checklist items before progressing.
+- Default to real BigQuery datasets, Google auth flows, and other production dependencies. Use mocks or fakes only when a real call would create irreversible side effects or breach compliance, and note the justification plus mitigation plan in the test/documentation.
+- Preserve the RED → GREEN → REFACTOR sequence: add or update failing tests first, then implement, then refactor.
+
 ## Project Overview
 
 KonveyN2AI_BigQuery is an Agentic AI Application built for the [BigQuery AI Hackathon](https://www.kaggle.com/competitions/bigquery-ai-hackathon) featuring BigQuery data analysis with Google Gemini API integration. The project implements a three-tier architecture where BigQuery serves as the system of record for data storage, vector search, and deterministic gap analysis, with AI orchestration providing bounded, additive intelligence.
@@ -169,7 +176,7 @@ KonveyN2AI_BigQuery/
 - **⚠️ HACKATHON RULE:** Create REAL functionality, NOT mocks
 - Focus on **functional tests** that verify actual behavior
 - **AVOID** circular testing dependencies (test-for-test-for-test)
-- Mock only external dependencies (APIs, databases)
+- Mock only when real dependency usage is unsafe; add inline justification + link to mitigation plan
 - **Demo-ready code** required - everything must work for live presentation
 - Test both happy path AND error scenarios
 

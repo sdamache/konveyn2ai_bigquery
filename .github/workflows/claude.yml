@@ -42,12 +42,6 @@ jobs:
             --model claude-sonnet-4-20250514
             --max-turns 10
             --allowed-tools "Read,Edit,Write,TodoWrite,Glob,Grep,Bash(make:*),Bash(pytest:*),Bash(python:*),Bash(pre-commit run:*),Bash(gh pr:*),Bash(gh issue:*),Bash(gh api:*),Bash(black:*)"
-
-          # Environment variables for your BigQuery project
-          settings: |
-            PROJECT_TYPE: bigquery_hackathon
-            ENVIRONMENT: development
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           
           prompt: |
             This is a BigQuery AI Hackathon project with a three-tier architecture. 
@@ -59,7 +53,7 @@ jobs:
             - This is a Python/FastAPI backend with BigQuery integration
             - Always examine the codebase first to understand current implementation
             - Create meaningful commits with clear messages
-            - Test changes when possible using available tools
+            - Run pytest and ruff before returning results and include command output in your response
 
             When working with GitHub issues and PRs:
             1. Use gh commands to fetch context and understand the full scope

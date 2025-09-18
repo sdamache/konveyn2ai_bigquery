@@ -79,10 +79,18 @@ jobs:
         # Use CI-specific pre-commit config with --check flags only
         pre-commit run --config .pre-commit-config-ci.yaml --all-files
 
+    - name: Setup test environment
+      run: |
+        # Create cache directory expected by some tests
+        mkdir -p .cache/embeddings
+        echo "Created .cache/embeddings directory for tests"
+
     - name: Run tests
       env:
         GOOGLE_CLOUD_PROJECT: 'konveyn2ai'
         BIGQUERY_DATASET_ID: 'semantic_gap_detector'
+        BQ_DATASET: 'source_ingestion'
+        BQ_PROJECT: 'konveyn2ai'
       run: |
         echo "🧪 Running tests with 70% pass rate threshold for hackathon mode"
         # Run tests and calculate pass rate - CI passes if >= 70% tests pass

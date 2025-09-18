@@ -1,10 +1,12 @@
 # Tasks: [FEATURE NAME]
 
 **Input**: Design documents from `/specs/[###-feature-name]/`
-**Prerequisites**: plan.md (required), research.md, data-model.md, contracts/
+**Prerequisites**: plan.md (required), research.md, data-model.md, contracts/, and a documented backlog audit confirming open TODOs/checklist failures from prior cycles are addressed in this run
 
 ## Execution Flow (main)
 ```
+0. Review latest spec, plan, tasks.md (if exists), CLAUDE guidance, and open PR notes
+   → If unresolved TODOs/checklist failures exist: create remediation tasks before new work
 1. Load plan.md from feature directory
    → If not found: ERROR "No implementation plan found"
    → Extract: tech stack, libraries, structure
@@ -21,7 +23,7 @@
 4. Apply task rules:
    → Different files = mark [P] for parallel
    → Same file = sequential (no [P])
-   → Tests before implementation (TDD)
+   → Tests before implementation (TDD); default to real dependencies, flag any mock usage with justification
 5. Number tasks sequentially (T001, T002...)
 6. Generate dependency graph
 7. Create parallel execution examples

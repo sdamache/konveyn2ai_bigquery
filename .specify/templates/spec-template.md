@@ -7,6 +7,8 @@
 
 ## Execution Flow (main)
 ```
+0. Review previous specs, plans, tasks, and PR feedback for this feature space
+   → Carry forward unresolved questions or TODOs into this specification before drafting new content
 1. Parse user description from Input
    → If empty: ERROR "No feature description provided"
 2. Extract key concepts from description
@@ -31,6 +33,7 @@
 - ✅ Focus on WHAT users need and WHY
 - ❌ Avoid HOW to implement (no tech stack, APIs, code structure)
 - 👥 Written for business stakeholders, not developers
+- 🔄 Reference outstanding work first: specs must note any carry-over requirements or debt before adding new scope
 
 ### Section Requirements
 - **Mandatory sections**: Must be completed for every feature
