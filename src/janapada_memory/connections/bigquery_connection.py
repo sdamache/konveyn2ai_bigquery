@@ -255,7 +255,9 @@ class BigQueryConnectionManager:
                     "connection_id": self.connection_id,
                     "correlation_id": correlation_id,
                     "dataset_ref": dataset_ref,
-                    "dataset_created": dataset.created.isoformat() if dataset.created else None,
+                    "dataset_created": (
+                        dataset.created.isoformat() if dataset.created else None
+                    ),
                 },
             )
             return True
@@ -308,7 +310,9 @@ class BigQueryConnectionManager:
         correlation_id = str(uuid.uuid4())
 
         try:
-            table_ref = f"{self.config.project_id}.{self.config.dataset_id}.{table_name}"
+            table_ref = (
+                f"{self.config.project_id}.{self.config.dataset_id}.{table_name}"
+            )
             table = self.client.get_table(table_ref)
 
             self.logger.info(

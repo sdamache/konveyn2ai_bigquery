@@ -52,12 +52,16 @@ class VectorSearchResult:
         if not self.chunk_id:
             raise ValueError("chunk_id cannot be empty")
         if not isinstance(self.chunk_id, str):
-            raise TypeError(f"chunk_id must be string, got {type(self.chunk_id).__name__}")
+            raise TypeError(
+                f"chunk_id must be string, got {type(self.chunk_id).__name__}"
+            )
 
     def _validate_distance(self) -> None:
         """Validate distance is a valid number."""
         if not isinstance(self.distance, (int, float)):
-            raise TypeError(f"distance must be numeric, got {type(self.distance).__name__}")
+            raise TypeError(
+                f"distance must be numeric, got {type(self.distance).__name__}"
+            )
 
         # Distance should be non-negative for most metrics
         # (though DOT_PRODUCT can be negative)
@@ -68,12 +72,16 @@ class VectorSearchResult:
         """Validate source is either 'bigquery' or 'local'."""
         valid_sources = {"bigquery", "local"}
         if self.source not in valid_sources:
-            raise ValueError(f"source must be one of {valid_sources}, got {self.source}")
+            raise ValueError(
+                f"source must be one of {valid_sources}, got {self.source}"
+            )
 
     def _validate_metadata(self) -> None:
         """Validate metadata is a dictionary."""
         if not isinstance(self.metadata, dict):
-            raise TypeError(f"metadata must be dict, got {type(self.metadata).__name__}")
+            raise TypeError(
+                f"metadata must be dict, got {type(self.metadata).__name__}"
+            )
 
     def __lt__(self, other: "VectorSearchResult") -> bool:
         """
@@ -194,7 +202,7 @@ class VectorSearchResult:
         distance: float,
         metadata: Optional[Dict[str, Any]] = None,
         content: Optional[str] = None,
-        fallback_reason: Optional[str] = None
+        fallback_reason: Optional[str] = None,
     ) -> "VectorSearchResult":
         """
         Create VectorSearchResult from local vector search.
