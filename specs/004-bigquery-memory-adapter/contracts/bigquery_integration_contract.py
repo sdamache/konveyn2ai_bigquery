@@ -8,6 +8,8 @@ import os
 from google.cloud import bigquery
 from google.cloud.exceptions import NotFound, Forbidden
 
+from src.janapada_memory.models.vector_search_result import VectorSearchResult
+
 
 class TestBigQueryIntegrationContract:
     """Integration tests against real BigQuery environment."""
@@ -22,7 +24,7 @@ class TestBigQueryIntegrationContract:
         """Test dataset configuration from environment."""
         return {
             "project_id": os.getenv("GOOGLE_CLOUD_PROJECT", "konveyn2ai"),
-            "dataset_id": os.getenv("BIGQUERY_DATASET_ID", "source_ingestion"),
+            "dataset_id": os.getenv("BIGQUERY_DATASET_ID", "semantic_gap_detector"),
             "table_name": "source_embeddings",
         }
 
@@ -158,15 +160,15 @@ class TestBigQueryVectorIndexIntegration:
         """End-to-end test: query vector → BigQuery → results."""
         # This test will fail until full implementation is complete
         query_vector = [0.1] * 3072  # Gemini embedding dimension
-        results = bigquery_vector_index.similarity_search(query_vector, top_k=5)
+        results = bigquery_vector_index.similarity_search(query_vector, k=5)
 
         assert isinstance(results, list)
         assert len(results) <= 5
 
         # Verify BigQuery-specific metadata
         for result in results:
-            assert "source" in result
-            assert result["source"] in ["bigquery", "local"]
+            assert isinstance(result, VectorSearchResult)
+            assert result.source in ["bigquery", "local"]
 
     def test_fallback_on_bigquery_failure(self, bigquery_vector_index, monkeypatch):
         """Must gracefully fallback when BigQuery fails."""
@@ -175,15 +177,20 @@ class TestBigQueryVectorIndexIntegration:
         def mock_bigquery_failure(*args, **kwargs):
             raise NotFound("Simulated BigQuery failure")
 
-        # This test structure will be completed in implementation
+        monkeypatch.setattr(
+            bigquery_vector_index.bigquery_adapter,
+            "search_similar_vectors",
+            mock_bigquery_failure,
+        )
+
         query_vector = [0.1] * 3072
-        results = bigquery_vector_index.similarity_search(query_vector, top_k=5)
+        results = bigquery_vector_index.similarity_search(query_vector, k=5)
 
         # Must still return valid results from fallback
         assert isinstance(results, list)
         # Should use local fallback when BigQuery fails
         if results:
-            assert results[0].get("source") == "local"
+            assert results[0].source == "local"
 
     def test_performance_baseline(self, bigquery_vector_index):
         """Establish performance baseline for similarity search."""
@@ -192,7 +199,7 @@ class TestBigQueryVectorIndexIntegration:
         query_vector = [0.1] * 3072
         start_time = time.time()
 
-        results = bigquery_vector_index.similarity_search(query_vector, top_k=10)
+        results = bigquery_vector_index.similarity_search(query_vector, k=10)
 
         elapsed = time.time() - start_time
 

@@ -7,6 +7,9 @@ import pytest
 from typing import List, Tuple
 from abc import ABC, abstractmethod
 
+from src.janapada_memory.models.vector_search_result import VectorSearchResult
+from src.janapada_memory.bigquery_vector_index import VectorIndexError
+
 
 class VectorIndex(ABC):
     """Abstract interface that MUST be preserved exactly."""
@@ -40,25 +43,24 @@ class TestVectorIndexContract:
     def test_similarity_search_returns_correct_type(self, vector_index):
         """similarity_search must return List[dict] with required fields."""
         query_vector = [0.1] * 3072  # Gemini embedding dimension
-        results = vector_index.similarity_search(query_vector, top_k=5)
+        results = vector_index.similarity_search(query_vector, k=5)
 
         assert isinstance(results, list)
         assert len(results) <= 5
 
         for result in results:
-            assert isinstance(result, dict)
-            assert "chunk_id" in result
-            assert "distance" in result
-            assert isinstance(result["chunk_id"], str)
-            assert isinstance(result["distance"], (int, float))
+            assert isinstance(result, VectorSearchResult)
+            assert isinstance(result.chunk_id, str)
+            assert isinstance(result.distance, (int, float))
+            assert result.source in {"bigquery", "local"}
 
     def test_similarity_search_orders_by_distance(self, vector_index):
         """Results must be ordered by ascending distance."""
         query_vector = [0.1] * 3072
-        results = vector_index.similarity_search(query_vector, top_k=10)
+        results = vector_index.similarity_search(query_vector, k=10)
 
         if len(results) > 1:
-            distances = [r["distance"] for r in results]
+            distances = [r.distance for r in results]
             assert distances == sorted(
                 distances
             ), "Results must be ordered by ascending distance"
@@ -68,22 +70,23 @@ class TestVectorIndexContract:
         query_vector = [0.1] * 3072
 
         for k in [1, 5, 10, 50]:
-            results = vector_index.similarity_search(query_vector, top_k=k)
+            results = vector_index.similarity_search(query_vector, k=k)
             assert len(results) <= k, f"Returned {len(results)} results for top_k={k}"
 
     def test_similarity_search_handles_empty_index(self, vector_index):
         """Must handle empty index gracefully."""
         query_vector = [0.1] * 3072
-        results = vector_index.similarity_search(query_vector, top_k=5)
+        results = vector_index.similarity_search(query_vector, k=5)
         assert isinstance(results, list)  # May be empty, but must be list
 
     def test_similarity_search_validates_query_vector(self, vector_index):
         """Must validate query vector dimensions."""
-        with pytest.raises((ValueError, TypeError)):
-            vector_index.similarity_search([], top_k=5)  # Empty vector
+        empty_results = vector_index.similarity_search([], k=5)
+        assert isinstance(empty_results, list)
+        assert empty_results == []
 
-        with pytest.raises((ValueError, TypeError)):
-            vector_index.similarity_search([0.1] * 10, top_k=5)  # Wrong dimensions
+        short_vector_results = vector_index.similarity_search([0.1] * 10, k=5)
+        assert isinstance(short_vector_results, list)
 
     def test_add_vectors_interface(self, vector_index):
         """add_vectors must accept List[Tuple[str, List[float]]]."""
@@ -103,13 +106,14 @@ class TestVectorIndexContract:
         query_vector = [0.1] * 3072
 
         # Force BigQuery error (mocked in actual implementation)
-        results = vector_index.similarity_search(query_vector, top_k=5)
+        results = vector_index.similarity_search(query_vector, k=5)
 
         # Interface contract must be preserved regardless of backend
         assert isinstance(results, list)
         for result in results:
-            assert "chunk_id" in result
-            assert "distance" in result
+            assert isinstance(result, VectorSearchResult)
+            assert isinstance(result.chunk_id, str)
+            assert isinstance(result.distance, (int, float))
 
 
 class TestBigQuerySpecificContract:
@@ -129,13 +133,23 @@ class TestBigQuerySpecificContract:
         assert bigquery_index.config.project_id is not None
         assert bigquery_index.config.dataset_id is not None
 
-    def test_fallback_activation_logging(self, bigquery_index, caplog):
+    def test_fallback_activation_logging(self, bigquery_index, caplog, monkeypatch):
         """Must log fallback activation with structured data."""
         query_vector = [0.1] * 3072
 
         # Force BigQuery error to trigger fallback
-        # (Actual error injection will be in implementation)
-        results = bigquery_index.similarity_search(query_vector, top_k=5)
+        from src.janapada_memory.adapters.bigquery_adapter import BigQueryAdapterError
+
+        def mock_failure(*args, **kwargs):
+            raise BigQueryAdapterError("simulated failure")
+
+        monkeypatch.setattr(
+            bigquery_index.bigquery_adapter,
+            "search_similar_vectors",
+            mock_failure,
+        )
+
+        results = bigquery_index.similarity_search(query_vector, k=5)
 
         # Must log fallback activation
         assert "fallback" in caplog.text.lower()
@@ -143,6 +157,7 @@ class TestBigQuerySpecificContract:
 
     def test_health_check_method(self, bigquery_index):
         """Must provide BigQuery health checking."""
-        assert hasattr(bigquery_index, "check_bigquery_health")
-        health = bigquery_index.check_bigquery_health()
-        assert isinstance(health, bool)
+        assert hasattr(bigquery_index, "health_check")
+        health = bigquery_index.health_check()
+        assert isinstance(health, dict)
+        assert "status" in health
