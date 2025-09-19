@@ -9,7 +9,9 @@ from google.cloud import bigquery
 from google.cloud.exceptions import NotFound, Forbidden
 
 from src.janapada_memory.bigquery_vector_index import BigQueryVectorIndex
-from src.janapada_memory.connections.bigquery_connection import BigQueryConnectionManager
+from src.janapada_memory.connections.bigquery_connection import (
+    BigQueryConnectionManager,
+)
 from src.janapada_memory.models.vector_search_result import VectorSearchResult
 from src.janapada_memory.schema_manager import SchemaManager
 from src.janapada_memory.config.bigquery_config import BigQueryConfig
@@ -55,42 +57,56 @@ class TestBigQueryIntegration:
     def test_source_embeddings_table_exists(self, schema_manager):
         """Test that source_embeddings table exists with correct schema."""
         tables = schema_manager.list_tables(include_schema=True)
-        
+
         embeddings_table = None
         for table in tables["tables"]:
             if table["name"] == "source_embeddings":
                 embeddings_table = table
                 break
-        
+
         assert embeddings_table is not None, "source_embeddings table not found"
-        
+
         # Check for required embedding_vector column
-        schema_fields = {field["name"]: field["type"] for field in embeddings_table["schema"]}
+        schema_fields = {
+            field["name"]: field["type"] for field in embeddings_table["schema"]
+        }
         assert "embedding_vector" in schema_fields, "embedding_vector column not found"
-        assert schema_fields["embedding_vector"] == "VECTOR", f"Expected VECTOR type, got {schema_fields['embedding_vector']}"
+        assert (
+            schema_fields["embedding_vector"] == "VECTOR"
+        ), f"Expected VECTOR type, got {schema_fields['embedding_vector']}"
 
     def test_source_metadata_table_exists(self, schema_manager):
         """Test that source_metadata table exists with correct schema."""
         tables = schema_manager.list_tables(include_schema=True)
-        
+
         metadata_table = None
         for table in tables["tables"]:
             if table["name"] == "source_metadata":
                 metadata_table = table
                 break
-        
+
         assert metadata_table is not None, "source_metadata table not found"
-        
+
         # Check for required columns
-        schema_fields = {field["name"]: field["type"] for field in metadata_table["schema"]}
-        required_fields = ["chunk_id", "source", "artifact_type", "text_content", "metadata"]
+        schema_fields = {
+            field["name"]: field["type"] for field in metadata_table["schema"]
+        }
+        required_fields = [
+            "chunk_id",
+            "source",
+            "artifact_type",
+            "text_content",
+            "metadata",
+        ]
         for field in required_fields:
             assert field in schema_fields, f"Required field {field} not found"
 
     def test_bigquery_connection_health(self, connection_manager):
         """Test BigQuery connection health check."""
         health = connection_manager.check_health()
-        assert health.is_healthy, f"BigQuery connection unhealthy: {health.error_message}"
+        assert (
+            health.is_healthy
+        ), f"BigQuery connection unhealthy: {health.error_message}"
         assert health.response_time_ms >= 0
 
     def test_vector_index_initialization(self, bigquery_vector_index):
@@ -102,8 +118,11 @@ class TestBigQueryIntegration:
     def test_vector_index_health_check(self, bigquery_vector_index):
         """Test comprehensive health check of vector index."""
         health = bigquery_vector_index.health_check()
-        
-        assert health["status"] in ["healthy", "degraded"], f"Unexpected status: {health['status']}"
+
+        assert health["status"] in [
+            "healthy",
+            "degraded",
+        ], f"Unexpected status: {health['status']}"
         assert "bigquery_connection" in health
         assert "bigquery_adapter" in health
         assert "search_stats" in health
@@ -117,7 +136,7 @@ class TestBigQueryIntegration:
         """Test similarity search with empty table (should not error)."""
         # Use a dummy 3072-dimension vector (Gemini embedding size)
         query_vector = [0.1] * 3072
-        
+
         try:
             results = bigquery_vector_index.similarity_search(query_vector, k=5)
             assert isinstance(results, list)
@@ -137,19 +156,19 @@ class TestBigQueryIntegration:
             ("test_chunk_1", [0.1] * 3072),
             ("test_chunk_2", [0.2] * 3072),
         ]
-        
+
         try:
             # Add vectors
             add_result = bigquery_vector_index.add_vectors(test_vectors)
             assert add_result["success"] or len(add_result["errors"]) == 0
-            
+
             # Search for similar vectors
             query_vector = [0.15] * 3072  # Between the test vectors
             results = bigquery_vector_index.similarity_search(query_vector, k=5)
-            
+
             assert isinstance(results, list)
             # May find results from BigQuery or fallback
-            
+
         except Exception as e:
             # Some exceptions are expected if BigQuery operations aren't fully set up
             if "not available" in str(e).lower() or "not implemented" in str(e).lower():
@@ -163,7 +182,7 @@ class TestBigQueryIntegration:
             # Try to remove a test chunk
             removed = bigquery_vector_index.remove_vector("test_chunk_1")
             assert isinstance(removed, bool)
-            
+
         except Exception as e:
             # Some exceptions are expected if BigQuery operations aren't fully set up
             if "not available" in str(e).lower() or "not implemented" in str(e).lower():
@@ -173,9 +192,13 @@ class TestBigQueryIntegration:
 
     def test_fallback_activation(self, bigquery_vector_index, monkeypatch):
         """Test that fallback activates when BigQuery fails."""
+
         # Mock BigQuery adapter to fail
         def mock_search_failure(*args, **kwargs):
-            from src.janapada_memory.adapters.bigquery_adapter import BigQueryAdapterError
+            from src.janapada_memory.adapters.bigquery_adapter import (
+                BigQueryAdapterError,
+            )
+
             raise BigQueryAdapterError("Simulated BigQuery failure")
 
         monkeypatch.setattr(
@@ -212,7 +235,9 @@ class TestBigQueryIntegration:
         except Exception as e:
             # Allow dimension-related errors for fresh setups
             if "dimension" in str(e).lower():
-                pytest.skip("Table exists but no valid embeddings data - expected for fresh setup")
+                pytest.skip(
+                    "Table exists but no valid embeddings data - expected for fresh setup"
+                )
             else:
                 raise
 
@@ -249,8 +274,9 @@ class TestBigQueryIntegration:
     def test_parameterized_query_support(self, connection_manager):
         """Test that parameterized queries work correctly."""
         query = "SELECT @test_param as param_value"
-        
+
         from google.cloud import bigquery
+
         job_config = bigquery.QueryJobConfig(
             query_parameters=[
                 bigquery.ScalarQueryParameter("test_param", "STRING", "test_value")
@@ -258,7 +284,9 @@ class TestBigQueryIntegration:
         )
 
         try:
-            results = list(connection_manager.execute_query(query, job_config=job_config))
+            results = list(
+                connection_manager.execute_query(query, job_config=job_config)
+            )
             assert len(results) == 1
             assert results[0].param_value == "test_value"
         except Exception as e:

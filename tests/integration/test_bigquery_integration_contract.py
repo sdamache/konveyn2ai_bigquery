@@ -1,4 +1,5 @@
 """Wrapper to execute the BigQuery integration contract defined in specs."""
+
 from __future__ import annotations
 
 import importlib.util
@@ -25,9 +26,7 @@ _spec_module = _load_spec_module(
 )
 
 
-class TestBigQueryIntegrationContract(
-    _spec_module.TestBigQueryIntegrationContract
-):
+class TestBigQueryIntegrationContract(_spec_module.TestBigQueryIntegrationContract):
     """Execute BigQuery integration contract from specs."""
 
 

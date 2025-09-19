@@ -135,7 +135,9 @@ class TestBigQueryPerformanceContract:
         query_vector = [0.1] * 3072
 
         # Force fallback by mocking BigQuery failure
-        with patch.object(bigquery_vector_index.bigquery_adapter, "search_similar_vectors") as mock_search:
+        with patch.object(
+            bigquery_vector_index.bigquery_adapter, "search_similar_vectors"
+        ) as mock_search:
             from google.cloud.exceptions import NotFound
 
             mock_search.side_effect = NotFound("Force fallback")

@@ -1,4 +1,5 @@
 """Wrapper to execute the vector index contract defined in specs."""
+
 from __future__ import annotations
 
 import importlib.util

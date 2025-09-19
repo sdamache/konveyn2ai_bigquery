@@ -151,7 +151,7 @@ class BigQueryVectorIndex(VectorIndex):
 
         # Initialize components
         self.bigquery_adapter = BigQueryAdapter(self.connection)
-        
+
         # Initialize vector store operations through connection
         self.bigquery_vector_store = self._create_vector_store_interface()
 
@@ -326,14 +326,16 @@ class BigQueryVectorIndex(VectorIndex):
             fallback_results = self._search_with_fallback_only(
                 query_embedding, config, artifact_types, fallback_context
             )
-            
+
             # Enrich fallback results with metadata
             enriched_results = []
             for result in fallback_results:
                 enriched_result = result.with_correlation_id(context["correlation_id"])
-                enriched_result.fallback_reason = fallback_context.get("fallback_reason")
+                enriched_result.fallback_reason = fallback_context.get(
+                    "fallback_reason"
+                )
                 enriched_results.append(enriched_result)
-            
+
             return enriched_results
 
     def _search_with_bigquery_only(
@@ -489,9 +491,7 @@ class BigQueryVectorIndex(VectorIndex):
                         text_content="",
                         metadata={},
                     )
-                    fallback_results.append(
-                        {"chunk_id": chunk_id, "status": "added"}
-                    )
+                    fallback_results.append({"chunk_id": chunk_id, "status": "added"})
 
             except Exception as e:
                 error_msg = f"Fallback index addition failed: {e}"
@@ -572,7 +572,7 @@ class BigQueryVectorIndex(VectorIndex):
     def check_bigquery_health(self) -> bool:
         """
         Check if BigQuery is accessible and healthy.
-        
+
         Returns:
             True if BigQuery is healthy, False otherwise
         """
@@ -708,7 +708,7 @@ class BigQueryVectorIndex(VectorIndex):
         self.logger.info(
             "BigQuery vector index closed", extra={"correlation_id": correlation_id}
         )
-    
+
     def _create_vector_store_interface(self):
         """Create a vector store interface using the connection manager."""
         return BigQueryVectorStore(self.connection)
@@ -716,18 +716,20 @@ class BigQueryVectorIndex(VectorIndex):
 
 class BigQueryVectorStore:
     """Simple vector store interface for BigQuery operations."""
-    
+
     def __init__(self, connection):
         self.connection = connection
-        
-    def batch_insert_embeddings(self, embeddings_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+
+    def batch_insert_embeddings(
+        self, embeddings_data: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """Insert embeddings into BigQuery table."""
         results = []
-        
+
         # Build INSERT SQL for embeddings
         table_name = "source_embeddings"
         full_table = f"`{self.connection.config.project_id}.{self.connection.config.dataset_id}.{table_name}`"
-        
+
         try:
             # Insert records one by one (can be optimized for batch later)
             for data in embeddings_data:
@@ -740,54 +742,66 @@ class BigQueryVectorStore:
                     CURRENT_TIMESTAMP(), 'bigquery', CURRENT_DATE()
                 )
                 """
-                
+
                 from google.cloud import bigquery
-                
+
                 params = [
-                    bigquery.ScalarQueryParameter("chunk_id", "STRING", data["chunk_id"]),
-                    bigquery.ScalarQueryParameter("model", "STRING", "text-embedding-004"),
-                    bigquery.ScalarQueryParameter("content_hash", "STRING", str(hash(str(data["embedding"])))),
-                    bigquery.ArrayQueryParameter("embedding_vector", "FLOAT64", data["embedding"]),
+                    bigquery.ScalarQueryParameter(
+                        "chunk_id", "STRING", data["chunk_id"]
+                    ),
+                    bigquery.ScalarQueryParameter(
+                        "model", "STRING", "text-embedding-004"
+                    ),
+                    bigquery.ScalarQueryParameter(
+                        "content_hash", "STRING", str(hash(str(data["embedding"])))
+                    ),
+                    bigquery.ArrayQueryParameter(
+                        "embedding_vector", "FLOAT64", data["embedding"]
+                    ),
                 ]
-                
+
                 job_config = bigquery.QueryJobConfig(query_parameters=params)
-                query_job = self.connection.client.query(insert_sql, job_config=job_config)
+                query_job = self.connection.client.query(
+                    insert_sql, job_config=job_config
+                )
                 query_job.result()  # Wait for completion
-                
-                results.append({
-                    "chunk_id": data["chunk_id"],
-                    "status": "inserted",
-                    "embedding_dimensions": len(data["embedding"])
-                })
-                
+
+                results.append(
+                    {
+                        "chunk_id": data["chunk_id"],
+                        "status": "inserted",
+                        "embedding_dimensions": len(data["embedding"]),
+                    }
+                )
+
         except Exception as e:
-            results.append({
-                "chunk_id": data.get("chunk_id", "unknown"),
-                "status": "error",
-                "error": str(e)
-            })
-            
+            results.append(
+                {
+                    "chunk_id": data.get("chunk_id", "unknown"),
+                    "status": "error",
+                    "error": str(e),
+                }
+            )
+
         return results
-        
+
     def delete_embedding(self, chunk_id: str) -> bool:
         """Delete embedding from BigQuery table."""
         table_name = "source_embeddings"
         full_table = f"`{self.connection.config.project_id}.{self.connection.config.dataset_id}.{table_name}`"
-        
+
         try:
             from google.cloud import bigquery
-            
+
             delete_sql = f"DELETE FROM {full_table} WHERE chunk_id = @chunk_id"
-            params = [
-                bigquery.ScalarQueryParameter("chunk_id", "STRING", chunk_id)
-            ]
-            
+            params = [bigquery.ScalarQueryParameter("chunk_id", "STRING", chunk_id)]
+
             job_config = bigquery.QueryJobConfig(query_parameters=params)
             query_job = self.connection.client.query(delete_sql, job_config=job_config)
             result = query_job.result()
-            
+
             return result.num_dml_affected_rows > 0
-            
+
         except Exception:
             return False
 

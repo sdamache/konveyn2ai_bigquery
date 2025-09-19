@@ -294,7 +294,10 @@ class BigQueryAdapter:
                             self.logger.warning(
                                 f"Failed to parse metadata JSON for chunk {row.chunk_id}: {e}"
                             )
-                            metadata = {"parsing_error": str(e), "raw_metadata": row.metadata}
+                            metadata = {
+                                "parsing_error": str(e),
+                                "raw_metadata": row.metadata,
+                            }
                     else:
                         # Unexpected type
                         metadata = {"raw_metadata": str(row.metadata)}
