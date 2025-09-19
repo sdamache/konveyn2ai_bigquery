@@ -151,6 +151,9 @@ class BigQueryVectorIndex(VectorIndex):
 
         # Initialize components
         self.bigquery_adapter = BigQueryAdapter(self.connection)
+        
+        # Initialize vector store operations through connection
+        self.bigquery_vector_store = self._create_vector_store_interface()
 
         if self.enable_fallback:
             self.local_index = LocalVectorIndex(max_entries=fallback_max_entries)
@@ -319,10 +322,19 @@ class BigQueryVectorIndex(VectorIndex):
                     f"BigQuery search failed and fallback disabled: {e}", e
                 )
 
-            # Activate fallback
-            return self._search_with_fallback_only(
+            # Activate fallback with enhanced context
+            fallback_results = self._search_with_fallback_only(
                 query_embedding, config, artifact_types, fallback_context
             )
+            
+            # Enrich fallback results with metadata
+            enriched_results = []
+            for result in fallback_results:
+                enriched_result = result.with_correlation_id(context["correlation_id"])
+                enriched_result.fallback_reason = fallback_context.get("fallback_reason")
+                enriched_results.append(enriched_result)
+            
+            return enriched_results
 
     def _search_with_bigquery_only(
         self,
@@ -418,13 +430,13 @@ class BigQueryVectorIndex(VectorIndex):
 
     def add_vectors(
         self,
-        vectors: List[Dict[str, Any]],
+        vectors: List[tuple],
     ) -> Dict[str, Any]:
         """
         Add vectors to both BigQuery and fallback index.
 
         Args:
-            vectors: List of vector data dictionaries
+            vectors: List of (chunk_id, embedding) tuples
 
         Returns:
             Addition result summary
@@ -447,9 +459,13 @@ class BigQueryVectorIndex(VectorIndex):
         # Add to BigQuery (primary storage)
         try:
             if hasattr(self, "bigquery_vector_store"):
-                # Use vector store for batch insertion
+                # Convert tuples to format expected by vector store
+                vector_dicts = [
+                    {"chunk_id": chunk_id, "embedding": embedding}
+                    for chunk_id, embedding in vectors
+                ]
                 bigquery_results = self.bigquery_vector_store.batch_insert_embeddings(
-                    vectors
+                    vector_dicts
                 )
             else:
                 self.logger.warning(
@@ -464,17 +480,17 @@ class BigQueryVectorIndex(VectorIndex):
         # Add to fallback index
         if self.local_index:
             try:
-                for vector_data in vectors:
+                for chunk_id, embedding in vectors:
                     self.local_index.add_vector(
-                        chunk_id=vector_data["chunk_id"],
-                        embedding=vector_data["embedding"],
-                        source=vector_data.get("source", "unknown"),
-                        artifact_type=vector_data.get("artifact_type", "unknown"),
-                        text_content=vector_data.get("text_content", ""),
-                        metadata=vector_data.get("metadata", {}),
+                        chunk_id=chunk_id,
+                        embedding=embedding,
+                        source="bigquery",
+                        artifact_type="unknown",
+                        text_content="",
+                        metadata={},
                     )
                     fallback_results.append(
-                        {"chunk_id": vector_data["chunk_id"], "status": "added"}
+                        {"chunk_id": chunk_id, "status": "added"}
                     )
 
             except Exception as e:
@@ -552,6 +568,22 @@ class BigQueryVectorIndex(VectorIndex):
         self.logger.info("Vector removal completed", extra=context)
 
         return success
+
+    def check_bigquery_health(self) -> bool:
+        """
+        Check if BigQuery is accessible and healthy.
+        
+        Returns:
+            True if BigQuery is healthy, False otherwise
+        """
+        try:
+            # Simple query to test BigQuery connectivity
+            query = "SELECT 1 as health_check"
+            results = list(self.connection.execute_query(query))
+            return len(results) == 1 and results[0].health_check == 1
+        except Exception as e:
+            self.logger.warning(f"BigQuery health check failed: {e}")
+            return False
 
     def health_check(self) -> Dict[str, Any]:
         """
@@ -676,6 +708,88 @@ class BigQueryVectorIndex(VectorIndex):
         self.logger.info(
             "BigQuery vector index closed", extra={"correlation_id": correlation_id}
         )
+    
+    def _create_vector_store_interface(self):
+        """Create a vector store interface using the connection manager."""
+        return BigQueryVectorStore(self.connection)
+
+
+class BigQueryVectorStore:
+    """Simple vector store interface for BigQuery operations."""
+    
+    def __init__(self, connection):
+        self.connection = connection
+        
+    def batch_insert_embeddings(self, embeddings_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Insert embeddings into BigQuery table."""
+        results = []
+        
+        # Build INSERT SQL for embeddings
+        table_name = "source_embeddings"
+        full_table = f"`{self.connection.config.project_id}.{self.connection.config.dataset_id}.{table_name}`"
+        
+        try:
+            # Insert records one by one (can be optimized for batch later)
+            for data in embeddings_data:
+                insert_sql = f"""
+                INSERT INTO {full_table} (
+                    chunk_id, model, content_hash, embedding_vector, 
+                    created_at, source_type, partition_date
+                ) VALUES (
+                    @chunk_id, @model, @content_hash, @embedding_vector,
+                    CURRENT_TIMESTAMP(), 'bigquery', CURRENT_DATE()
+                )
+                """
+                
+                from google.cloud import bigquery
+                
+                params = [
+                    bigquery.ScalarQueryParameter("chunk_id", "STRING", data["chunk_id"]),
+                    bigquery.ScalarQueryParameter("model", "STRING", "text-embedding-004"),
+                    bigquery.ScalarQueryParameter("content_hash", "STRING", str(hash(str(data["embedding"])))),
+                    bigquery.ArrayQueryParameter("embedding_vector", "FLOAT64", data["embedding"]),
+                ]
+                
+                job_config = bigquery.QueryJobConfig(query_parameters=params)
+                query_job = self.connection.client.query(insert_sql, job_config=job_config)
+                query_job.result()  # Wait for completion
+                
+                results.append({
+                    "chunk_id": data["chunk_id"],
+                    "status": "inserted",
+                    "embedding_dimensions": len(data["embedding"])
+                })
+                
+        except Exception as e:
+            results.append({
+                "chunk_id": data.get("chunk_id", "unknown"),
+                "status": "error",
+                "error": str(e)
+            })
+            
+        return results
+        
+    def delete_embedding(self, chunk_id: str) -> bool:
+        """Delete embedding from BigQuery table."""
+        table_name = "source_embeddings"
+        full_table = f"`{self.connection.config.project_id}.{self.connection.config.dataset_id}.{table_name}`"
+        
+        try:
+            from google.cloud import bigquery
+            
+            delete_sql = f"DELETE FROM {full_table} WHERE chunk_id = @chunk_id"
+            params = [
+                bigquery.ScalarQueryParameter("chunk_id", "STRING", chunk_id)
+            ]
+            
+            job_config = bigquery.QueryJobConfig(query_parameters=params)
+            query_job = self.connection.client.query(delete_sql, job_config=job_config)
+            result = query_job.result()
+            
+            return result.num_dml_affected_rows > 0
+            
+        except Exception:
+            return False
 
     def __enter__(self):
         """Context manager entry."""

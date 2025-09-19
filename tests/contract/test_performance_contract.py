@@ -135,13 +135,13 @@ class TestBigQueryPerformanceContract:
         query_vector = [0.1] * 3072
 
         # Force fallback by mocking BigQuery failure
-        with patch.object(bigquery_vector_index, "_bigquery_client") as mock_client:
+        with patch.object(bigquery_vector_index.bigquery_adapter, "search_similar_vectors") as mock_search:
             from google.cloud.exceptions import NotFound
 
-            mock_client.query.side_effect = NotFound("Force fallback")
+            mock_search.side_effect = NotFound("Force fallback")
 
             start_time = time.time()
-            results = bigquery_vector_index.similarity_search(query_vector, top_k=10)
+            results = bigquery_vector_index.similarity_search(query_vector, k=10)
             elapsed = time.time() - start_time
 
             # Fallback should still meet performance requirement
@@ -152,11 +152,11 @@ class TestBigQueryPerformanceContract:
 
     @pytest.mark.parametrize("top_k", [1, 5, 10, 25, 50])
     def test_performance_scaling_with_top_k(self, bigquery_vector_index, top_k):
-        """Performance should scale reasonably with different top_k values."""
+        """Performance should scale reasonably with different k values."""
         query_vector = [0.1] * 3072
 
         start_time = time.time()
-        results = bigquery_vector_index.similarity_search(query_vector, top_k=top_k)
+        results = bigquery_vector_index.similarity_search(query_vector, k=top_k)
         elapsed = time.time() - start_time
 
         # Base requirement: all top_k values should meet 500ms requirement

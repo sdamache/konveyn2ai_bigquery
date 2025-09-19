@@ -38,7 +38,7 @@ class SchemaManager:
             bigquery.SchemaField("chunk_id", "STRING", mode="REQUIRED"),
             bigquery.SchemaField("model", "STRING", mode="REQUIRED"),
             bigquery.SchemaField("content_hash", "STRING", mode="REQUIRED"),
-            bigquery.SchemaField("embedding", "FLOAT64", mode="REPEATED"),
+            bigquery.SchemaField("embedding_vector", "FLOAT64", mode="REPEATED"),
             bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED"),
             bigquery.SchemaField("source_type", "STRING", mode="NULLABLE"),
             bigquery.SchemaField("artifact_id", "STRING", mode="NULLABLE"),

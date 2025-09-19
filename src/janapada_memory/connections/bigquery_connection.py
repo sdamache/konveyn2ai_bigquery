@@ -577,6 +577,61 @@ class BigQueryConnectionManager:
 
         return info
 
+    def create_dataset(self, dataset_id: str, location: str = "us-central1", exists_ok: bool = True):
+        """
+        Create a BigQuery dataset.
+        
+        Args:
+            dataset_id: Name of the dataset to create
+            location: Geographic location for the dataset
+            exists_ok: If True, don't raise error if dataset already exists
+            
+        Returns:
+            The created or existing dataset
+        """
+        correlation_id = str(uuid.uuid4())
+        
+        try:
+            dataset_ref = f"{self.config.project_id}.{dataset_id}"
+            dataset = bigquery.Dataset(dataset_ref)
+            dataset.location = location
+            
+            self.logger.info(
+                "Creating BigQuery dataset",
+                extra={
+                    "connection_id": self.connection_id,
+                    "correlation_id": correlation_id,
+                    "dataset_ref": dataset_ref,
+                    "location": location,
+                },
+            )
+            
+            created_dataset = self.client.create_dataset(dataset, exists_ok=exists_ok)
+            
+            self.logger.info(
+                "BigQuery dataset created successfully",
+                extra={
+                    "connection_id": self.connection_id,
+                    "correlation_id": correlation_id,
+                    "dataset_ref": dataset_ref,
+                    "created": created_dataset.created.isoformat() if created_dataset.created else None,
+                },
+            )
+            
+            return created_dataset
+            
+        except Exception as e:
+            self.logger.error(
+                "Failed to create BigQuery dataset",
+                extra={
+                    "connection_id": self.connection_id,
+                    "correlation_id": correlation_id,
+                    "dataset_id": dataset_id,
+                    "error": str(e),
+                },
+            )
+            raise BigQueryConnectionError(f"Failed to create dataset {dataset_id}: {e}", e)
+
     def close(self) -> None:
         """
         Close the BigQuery client connection and cleanup resources.

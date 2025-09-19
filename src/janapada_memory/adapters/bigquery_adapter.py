@@ -228,18 +228,18 @@ class BigQueryAdapter:
         if where_conditions:
             where_clause = "WHERE " + " AND ".join(where_conditions)
 
-        # Construct the main query
+        # Construct hackathon-compliant query using VECTOR_SEARCH
         query = f"""
-        WITH vector_search AS (
+        WITH vector_search_results AS (
             SELECT
                 result.base.chunk_id AS chunk_id,
-                result.distance AS distance
+                result.distance AS distance,
+                result.base AS base_data
             FROM VECTOR_SEARCH(
                 TABLE `{config.full_table_reference}`,
-                'embedding',
-                (SELECT @query_embedding as embedding),
-                top_k => @top_k,
-                distance_type => '{config.distance_type.value}'
+                'embedding_vector',
+                (SELECT @query_embedding as embedding_vector),
+                top_k => @top_k
             ) AS result
         )
         SELECT
@@ -257,7 +257,7 @@ class BigQueryAdapter:
             m.record_name,
             m.metadata,
             m.created_at
-        FROM vector_search vs
+        FROM vector_search_results vs
         JOIN `{self.connection.config.project_id}.{self.connection.config.dataset_id}.source_metadata` m 
         ON vs.chunk_id = m.chunk_id
         {where_clause}
@@ -280,29 +280,38 @@ class BigQueryAdapter:
 
         for row in results:
             try:
-                # Parse metadata JSON if present
+                # Handle metadata - BigQuery JSON fields return native Python dicts
                 metadata = {}
                 if row.metadata:
-                    try:
-                        metadata = json.loads(row.metadata)
-                    except json.JSONDecodeError as e:
-                        self.logger.warning(
-                            f"Failed to parse metadata for chunk {row.chunk_id}: {e}"
-                        )
-                        metadata = {"parsing_error": str(e)}
+                    if isinstance(row.metadata, dict):
+                        # BigQuery JSON field returns dict directly
+                        metadata = row.metadata
+                    elif isinstance(row.metadata, str):
+                        # Fallback for string JSON
+                        try:
+                            metadata = json.loads(row.metadata)
+                        except json.JSONDecodeError as e:
+                            self.logger.warning(
+                                f"Failed to parse metadata JSON for chunk {row.chunk_id}: {e}"
+                            )
+                            metadata = {"parsing_error": str(e), "raw_metadata": row.metadata}
+                    else:
+                        # Unexpected type
+                        metadata = {"raw_metadata": str(row.metadata)}
 
                 # Create VectorSearchResult
                 result = VectorSearchResult(
                     chunk_id=row.chunk_id,
                     distance=float(row.distance),
                     similarity_score=float(row.similarity_score),
-                    source=row.source,
+                    source="bigquery",  # This result comes from BigQuery
                     artifact_type=row.artifact_type,
                     text_content=row.text_content,
                     metadata={
                         "kind": row.kind,
                         "api_path": row.api_path,
                         "record_name": row.record_name,
+                        "source_file": row.source,  # Original source file path
                         "created_at": (
                             row.created_at.isoformat() if row.created_at else None
                         ),

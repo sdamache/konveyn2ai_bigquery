@@ -27,83 +27,91 @@ class TestBigQueryFallbackContract:
         """Must fallback to local search when BigQuery table is not found."""
         query_vector = [0.1] * 3072  # Gemini embedding dimension
 
-        # Mock BigQuery client to raise NotFound exception
-        with patch.object(bigquery_vector_index, "_bigquery_client") as mock_client:
-            mock_client.query.side_effect = NotFound("Table not found")
+        # Mock BigQuery adapter to raise NotFound exception
+        with patch.object(bigquery_vector_index.bigquery_adapter, "search_similar_vectors") as mock_search:
+            mock_search.side_effect = NotFound("Table not found")
 
             # Should still return results from local fallback
-            results = bigquery_vector_index.similarity_search(query_vector, top_k=5)
+            results = bigquery_vector_index.similarity_search(query_vector, k=5)
 
             assert isinstance(results, list)
-            # Verify fallback was used by checking source metadata
+            # Verify fallback was used by checking VectorSearchResult objects
             if results:
-                assert results[0].get("source") == "local"
-                assert "fallback_reason" in results[0]
-                assert "NotFound" in results[0]["fallback_reason"]
+                from src.janapada_memory.models.vector_search_result import VectorSearchResult
+                assert isinstance(results[0], VectorSearchResult)
+                assert results[0].source == "local"
+                assert results[0].fallback_reason is not None
+                assert "NotFound" in results[0].fallback_reason
 
     def test_fallback_on_permission_denied(self, bigquery_vector_index):
         """Must fallback to local search when BigQuery access is forbidden."""
         query_vector = [0.1] * 3072
 
-        with patch.object(bigquery_vector_index, "_bigquery_client") as mock_client:
-            mock_client.query.side_effect = Forbidden("Access denied")
+        with patch.object(bigquery_vector_index.bigquery_adapter, "search_similar_vectors") as mock_search:
+            mock_search.side_effect = Forbidden("Access denied")
 
-            results = bigquery_vector_index.similarity_search(query_vector, top_k=5)
+            results = bigquery_vector_index.similarity_search(query_vector, k=5)
 
             assert isinstance(results, list)
             if results:
-                assert results[0].get("source") == "local"
-                assert "fallback_reason" in results[0]
-                assert "Forbidden" in results[0]["fallback_reason"]
+                from src.janapada_memory.models.vector_search_result import VectorSearchResult
+                assert isinstance(results[0], VectorSearchResult)
+                assert results[0].source == "local"
+                assert results[0].fallback_reason is not None
+                assert "Forbidden" in results[0].fallback_reason
 
     def test_fallback_on_connection_error(self, bigquery_vector_index):
         """Must fallback to local search when BigQuery connection fails."""
         query_vector = [0.1] * 3072
 
-        with patch.object(bigquery_vector_index, "_bigquery_client") as mock_client:
-            mock_client.query.side_effect = GoogleAPICallError("Connection failed")
+        with patch.object(bigquery_vector_index.bigquery_adapter, "search_similar_vectors") as mock_search:
+            from src.janapada_memory.adapters.bigquery_adapter import BigQueryAdapterError
+            mock_search.side_effect = BigQueryAdapterError("Connection failed")
 
-            results = bigquery_vector_index.similarity_search(query_vector, top_k=5)
+            results = bigquery_vector_index.similarity_search(query_vector, k=5)
 
             assert isinstance(results, list)
             if results:
-                assert results[0].get("source") == "local"
-                assert "fallback_reason" in results[0]
+                from src.janapada_memory.models.vector_search_result import VectorSearchResult
+                assert isinstance(results[0], VectorSearchResult)
+                assert results[0].source == "local"
+                assert results[0].fallback_reason is not None
 
     def test_fallback_preserves_interface_contract(self, bigquery_vector_index):
         """Fallback must preserve the same interface contract as normal operation."""
         query_vector = [0.1] * 3072
 
         # Simulate BigQuery failure
-        with patch.object(bigquery_vector_index, "_bigquery_client") as mock_client:
-            mock_client.query.side_effect = NotFound("Simulated failure")
+        with patch.object(bigquery_vector_index.bigquery_adapter, "search_similar_vectors") as mock_search:
+            mock_search.side_effect = NotFound("Simulated failure")
 
-            # Test different top_k values
+            # Test different k values
             for k in [1, 5, 10]:
-                results = bigquery_vector_index.similarity_search(query_vector, top_k=k)
+                results = bigquery_vector_index.similarity_search(query_vector, k=k)
 
                 assert isinstance(results, list)
                 assert len(results) <= k
 
                 # Verify result format consistency
                 for result in results:
-                    assert isinstance(result, dict)
-                    assert "chunk_id" in result
-                    assert "distance" in result
-                    assert isinstance(result["chunk_id"], str)
-                    assert isinstance(result["distance"], (int, float))
+                    from src.janapada_memory.models.vector_search_result import VectorSearchResult
+                    assert isinstance(result, VectorSearchResult)
+                    assert hasattr(result, "chunk_id")
+                    assert hasattr(result, "distance")
+                    assert isinstance(result.chunk_id, str)
+                    assert isinstance(result.distance, (int, float))
 
     def test_fallback_maintains_distance_ordering(self, bigquery_vector_index):
         """Fallback results must maintain distance ordering requirement."""
         query_vector = [0.1] * 3072
 
-        with patch.object(bigquery_vector_index, "_bigquery_client") as mock_client:
-            mock_client.query.side_effect = NotFound("Simulated failure")
+        with patch.object(bigquery_vector_index.bigquery_adapter, "search_similar_vectors") as mock_search:
+            mock_search.side_effect = NotFound("Simulated failure")
 
-            results = bigquery_vector_index.similarity_search(query_vector, top_k=10)
+            results = bigquery_vector_index.similarity_search(query_vector, k=10)
 
             if len(results) > 1:
-                distances = [r["distance"] for r in results]
+                distances = [r.distance for r in results]
                 assert distances == sorted(
                     distances
                 ), "Fallback results must be ordered by distance"
