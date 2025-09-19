@@ -20,6 +20,10 @@ from src.janapada_memory.config.bigquery_config import BigQueryConfig
 class TestBigQueryIntegration:
     """Integration tests for the complete BigQuery vector search flow."""
 
+    # TODO(codex@52624cad): These tests expect a fully provisioned semantic_gap_detector dataset populated via
+    # `make setup`. They fail in bare CI environments (dataset missing or empty). Add an isolated fixture
+    # dataset/create-once flow or switch to generated temporary datasets before turning this suite GREEN.
+
     @pytest.fixture(scope="session")
     def bigquery_config(self):
         """BigQuery configuration for testing."""

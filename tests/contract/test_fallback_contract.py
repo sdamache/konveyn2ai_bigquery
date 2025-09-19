@@ -16,6 +16,10 @@ from google.api_core.exceptions import GoogleAPICallError
 class TestBigQueryFallbackContract:
     """Contract tests for BigQuery fallback behavior."""
 
+    # TODO(codex@52624cad): Contract still mocks the adapter and asserts dict payloads. Update to drive the real
+    # BigQueryVectorIndex (VectorSearchResult objects + enriched metadata) once the implementation is
+    # finalized, then drop the mocks so RED→GREEN enforces production behaviour.
+
     @pytest.fixture
     def bigquery_vector_index(self):
         """This will fail until BigQueryVectorIndex is implemented."""

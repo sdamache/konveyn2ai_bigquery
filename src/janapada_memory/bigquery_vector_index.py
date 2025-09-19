@@ -432,13 +432,17 @@ class BigQueryVectorIndex(VectorIndex):
 
     def add_vectors(
         self,
-        vectors: List[tuple],
+        vectors: List[Any],
     ) -> Dict[str, Any]:
         """
         Add vectors to both BigQuery and fallback index.
 
         Args:
-            vectors: List of (chunk_id, embedding) tuples
+            vectors: Sequence of vector payloads. Each entry may be either
+                - a dict containing at minimum ``chunk_id`` and ``embedding`` keys
+                  plus optional metadata (source, artifact_type, text_content, metadata, etc.), or
+                - a tuple of ``(chunk_id, embedding)`` optionally followed by a
+                  metadata dict.
 
         Returns:
             Addition result summary
@@ -446,10 +450,58 @@ class BigQueryVectorIndex(VectorIndex):
         correlation_id = str(uuid.uuid4())
         start_time = time.time()
 
+        normalized_vectors: List[Dict[str, Any]] = []
+
+        try:
+            for entry in vectors:
+                if isinstance(entry, dict):
+                    chunk_id = entry["chunk_id"]
+                    embedding = entry["embedding"]
+                    metadata = entry.get("metadata", {})
+                    normalized_vectors.append(
+                        {
+                            "chunk_id": chunk_id,
+                            "embedding": embedding,
+                            "source": entry.get("source", "unknown"),
+                            "artifact_type": entry.get("artifact_type", "unknown"),
+                            "text_content": entry.get("text_content", ""),
+                            "metadata": metadata,
+                            "embedding_model": entry.get("embedding_model"),
+                            "kind": entry.get("kind"),
+                            "api_path": entry.get("api_path"),
+                            "record_name": entry.get("record_name"),
+                        }
+                    )
+                elif isinstance(entry, (list, tuple)) and len(entry) >= 2:
+                    chunk_id, embedding = entry[0], entry[1]
+                    metadata = entry[2] if len(entry) > 2 else {}
+                    normalized_vectors.append(
+                        {
+                            "chunk_id": chunk_id,
+                            "embedding": embedding,
+                            "source": "unknown",
+                            "artifact_type": "unknown",
+                            "text_content": "",
+                            "metadata": metadata if isinstance(metadata, dict) else {},
+                            "embedding_model": None,
+                            "kind": None,
+                            "api_path": None,
+                            "record_name": None,
+                        }
+                    )
+                else:
+                    raise ValueError(
+                        "Vector entries must be dicts or (chunk_id, embedding[, metadata]) tuples"
+                    )
+        except KeyError as exc:
+            raise VectorIndexError(
+                f"Missing required vector field: {exc.args[0]}", exc
+            ) from exc
+
         context = {
             "correlation_id": correlation_id,
             "index_id": self.index_id,
-            "vectors_count": len(vectors),
+            "vectors_count": len(normalized_vectors),
         }
 
         self.logger.info("Adding vectors to index", extra=context)
@@ -461,13 +513,30 @@ class BigQueryVectorIndex(VectorIndex):
         # Add to BigQuery (primary storage)
         try:
             if hasattr(self, "bigquery_vector_store"):
-                # Convert tuples to format expected by vector store
-                vector_dicts = [
-                    {"chunk_id": chunk_id, "embedding": embedding}
-                    for chunk_id, embedding in vectors
-                ]
+                bigquery_payload = []
+                for entry in normalized_vectors:
+                    payload = {
+                        "chunk_id": entry["chunk_id"],
+                        "embedding": entry["embedding"],
+                        "source": entry["source"],
+                        "artifact_type": entry["artifact_type"],
+                        "text_content": entry["text_content"],
+                        "metadata": entry.get("metadata"),
+                    }
+
+                    if entry.get("embedding_model"):
+                        payload["embedding_model"] = entry["embedding_model"]
+                    if entry.get("kind"):
+                        payload["kind"] = entry["kind"]
+                    if entry.get("api_path"):
+                        payload["api_path"] = entry["api_path"]
+                    if entry.get("record_name"):
+                        payload["record_name"] = entry["record_name"]
+
+                    bigquery_payload.append(payload)
+
                 bigquery_results = self.bigquery_vector_store.batch_insert_embeddings(
-                    vector_dicts
+                    bigquery_payload
                 )
             else:
                 self.logger.warning(
@@ -482,16 +551,18 @@ class BigQueryVectorIndex(VectorIndex):
         # Add to fallback index
         if self.local_index:
             try:
-                for chunk_id, embedding in vectors:
+                for entry in normalized_vectors:
                     self.local_index.add_vector(
-                        chunk_id=chunk_id,
-                        embedding=embedding,
-                        source="bigquery",
-                        artifact_type="unknown",
-                        text_content="",
-                        metadata={},
+                        chunk_id=entry["chunk_id"],
+                        embedding=entry["embedding"],
+                        source=entry["source"],
+                        artifact_type=entry["artifact_type"],
+                        text_content=entry["text_content"],
+                        metadata=entry.get("metadata", {}),
                     )
-                    fallback_results.append({"chunk_id": chunk_id, "status": "added"})
+                    fallback_results.append(
+                        {"chunk_id": entry["chunk_id"], "status": "added"}
+                    )
 
             except Exception as e:
                 error_msg = f"Fallback index addition failed: {e}"
@@ -502,7 +573,7 @@ class BigQueryVectorIndex(VectorIndex):
 
         result = {
             "correlation_id": correlation_id,
-            "vectors_processed": len(vectors),
+            "vectors_processed": len(normalized_vectors),
             "bigquery_results": len(bigquery_results),
             "fallback_results": len(fallback_results),
             "errors": errors,

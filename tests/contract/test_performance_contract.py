@@ -16,6 +16,10 @@ from unittest.mock import Mock, patch
 class TestBigQueryPerformanceContract:
     """Contract tests for BigQuery performance requirements."""
 
+    # TODO(codex@52624cad): Performance assertions (<500 ms, concurrency, etc.) currently fail because the
+    # adapter isn’t wired to a production-grade BigQuery dataset in CI. Revisit once the live index is
+    # optimized, or inject timing fixtures that exercise a representative dataset before flipping GREEN.
+
     @pytest.fixture
     def bigquery_vector_index(self):
         """This will fail until BigQueryVectorIndex is implemented."""

@@ -16,6 +16,11 @@ from google.cloud.exceptions import NotFound
 class TestBigQueryEmbeddingSchema:
     """Contract test for BigQuery source_embeddings table schema."""
 
+    # TODO(codex@52624cad): This contract currently fails in CI when the konveyn2ai.semantic_gap_detector
+    # dataset has not been upgraded in the test environment. Once the shared BigQuery dataset is
+    # provisioned (make setup against semantic_gap_detector) or the suite spins up an isolated
+    # fixture dataset, re-enable enforcement of the VECTOR column without relying on global state.
+
     @pytest.fixture(scope="class")
     def bigquery_client(self):
         """BigQuery client for testing."""

@@ -258,7 +258,7 @@ class BigQueryAdapter:
             m.metadata,
             m.created_at
         FROM vector_search_results vs
-        JOIN `{self.connection.config.project_id}.{self.connection.config.dataset_id}.source_metadata` m 
+        JOIN `{config.project_id}.{config.dataset_id}.source_metadata` m 
         ON vs.chunk_id = m.chunk_id
         {where_clause}
         ORDER BY vs.distance ASC
