@@ -187,18 +187,19 @@ class BigQueryAdapter:
         Returns:
             Tuple of (query_string, query_parameters)
         """
-        # Build artifact type filter
-        artifact_filter = ""
+        # Build query parameters
         query_params = [
             bigquery.ArrayQueryParameter("query_embedding", "FLOAT64", query_embedding),
             bigquery.ScalarQueryParameter("top_k", "INT64", config.top_k),
         ]
 
+        where_conditions = []
+
         if artifact_types:
             placeholders = ", ".join(
                 [f"@artifact_type_{i}" for i in range(len(artifact_types))]
             )
-            artifact_filter = f"AND m.artifact_type IN ({placeholders})"
+            where_conditions.append(f"m.artifact_type IN ({placeholders})")
 
             for i, artifact_type in enumerate(artifact_types):
                 query_params.append(
@@ -207,40 +208,39 @@ class BigQueryAdapter:
                     )
                 )
 
-        # Build distance threshold filter
-        threshold_filter = ""
         if config.distance_threshold is not None:
             if config.distance_type.value == "COSINE":
-                # For cosine distance, threshold is on similarity score (1 - distance)
-                threshold_filter = "AND (1 - vs.distance) >= @similarity_threshold"
+                where_conditions.append("(1 - vs.distance) >= @similarity_threshold")
                 query_params.append(
                     bigquery.ScalarQueryParameter(
                         "similarity_threshold", "FLOAT64", config.distance_threshold
                     )
                 )
             else:
-                # For other distance types, threshold is on raw distance
-                threshold_filter = "AND vs.distance <= @distance_threshold"
+                where_conditions.append("vs.distance <= @distance_threshold")
                 query_params.append(
                     bigquery.ScalarQueryParameter(
                         "distance_threshold", "FLOAT64", config.distance_threshold
                     )
                 )
 
+        where_clause = ""
+        if where_conditions:
+            where_clause = "WHERE " + " AND ".join(where_conditions)
+
         # Construct the main query
         query = f"""
         WITH vector_search AS (
             SELECT
-                base.chunk_id,
-                distance
+                result.base.chunk_id AS chunk_id,
+                result.distance AS distance
             FROM VECTOR_SEARCH(
                 TABLE `{config.full_table_reference}`,
                 'embedding',
                 (SELECT @query_embedding as embedding),
                 top_k => @top_k,
                 distance_type => '{config.distance_type.value}'
-            ) AS base
-            {threshold_filter.replace('vs.', 'base.')}
+            ) AS result
         )
         SELECT
             vs.chunk_id,
@@ -260,7 +260,7 @@ class BigQueryAdapter:
         FROM vector_search vs
         JOIN `{self.connection.config.project_id}.{self.connection.config.dataset_id}.source_metadata` m 
         ON vs.chunk_id = m.chunk_id
-        {artifact_filter}
+        {where_clause}
         ORDER BY vs.distance ASC
         """
 

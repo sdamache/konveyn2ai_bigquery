@@ -314,7 +314,7 @@ class BigQueryVectorIndex(VectorIndex):
                 "BigQuery search failed, activating fallback", extra=fallback_context
             )
 
-            if not self.enable_fallback or not self.local_index:
+            if not self.enable_fallback or self.local_index is None:
                 raise VectorIndexError(
                     f"BigQuery search failed and fallback disabled: {e}", e
                 )
@@ -361,7 +361,7 @@ class BigQueryVectorIndex(VectorIndex):
         context: Dict[str, Any],
     ) -> List[VectorSearchResult]:
         """Search with local fallback only."""
-        if not self.enable_fallback or not self.local_index:
+        if not self.enable_fallback or self.local_index is None:
             raise VectorIndexError("Fallback search requested but not available")
 
         try:
