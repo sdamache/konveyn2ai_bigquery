@@ -1,0 +1,42 @@
+# Preface — BigQuery Memory Adapter (M2 Integration)
+
+## What
+Wire the Janapada memory service so `similarity_search` executes a BigQuery `approximate_neighbors` query against `source_embeddings`, preserving the `vector_index` contract and providing a local in-memory fallback.
+
+## Why
+Unify retrieval on the same BigQuery stack established in M1/M2, keep Svami’s surface stable for judges, and enable end-to-end Q→A over the ingested corpus without re-plumbing clients.
+
+## Constraints
+- **Do not change public surfaces** (Svami orchestration and `vector_index` interface remain stable).  
+- **Build on prior artifacts** only: reuse M1 schemas/DDL and M2 embeddings; do not duplicate or drift.  
+- **Idempotent setup**: `make setup` remains the single entry-point for tables/creds.  
+- **Config-first**: project/dataset/table/creds via `.env` with sensible defaults.  
+- **Fallback**: graceful local in-memory index when BigQuery is unavailable.  
+- **Tests**: mock BigQuery calls, assert rank-ordering and fallback path.
+
+---
+
+## Source Issue (verbatim)
+
+### Title
+M2: Integrate BigQuery vector search into KonveyN2AI memory agent
+
+### Overview
+Modify the Janapada memory service to use BigQuery for vector similarity search. This will allow the existing orchestrator to query BigQuery instead of the previous vector database.
+
+### Tasks
+1. Refactor `src/janapada-memory` so that the `similarity_search` method invokes a BigQuery SQL statement using `approximate_neighbors` on the `source_embeddings` table.
+2. Update configuration loading to accept BigQuery credentials and dataset/table names. Use `google-cloud-bigquery` library for execution.
+3. Write a unit test that mocks BigQuery and verifies that queries return expected chunk IDs in order of similarity.
+4. Provide a fallback path: if BigQuery is unavailable, default to a local in-memory vector index with approximate search for testing.
+
+### Acceptance Criteria
+- The memory agent returns search results from BigQuery when BigQuery is configured.
+- Unit tests cover BigQuery query construction and fallback logic.
+- The orchestrator (`svami`) can answer a simple knowledge question end-to-end using BigQuery as the backend store.
+
+### Labels
+epic, area:bigquery, type:feature, priority:P0
+
+### Milestone
+M2 Embeddings

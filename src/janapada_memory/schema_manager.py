@@ -12,7 +12,7 @@ from typing import Any, Optional
 from google.cloud import bigquery
 from google.cloud.exceptions import Conflict, NotFound
 
-from .bigquery_connection import BigQueryConnection
+from .connections.bigquery_connection import BigQueryConnectionManager
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class SchemaManager:
             bigquery.SchemaField("chunk_id", "STRING", mode="REQUIRED"),
             bigquery.SchemaField("model", "STRING", mode="REQUIRED"),
             bigquery.SchemaField("content_hash", "STRING", mode="REQUIRED"),
-            bigquery.SchemaField("embedding", "FLOAT64", mode="REPEATED"),
+            bigquery.SchemaField("embedding_vector", "FLOAT64", mode="REPEATED"),
             bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED"),
             bigquery.SchemaField("source_type", "STRING", mode="NULLABLE"),
             bigquery.SchemaField("artifact_id", "STRING", mode="NULLABLE"),
@@ -64,7 +64,7 @@ class SchemaManager:
 
     def __init__(
         self,
-        connection: Optional[BigQueryConnection] = None,
+        connection: Optional[BigQueryConnectionManager] = None,
         project_id: Optional[str] = None,
         dataset_id: Optional[str] = None,
     ):
@@ -79,14 +79,18 @@ class SchemaManager:
         if connection:
             self.connection = connection
         else:
-            # Use same environment-driven fallbacks as BigQueryConnection so CLI/tests
+            # Use same environment-driven fallbacks so CLI/tests
             # can run locally without hardcoding production credentials.
-            self.connection = BigQueryConnection(
-                project_id=project_id, dataset_id=dataset_id
-            )
+            from .config import BigQueryConfig
 
-        self.project_id = self.connection.project_id
-        self.dataset_id = self.connection.dataset_id
+            config = BigQueryConfig(
+                project_id=project_id or "konveyn2ai",
+                dataset_id=dataset_id or "semantic_gap_detector",
+            )
+            self.connection = BigQueryConnectionManager(config=config)
+
+        self.project_id = self.connection.config.project_id
+        self.dataset_id = self.connection.config.dataset_id
 
         logger.info(
             f"Schema manager initialized for {self.project_id}.{self.dataset_id}"

@@ -15,8 +15,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Before triggering `/specify`, `/plan`, `/tasks`, or making code changes, review the latest spec, plan, tasks, CLAUDE guidance, and open PR comments. 
   Document how you will resolve any outstanding TODOs or unchecked checklist items before progressing.
+- Apply the `tdd-red-phase` label to pull requests (or use a `tdd-red/` branch prefix) while introducing failing tests so CI recognizes the RED stage; remove it once implementation begins.
 - Default to real BigQuery datasets, Google auth flows, and other production dependencies. Use mocks or fakes only when a real call would create irreversible side effects or breach compliance, and note the justification plus mitigation plan in the test/documentation.
 - Preserve the RED → GREEN → REFACTOR sequence: add or update failing tests first, then implement, then refactor.
+
+## Current BigQuery Adapter Status (2025-09-18)
+
+- **Do not mark T010 complete yet.** `BigQueryConnectionManager` (new file at `src/janapada_memory/connections/bigquery_connection.py`) exists, but all runtime code still uses the legacy `BigQueryConnection` in `src/janapada_memory/bigquery_connection.py`. Migrate those imports before claiming the task.
+- **Auth handling gap.** Add explicit `DefaultCredentialsError` handling (reuse `BigQueryConfigManager.handle_missing_credentials()`) so authentication failures surface actionable guidance.
+- **Lifecycle cleanup missing.** Ensure the manager closes its `bigquery.Client` when resetting or exiting; today the client is left open.
+- **Update docs/tests when flipping over.** API endpoints, migration manager, schema manager, and vector store stubs assume the legacy connection. Update them in lockstep, then delete or alias the old class to avoid reintroducing duplicate logic.
+- **Vertex AI service removed.** The old `src/janapada_memory/main.py` has been deleted; keep the project BigQuery-only going forward unless a spec explicitly asks otherwise.
 
 ## Project Overview
 
@@ -68,7 +77,7 @@ The project follows a three-tier architecture:
 - **Query Orchestration**: Lightweight Python layer (CLI/Make targets, optional FastAPI)
 - **AI Orchestration**: Svami (`src/svami-orchestrator/`) for bounded AI tasks only
 - Handles ingestion, schema creation, vector writes, SQL vector search, gap-rule queries
-- **Janapada Memory** (`src/janapada-memory/`) - Integrates with BigQuery for vector embeddings
+- **Janapada Memory** (`src/janapada_memory/`; legacy deployment assets in `src/janapada-memory/`) - Integrates with BigQuery for vector embeddings
 
 ### Tier 3: Data Layer (BigQuery as System of Record)
 - **source_metadata**: Normalized chunks from ingested artifacts
@@ -152,6 +161,7 @@ This is a BigQuery AI Hackathon project requiring:
 KonveyN2AI_BigQuery/
 ├── src/
 │   ├── amatya-role-prompter/    # Role & prompt management
+│   ├── janapada_memory/
 │   ├── janapada-memory/         # Memory & persistence
 │   └── svami-orchestrator/      # Workflow orchestration
 ├── vector_index.py              # AI Platform setup

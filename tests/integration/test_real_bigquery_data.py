@@ -324,7 +324,7 @@ def manhattan_distance(point_a, point_b):
             # Test imports work
             try:
                 from janapada_memory import (
-                    BigQueryConnection,
+                    BigQueryConnectionManager,
                     BigQueryVectorStore,
                     SchemaManager,
                 )
@@ -333,7 +333,7 @@ def manhattan_distance(point_a, point_b):
 
                 # Try to initialize components (may fail without credentials, that's ok)
                 try:
-                    self.connection = BigQueryConnection()
+                    self.connection = BigQueryConnectionManager()
                     self.schema_manager = SchemaManager(connection=self.connection)
                     self.vector_store = BigQueryVectorStore(connection=self.connection)
                     logger.info("✅ All components initialized successfully")

@@ -82,8 +82,23 @@ setup: check-env
 	@echo "🚀 Setting up BigQuery infrastructure..."
 	@echo "Project: $$GOOGLE_CLOUD_PROJECT"
 	@echo "Dataset: $$BIGQUERY_DATASET_ID"
+	@echo "🔧 Creating BigQuery tables and schema..."
 	python -m src.janapada_memory.schema_manager create-all
-	@echo "✅ BigQuery setup completed"
+	@echo "🔍 Validating BigQuery setup..."
+	python -c "from src.janapada_memory.connections.bigquery_connection import BigQueryConnectionManager; \
+		from src.janapada_memory.schema_manager import SchemaManager; \
+		conn = BigQueryConnectionManager(); \
+		health = conn.check_health(); \
+		print(f'Connection health: {health.is_healthy}'); \
+		assert health.is_healthy, f'BigQuery connection failed: {health.error_message}'; \
+		assert conn.check_dataset_access(), 'Dataset access check failed'; \
+		assert conn.check_table_access('source_metadata'), 'source_metadata table not accessible'; \
+		assert conn.check_table_access('source_embeddings'), 'source_embeddings table not accessible'; \
+		schema = SchemaManager(connection=conn); \
+		validation = schema.validate_schema(validate_data=False, check_indexes=False); \
+		assert validation['overall_status'] in ['VALID', 'INVALID'], f'Schema validation failed: {validation}'; \
+		print('✅ All validation checks passed')"
+	@echo "✅ BigQuery setup completed and validated"
 
 # Migration from Vertex AI
 migrate: check-env setup

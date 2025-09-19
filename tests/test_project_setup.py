@@ -16,7 +16,7 @@ def test_project_structure():
     expected_dirs = [
         "src",
         "src/amatya-role-prompter",
-        "src/janapada-memory",
+        "src/janapada_memory",
         "src/svami-orchestrator",
         "src/common",
         "tests",
@@ -40,7 +40,7 @@ def test_python_files_exist():
         "src/common/__init__.py",
         "src/common/config.py",
         "src/amatya-role-prompter/__init__.py",
-        "src/janapada-memory/__init__.py",
+        "src/janapada_memory/__init__.py",
         "src/svami-orchestrator/__init__.py",
     ]
 
@@ -77,23 +77,28 @@ def test_config_loading():
     assert config.APPROXIMATE_NEIGHBORS_COUNT == 150
 
 
-def test_component_requirements_exist():
-    """Test that component-specific requirements files exist."""
-    component_requirements = [
-        "src/amatya-role-prompter/requirements.txt",
-        "src/janapada-memory/requirements.txt",
-        "src/svami-orchestrator/requirements.txt",
-        "src/common/requirements.txt",
-    ]
+def test_main_requirements_exist():
+    """Test that main requirements file exists and contains necessary dependencies."""
+    # This project uses a single main requirements.txt file
+    main_requirements = "requirements.txt"
 
-    for req_file in component_requirements:
-        full_path = project_root / req_file
-        assert full_path.exists(), f"Requirements file {req_file} should exist"
-        assert full_path.is_file(), f"{req_file} should be a file"
+    full_path = project_root / main_requirements
+    assert (
+        full_path.exists()
+    ), f"Main requirements file {main_requirements} should exist"
+    assert full_path.is_file(), f"{main_requirements} should be a file"
 
-        # Check that file is not empty
-        content = full_path.read_text()
-        assert len(content.strip()) > 0, f"{req_file} should not be empty"
+    # Check that file is not empty and contains key dependencies
+    content = full_path.read_text()
+    assert len(content.strip()) > 0, f"{main_requirements} should not be empty"
+
+    # Verify key dependencies are present
+    required_deps = ["google-cloud-bigquery", "numpy", "fastapi", "streamlit"]
+
+    for dep in required_deps:
+        assert (
+            dep in content
+        ), f"Required dependency {dep} should be in {main_requirements}"
 
 
 def test_poetry_configuration():
@@ -198,7 +203,7 @@ if __name__ == "__main__":
     test_python_files_exist()
     test_imports()
     test_config_loading()
-    test_component_requirements_exist()
+    test_main_requirements_exist()
     test_poetry_configuration()
     test_code_quality_tools()
     test_configuration_management()

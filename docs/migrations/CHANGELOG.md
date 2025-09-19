@@ -4,6 +4,9 @@
 - Added Backlog Alignment prerequisite to constitution and propagated to `.specify/templates/spec-template.md`, `.specify/templates/tasks-template.md`, and `CLAUDE.md`.
 - Tightened mock usage policy: tests must use real dependencies unless irreversible side effects/compliance issues exist, with inline justification + mitigation links.
 - Updated plan template footer to reference Constitution v2.2.1.
+- Updated `.github/workflows/ci.yml` to detect the `tdd-red-phase` label or `tdd-red/` branch prefix, require contract tests, and allow expected failures during RED phase.
+- Relocated `main.py` from `src/janapada-memory/` to `src/janapada_memory/` and updated documentation to reference the canonical package.
+
 
 ## 2025-09-18 — v2.2.0
 - Replaced boilerplate constitution with KonveyN2AI-specific principles (Library-First, CLI protocol, TDD, integration, observability, versioning, simplicity).

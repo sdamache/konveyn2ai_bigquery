@@ -14,7 +14,7 @@ import numpy as np
 from google.cloud import bigquery
 from google.cloud.exceptions import NotFound
 
-from .bigquery_connection import BigQueryConnection
+from .connections.bigquery_connection import BigQueryConnectionManager
 from .dimension_reducer import DimensionReducer
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class BigQueryVectorStore:
 
     def __init__(
         self,
-        connection: Optional[BigQueryConnection] = None,
+        connection: Optional[BigQueryConnectionManager] = None,
         project_id: Optional[str] = None,
         dataset_id: Optional[str] = None,
         embedding_model: str = "text-embedding-004",
@@ -46,12 +46,16 @@ class BigQueryVectorStore:
         if connection:
             self.connection = connection
         else:
-            self.connection = BigQueryConnection(
-                project_id=project_id, dataset_id=dataset_id
-            )
+            from .config import BigQueryConfig
 
-        self.project_id = self.connection.project_id
-        self.dataset_id = self.connection.dataset_id
+            config = BigQueryConfig(
+                project_id=project_id or "konveyn2ai",
+                dataset_id=dataset_id or "semantic_gap_detector",
+            )
+            self.connection = BigQueryConnectionManager(config=config)
+
+        self.project_id = self.connection.config.project_id
+        self.dataset_id = self.connection.config.dataset_id
         self.embedding_model = embedding_model
         self.target_dimensions = target_dimensions
         self.dimension_reducer = dimension_reducer

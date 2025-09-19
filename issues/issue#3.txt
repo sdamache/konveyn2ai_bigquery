@@ -1,0 +1,33 @@
+# Preface — BigQuery Semantic Gap Detector (Vector Backend)
+
+## What
+Replace KonveyN2AI’s vector store with BigQuery VECTOR tables and ship a baseline dataset for metadata, embeddings, and analysis outputs. Keep Svami’s search interface stable.
+
+## Why
+Reproducible, judge-friendly notebook; deterministic SQL; no scope creep (static viewer later, no multi-agent sprawl).
+
+## Constraints
+- Keep `vector_index` interface stable.
+- One command: `make setup && make run`.
+- Works in BigQuery Studio & Colab.
+- LLM only for summaries later, not for core search.
+
+---
+
+## Source Issue (verbatim)
+Overview
+Compute 768-dimensional embeddings for each ingested chunk using Gemini or Vertex AI and store them in BigQuery’s vector table. Ensure embedding generation is batched and cached to reduce costs.
+
+Tasks
+Add a module in pipeline/embedding.py that iterates over rows in source_metadata lacking an embedding, calls the Vertex AI embedding endpoint (e.g., text-embedding-004), and collects the resulting vectors.
+Implement batching and exponential backoff for API calls and write a local disk cache keyed by a hash of the text content.
+Extend the BigQuery vector table creation script with a VECTOR<768> column. Insert new embeddings along with their chunk_id and source metadata.
+Document the embedding generation process in the repo’s README, including expected runtime and cost estimates.
+
+## Acceptance Criteria (verbatim)
+Running make embeddings populates the vector table with embeddings for all existing metadata rows.
+Re-running the command does not duplicate existing embeddings (idempotent behaviour).
+Embedding generation logs the number of API calls and caches repeated invocations.
+At least one query using BigQuery’s approximate_neighbors function returns the nearest neighbours for a test chunk.
+
+---
