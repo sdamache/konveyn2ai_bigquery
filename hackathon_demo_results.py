@@ -453,8 +453,8 @@ def generate_hackathon_demo():
         "hackathon_readiness": "🎯 FULLY COMPLIANT",
         "key_achievements": [
             f"✅ Analyzed {len(file_analyses)} real repository infrastructure files",
-            f"✅ Implemented BigQuery VECTOR_SEARCH for semantic similarity",
-            f"✅ Demonstrated cross-artifact semantic search capabilities",
+            "✅ Implemented BigQuery VECTOR_SEARCH for semantic similarity",
+            "✅ Demonstrated cross-artifact semantic search capabilities",
             f"✅ Extracted {len(metrics['semantic_analysis']['technical_terms_identified'])} technical concepts",
             f"✅ Supports {len(metrics['data_ingestion']['artifact_types_supported'])} artifact types",
             "✅ Production-ready error handling and performance monitoring",
