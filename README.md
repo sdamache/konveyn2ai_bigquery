@@ -529,11 +529,48 @@ KonveyN2AI implements a sophisticated microservices architecture with three spec
 - **Fallback Mechanisms**: Graceful degradation with Vertex AI text models when Gemini is unavailable
 
 ### 🧠 Janapada Memory (`src/janapada-memory/`)
-**The Semantic Memory Agent**
-- **Advanced Vector Search**: 768-dimensional embeddings using Google Cloud Vertex AI `text-embedding-004` model
-- **Intelligent Caching**: LRU cache with 1000-entry capacity for optimal performance
-- **Matching Engine Integration**: Real-time similarity search with configurable thresholds
-- **Hybrid Search Capabilities**: Combines vector similarity with keyword matching for comprehensive results
+**The BigQuery Memory Adapter**
+- **BigQuery-first retrieval**: Executes `APPROXIMATE_NEIGHBORS` queries over the `source_embeddings` table to satisfy `vector_index` lookups without changing Svami's contract.
+- **Transparent resilience**: Automatically promotes a local in-memory index whenever BigQuery credentials, tables, or jobs fail, then resumes BigQuery usage once the service recovers.
+- **Operational visibility**: Structured logs surface BigQuery job IDs, latency, and fallback activations for observability pipelines.
+
+#### Configuration
+| Variable | Description | Default |
+| --- | --- | --- |
+| `GOOGLE_CLOUD_PROJECT` | Google Cloud project housing the BigQuery dataset. | Derived from Application Default Credentials |
+| `BIGQUERY_DATASET_ID` | Dataset that stores `source_embeddings` and related tables. | `source_ingestion` |
+| `BIGQUERY_TABLE_PREFIX` | Prefix applied to Janapada-managed tables (e.g., `source_embeddings`). | `source_` |
+| `GOOGLE_APPLICATION_CREDENTIALS` *(optional)* | Path to a service account JSON key if ADC is unavailable. | unset |
+
+> Run `make setup` whenever the dataset needs to be created or refreshed; the target is idempotent and provisions the embeddings table required by the adapter.
+
+#### Quickstart
+1. **Authenticate**: Ensure Google Cloud credentials are active (`gcloud auth application-default login`) or set `GOOGLE_APPLICATION_CREDENTIALS`.
+2. **Configure env vars**: Export the variables above or store them in `.env` before launching Janapada.
+3. **Smoke test connectivity**:
+   ```bash
+   python -c "from google.cloud import bigquery; client = bigquery.Client(); client.get_table('"$GOOGLE_CLOUD_PROJECT"."$BIGQUERY_DATASET_ID".source_embeddings)"
+   ```
+4. **Run contract suite** (RED→GREEN workflow):
+   ```bash
+   pytest specs/004-bigquery-memory-adapter/contracts/vector_index_contract.py -v
+   pytest specs/004-bigquery-memory-adapter/contracts/bigquery_integration_contract.py -v
+   ```
+5. **Validate data readiness**:
+   ```bash
+   bq query --use_legacy_sql=false "SELECT COUNT(*) AS embedding_count FROM \`$GOOGLE_CLOUD_PROJECT.$BIGQUERY_DATASET_ID.source_embeddings\`"
+   ```
+
+#### Fallback behaviour
+- BigQuery execution is attempted first for every `similarity_search` call. Connection errors, missing tables, authentication failures, or query timeouts trigger the local vector index.
+- Fallback activation is logged with context (exception, project/dataset, retry guidance) and persists only for the failed request—subsequent calls retry BigQuery automatically.
+- To simulate and test fallback manually, export an invalid project ID: `export GOOGLE_CLOUD_PROJECT=invalid-project` before running the contract suite; the adapter should continue serving results from the in-memory store while reporting the outage.
+
+#### Performance expectations
+- **Latency**: <500 ms per `similarity_search` query when BigQuery is healthy (per contract test baseline).
+- **Recall**: Matches Svami expectations by returning ranked chunk IDs in the same order as BigQuery `APPROXIMATE_NEIGHBORS` results.
+- **Throughput**: Designed for ~150 neighbors per request—the adapter streams results without loading entire tables into memory.
+- **Fallback cost**: Local index keeps parity with historical in-memory behaviour so Svami remains responsive during BigQuery incidents.
 
 ### 🎯 Svami Orchestrator (`src/svami-orchestrator/`)
 **The Workflow Coordination Agent**
