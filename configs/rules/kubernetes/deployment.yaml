@@ -1,0 +1,87 @@
+rule_name: "kubernetes_deployment_description"
+artifact_type: "kubernetes"
+version: "1.0.0"
+description: "Validates that Kubernetes Deployments have proper documentation including description annotations and essential labels"
+evaluation_sql: |
+  WITH rule_eval AS (
+    SELECT 
+      chunk_id,
+      CASE WHEN JSON_EXTRACT_SCALAR(metadata, '$.annotations.description') IS NOT NULL 
+           AND LENGTH(JSON_EXTRACT_SCALAR(metadata, '$.annotations.description')) > 10
+           THEN true ELSE false END as has_description,
+      CASE WHEN JSON_EXTRACT_SCALAR(metadata, '$.labels.app') IS NOT NULL
+           THEN true ELSE false END as has_app_label,
+      CASE WHEN JSON_EXTRACT_SCALAR(metadata, '$.spec.template.spec.containers[0].resources.limits') IS NOT NULL
+           THEN true ELSE false END as has_resource_limits
+    FROM source_metadata 
+    WHERE artifact_type = 'kubernetes' AND kind = 'Deployment'
+  )
+  SELECT 
+    chunk_id,
+    (has_description AND has_app_label AND has_resource_limits) as passed,
+    (CAST(has_description as INT64) * 0.5 + 
+     CAST(has_app_label as INT64) * 0.2 + 
+     CAST(has_resource_limits as INT64) * 0.3) as confidence
+  FROM rule_eval
+confidence_weights:
+  description_present: 0.5
+  app_label_present: 0.2
+  resource_limits_present: 0.3
+severity: 3
+suggested_fix_template: "Add missing fields: {{#missing_description}}description annotation{{/missing_description}}{{#missing_app_label}}{{#missing_description}}, {{/missing_description}}app label{{/missing_app_label}}{{#missing_resources}}{{#missing_description}}{{#missing_app_label}}, {{/missing_app_label}}{{/missing_description}}{{^missing_description}}{{#missing_app_label}}, {{/missing_app_label}}{{/missing_description}}resource limits{{/missing_resources}}"
+enabled: true
+tags: ["documentation", "kubernetes", "best_practices", "deployment"]
+quality_thresholds:
+  min_content_length: 10
+  required_fields: 
+    - "metadata.annotations.description"
+    - "metadata.labels.app"
+    - "spec.template.spec.containers[0].resources.limits"
+metadata:
+  author: "platform-team"
+  created_date: "2025-01-09"
+  review_frequency: "quarterly"
+  related_rules: ["kubernetes_service_documentation"]
+
+---
+rule_name: "kubernetes_deployment_security"
+artifact_type: "kubernetes"
+version: "1.0.0"
+description: "Validates that Kubernetes Deployments follow security best practices including security contexts and non-root containers"
+evaluation_sql: |
+  WITH security_eval AS (
+    SELECT 
+      chunk_id,
+      CASE WHEN JSON_EXTRACT_SCALAR(metadata, '$.spec.template.spec.securityContext.runAsNonRoot') = 'true'
+           THEN true ELSE false END as runs_as_non_root,
+      CASE WHEN JSON_EXTRACT_SCALAR(metadata, '$.spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation') = 'false'
+           THEN true ELSE false END as no_privilege_escalation,
+      CASE WHEN JSON_EXTRACT_SCALAR(metadata, '$.spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem') = 'true'
+           THEN true ELSE false END as readonly_filesystem
+    FROM source_metadata 
+    WHERE artifact_type = 'kubernetes' AND kind = 'Deployment'
+  )
+  SELECT 
+    chunk_id,
+    (runs_as_non_root AND no_privilege_escalation AND readonly_filesystem) as passed,
+    (CAST(runs_as_non_root as INT64) * 0.4 + 
+     CAST(no_privilege_escalation as INT64) * 0.4 + 
+     CAST(readonly_filesystem as INT64) * 0.2) as confidence
+  FROM security_eval
+confidence_weights:
+  runs_as_non_root: 0.4
+  no_privilege_escalation: 0.4
+  readonly_filesystem: 0.2
+severity: 4
+suggested_fix_template: "Add security configurations: {{#missing_non_root}}runAsNonRoot: true{{/missing_non_root}}{{#missing_privilege}}{{#missing_non_root}}, {{/missing_non_root}}allowPrivilegeEscalation: false{{/missing_privilege}}{{#missing_readonly}}{{#missing_non_root}}{{#missing_privilege}}, {{/missing_privilege}}{{/missing_non_root}}{{^missing_non_root}}{{#missing_privilege}}, {{/missing_privilege}}{{/missing_non_root}}readOnlyRootFilesystem: true{{/missing_readonly}}"
+enabled: true
+tags: ["security", "kubernetes", "deployment", "best_practices"]
+quality_thresholds:
+  required_fields:
+    - "spec.template.spec.securityContext.runAsNonRoot"
+    - "spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation"
+    - "spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem"
+metadata:
+  author: "security-team"
+  created_date: "2025-01-09"
+  review_frequency: "monthly"

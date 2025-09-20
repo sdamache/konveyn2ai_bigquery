@@ -1,0 +1,326 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://konveyn2ai.com/schemas/input_contract.json",
+  "title": "Source Metadata Input Contract",
+  "description": "Contract definition for source_metadata table fields required for gap analysis rule evaluation",
+  "type": "object",
+  "required": [
+    "chunk_id",
+    "artifact_type",
+    "text_content"
+  ],
+  "properties": {
+    "chunk_id": {
+      "type": "string",
+      "description": "Unique identifier for the content chunk",
+      "pattern": "^[a-zA-Z0-9_\\-:/\\.]+$",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "artifact_type": {
+      "type": "string", 
+      "enum": ["kubernetes", "fastapi", "cobol", "irs", "mumps"],
+      "description": "Type of artifact being analyzed"
+    },
+    "text_content": {
+      "type": "string",
+      "description": "Raw text content of the artifact chunk for rule evaluation",
+      "minLength": 1
+    },
+    "kind": {
+      "type": "string",
+      "description": "Sub-type or resource kind within the artifact type",
+      "examples": ["Deployment", "Service", "ConfigMap", "endpoint", "routine", "copybook"]
+    },
+    "api_path": {
+      "type": "string",
+      "description": "File path, API endpoint, or resource identifier",
+      "examples": ["/api/v1/users", "src/main.py", "manifests/deployment.yaml"]
+    },
+    "record_name": {
+      "type": "string", 
+      "description": "Specific record, function, or entity name within the chunk",
+      "examples": ["get_user_profile", "CUSTOMER-RECORD", "PATIENT"]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Structured metadata extracted from the artifact",
+      "properties": {
+        "annotations": {
+          "type": "object",
+          "description": "Key-value annotations (Kubernetes style)"
+        },
+        "labels": {
+          "type": "object", 
+          "description": "Key-value labels for categorization"
+        },
+        "spec": {
+          "type": "object",
+          "description": "Specification details (configuration, parameters, etc.)"
+        },
+        "status": {
+          "type": "object",
+          "description": "Status information if applicable"
+        }
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the record was created"
+    },
+    "partition_date": {
+      "type": "string",
+      "format": "date", 
+      "description": "Date for BigQuery partitioning (YYYY-MM-DD)"
+    }
+  },
+  "artifact_type_mappings": {
+    "kubernetes": {
+      "description": "Kubernetes YAML/JSON manifests",
+      "required_fields": ["chunk_id", "artifact_type", "text_content", "kind"],
+      "field_mappings": {
+        "kind": {
+          "source": "$.kind",
+          "description": "Kubernetes resource type (Deployment, Service, etc.)",
+          "examples": ["Deployment", "Service", "ConfigMap", "Secret", "Ingress"]
+        },
+        "api_path": {
+          "source": "file_path or $.metadata.name",
+          "description": "File path or resource name"
+        },
+        "record_name": {
+          "source": "$.metadata.name",
+          "description": "Kubernetes resource name"
+        },
+        "metadata.annotations": {
+          "source": "$.metadata.annotations",
+          "description": "Kubernetes annotations for documentation"
+        },
+        "metadata.labels": {
+          "source": "$.metadata.labels", 
+          "description": "Kubernetes labels for organization"
+        },
+        "metadata.spec": {
+          "source": "$.spec",
+          "description": "Resource specification"
+        }
+      },
+      "extraction_rules": {
+        "description_sources": [
+          "$.metadata.annotations.description",
+          "$.metadata.annotations['kubernetes.io/description']",
+          "$.spec.template.metadata.annotations.description"
+        ],
+        "security_contexts": [
+          "$.spec.template.spec.securityContext",
+          "$.spec.template.spec.containers[*].securityContext"
+        ],
+        "resource_requirements": [
+          "$.spec.template.spec.containers[*].resources"
+        ]
+      }
+    },
+    "fastapi": {
+      "description": "FastAPI Python source code and OpenAPI specifications",
+      "required_fields": ["chunk_id", "artifact_type", "text_content"],
+      "field_mappings": {
+        "kind": {
+          "source": "function_type or endpoint_type",
+          "description": "Type of FastAPI component",
+          "examples": ["endpoint", "model", "dependency", "middleware"]
+        },
+        "api_path": {
+          "source": "file_path or endpoint_path",
+          "description": "File path or API endpoint path"
+        },
+        "record_name": {
+          "source": "function_name or class_name", 
+          "description": "Function or class name"
+        }
+      },
+      "extraction_rules": {
+        "docstring_patterns": [
+          "r'\"\"\"[\\s\\S]*?\"\"\"'",
+          "r\"'''[\\s\\S]*?'''\""
+        ],
+        "endpoint_decorators": [
+          "@app.get",
+          "@app.post", 
+          "@app.put",
+          "@app.delete",
+          "@app.patch"
+        ],
+        "parameter_documentation": [
+          "response_model",
+          "status_code",
+          "description"
+        ]
+      }
+    },
+    "cobol": {
+      "description": "COBOL copybooks and procedure divisions",
+      "required_fields": ["chunk_id", "artifact_type", "text_content"],
+      "field_mappings": {
+        "kind": {
+          "source": "cobol_section_type",
+          "description": "Type of COBOL component",
+          "examples": ["copybook", "procedure", "data_division", "working_storage"]
+        },
+        "api_path": {
+          "source": "file_path or copy_statement",
+          "description": "File path or COPY statement reference"
+        },
+        "record_name": {
+          "source": "record_name or section_name",
+          "description": "01-level record name or section identifier"
+        }
+      },
+      "extraction_rules": {
+        "record_structures": [
+          "r'01\\s+[A-Z0-9\\-]+'",
+          "r'COPY\\s+[A-Z0-9\\-]+'"
+        ],
+        "pic_clauses": [
+          "r'PIC\\s+[X9A-Z()\\-]+'"
+        ],
+        "comment_patterns": [
+          "r'\\*\\s*[A-Za-z]'",
+          "r'\\*\\s*PURPOSE:',",
+          "r'\\*\\s*DESCRIPTION:'"
+        ]
+      }
+    },
+    "irs": {
+      "description": "IRS record layout specifications and format documents",
+      "required_fields": ["chunk_id", "artifact_type", "text_content"], 
+      "field_mappings": {
+        "kind": {
+          "source": "record_type or layout_type",
+          "description": "Type of IRS record",
+          "examples": ["individual_master_file", "business_master_file", "return_transaction"]
+        },
+        "api_path": {
+          "source": "file_path or document_reference",
+          "description": "Document path or IRS publication reference"
+        },
+        "record_name": {
+          "source": "field_name or record_identifier",
+          "description": "Field name or record type identifier"
+        }
+      },
+      "extraction_rules": {
+        "field_definitions": [
+          "r'Field\\s+Name:|FIELD\\s+NAME:'",
+          "r'Description:|DESCRIPTION:'",
+          "r'Position:|POSITION:'",
+          "r'Length:|LENGTH:'"
+        ],
+        "validation_rules": [
+          "r'Valid\\s+Values?:|VALID\\s+VALUES?:'",
+          "r'Required:|REQUIRED:'",
+          "r'Format:|FORMAT:'"
+        ]
+      }
+    },
+    "mumps": {
+      "description": "MUMPS/VistA routines and FileMan dictionary entries",
+      "required_fields": ["chunk_id", "artifact_type", "text_content"],
+      "field_mappings": {
+        "kind": {
+          "source": "mumps_component_type", 
+          "description": "Type of MUMPS component",
+          "examples": ["routine", "fileman_field", "input_template", "print_template"]
+        },
+        "api_path": {
+          "source": "file_path or routine_name",
+          "description": "File path or routine identifier"
+        },
+        "record_name": {
+          "source": "routine_name or field_number",
+          "description": "Routine name or FileMan field identifier"
+        }
+      },
+      "extraction_rules": {
+        "routine_headers": [
+          "r'^[A-Z][A-Z0-9]*\\s*;'",
+          "r';;[0-9.]+;[A-Z\\s]+;[A-Z\\s]+;'"
+        ],
+        "fileman_references": [
+          "r'\\^DD\\([0-9,.]+\\)'",
+          "r'INPUT\\s+TRANSFORM:|INPUT TRANSFORM:'",
+          "r'HELP-PROMPT:|Help-Prompt:'"
+        ],
+        "documentation_patterns": [
+          "r';;\\s*PURPOSE:|;;\\s*DESCRIPTION:'",
+          "r';;\\s*INPUT:|;;\\s*OUTPUT:'"
+        ]
+      }
+    }
+  },
+  "data_quality_requirements": {
+    "completeness": {
+      "required_field_coverage": 0.8,
+      "description": "At least 80% of required fields must be non-null"
+    },
+    "consistency": {
+      "artifact_type_validation": true,
+      "description": "artifact_type must match expected patterns for the content"
+    },
+    "accuracy": {
+      "text_content_min_length": 10,
+      "description": "text_content must have meaningful content length"
+    },
+    "timeliness": {
+      "max_age_days": 90,
+      "description": "Records should not be older than 90 days for active analysis"
+    }
+  },
+  "validation_rules": [
+    {
+      "rule": "artifact_type_consistency",
+      "description": "Verify artifact_type matches content patterns",
+      "sql": "SELECT chunk_id FROM source_metadata WHERE artifact_type = 'kubernetes' AND NOT REGEXP_CONTAINS(text_content, r'kind:|apiVersion:')"
+    },
+    {
+      "rule": "required_field_presence", 
+      "description": "Ensure all required fields are present",
+      "sql": "SELECT chunk_id FROM source_metadata WHERE chunk_id IS NULL OR artifact_type IS NULL OR text_content IS NULL"
+    },
+    {
+      "rule": "content_quality_check",
+      "description": "Validate content has minimum quality standards", 
+      "sql": "SELECT chunk_id FROM source_metadata WHERE LENGTH(text_content) < 10 OR text_content = ''"
+    }
+  ],
+  "examples": [
+    {
+      "kubernetes_deployment": {
+        "chunk_id": "k8s-manifests/deployment.yaml:chunk_1",
+        "artifact_type": "kubernetes",
+        "text_content": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: nginx-deployment\n  annotations:\n    description: \"Nginx web server deployment\"\n...",
+        "kind": "Deployment",
+        "api_path": "k8s-manifests/deployment.yaml",
+        "record_name": "nginx-deployment",
+        "metadata": {
+          "annotations": {
+            "description": "Nginx web server deployment"
+          },
+          "labels": {
+            "app": "nginx"
+          }
+        }
+      }
+    },
+    {
+      "fastapi_endpoint": {
+        "chunk_id": "src/api/users.py:get_user_profile",
+        "artifact_type": "fastapi", 
+        "text_content": "@app.get(\"/users/{user_id}\")\ndef get_user_profile(user_id: int):\n    \"\"\"Retrieve user profile information...\"\"\"\n    return user_service.get_user(user_id)",
+        "kind": "endpoint",
+        "api_path": "/users/{user_id}",
+        "record_name": "get_user_profile"
+      }
+    }
+  ]
+}

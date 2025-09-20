@@ -1,0 +1,92 @@
+rule_name: "irs_field_documentation"
+artifact_type: "irs"
+version: "1.0.0"
+description: "Validates that IRS record layout fields have proper descriptions and format specifications"
+evaluation_sql: |
+  WITH irs_eval AS (
+    SELECT 
+      chunk_id,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'Field\s+Name:|FIELD\s+NAME:')
+           THEN true ELSE false END as has_field_names,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'Description:|DESCRIPTION:')
+           THEN true ELSE false END as has_descriptions,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'Format:|FORMAT:|Type:|TYPE:')
+           THEN true ELSE false END as has_format_specs,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'Position:|POSITION:|Columns?:|COLUMNS?:')
+           THEN true ELSE false END as has_position_info,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'Length:|LENGTH:|Size:|SIZE:')
+           THEN true ELSE false END as has_length_info
+    FROM source_metadata 
+    WHERE artifact_type = 'irs'
+  )
+  SELECT 
+    chunk_id,
+    (has_field_names AND has_descriptions AND has_format_specs AND has_position_info) as passed,
+    (CAST(has_field_names as INT64) * 0.25 + 
+     CAST(has_descriptions as INT64) * 0.35 + 
+     CAST(has_format_specs as INT64) * 0.25 + 
+     CAST(has_position_info as INT64) * 0.15) as confidence
+  FROM irs_eval
+confidence_weights:
+  field_names_present: 0.25
+  descriptions_present: 0.35
+  format_specifications: 0.25
+  position_information: 0.15
+severity: 4
+suggested_fix_template: "Add IRS record documentation: {{#missing_field_names}}field names{{/missing_field_names}}{{#missing_descriptions}}{{#missing_field_names}}, {{/missing_field_names}}field descriptions{{/missing_descriptions}}{{#missing_format}}{{#missing_field_names}}{{#missing_descriptions}}, {{/missing_descriptions}}{{/missing_field_names}}{{^missing_field_names}}{{#missing_descriptions}}, {{/missing_descriptions}}{{/missing_field_names}}format specifications{{/missing_format}}{{#missing_position}}{{#missing_field_names}}{{#missing_descriptions}}{{#missing_format}}, {{/missing_format}}{{/missing_descriptions}}{{/missing_field_names}}{{^missing_field_names}}{{#missing_descriptions}}{{#missing_format}}, {{/missing_format}}{{/missing_descriptions}}{{^missing_descriptions}}{{#missing_format}}, {{/missing_format}}{{/missing_descriptions}}{{/missing_field_names}}position information{{/missing_position}}"
+enabled: true
+tags: ["documentation", "irs", "record_layouts", "compliance"]
+quality_thresholds:
+  min_content_length: 30
+  field_patterns:
+    field_name: 'Field\s+Name:|FIELD\s+NAME:'
+    description: 'Description:|DESCRIPTION:'
+    format_spec: 'Format:|FORMAT:|Type:|TYPE:'
+    position: 'Position:|POSITION:|Columns?:|COLUMNS?:'
+metadata:
+  author: "compliance-team"
+  created_date: "2025-01-09"
+  review_frequency: "annually"
+
+---
+rule_name: "irs_validation_rules"
+artifact_type: "irs"
+version: "1.0.0"
+description: "Validates that IRS record layouts include proper validation rules and constraints"
+evaluation_sql: |
+  WITH validation_eval AS (
+    SELECT 
+      chunk_id,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'Valid\s+Values?:|VALID\s+VALUES?:|Allowable:|ALLOWABLE:')
+           THEN true ELSE false END as has_valid_values,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'Required:|REQUIRED:|Mandatory:|MANDATORY:')
+           THEN true ELSE false END as has_required_flags,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'Range:|RANGE:|Min:|MAX:|Minimum:|MAXIMUM:')
+           THEN true ELSE false END as has_range_constraints,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'Pattern:|PATTERN:|Mask:|MASK:|Format:|FORMAT:')
+           THEN true ELSE false END as has_pattern_rules
+    FROM source_metadata 
+    WHERE artifact_type = 'irs'
+      AND REGEXP_CONTAINS(text_content, r'Field|FIELD|Record|RECORD')
+  )
+  SELECT 
+    chunk_id,
+    (has_valid_values OR has_required_flags OR has_range_constraints OR has_pattern_rules) as passed,
+    (CAST(has_valid_values as INT64) * 0.3 + 
+     CAST(has_required_flags as INT64) * 0.3 + 
+     CAST(has_range_constraints as INT64) * 0.2 + 
+     CAST(has_pattern_rules as INT64) * 0.2) as confidence
+  FROM validation_eval
+confidence_weights:
+  valid_values_specified: 0.3
+  required_flags_present: 0.3
+  range_constraints_defined: 0.2
+  pattern_rules_specified: 0.2
+severity: 3
+suggested_fix_template: "Add validation rules: {{#missing_valid_values}}valid values or allowable entries{{/missing_valid_values}}{{#missing_required}}{{#missing_valid_values}}, {{/missing_valid_values}}required/mandatory field indicators{{/missing_required}}{{#missing_range}}{{#missing_valid_values}}{{#missing_required}}, {{/missing_required}}{{/missing_valid_values}}{{^missing_valid_values}}{{#missing_required}}, {{/missing_required}}{{/missing_valid_values}}range constraints{{/missing_range}}{{#missing_pattern}}{{#missing_valid_values}}{{#missing_required}}{{#missing_range}}, {{/missing_range}}{{/missing_required}}{{/missing_valid_values}}{{^missing_valid_values}}{{#missing_required}}{{#missing_range}}, {{/missing_range}}{{/missing_required}}{{^missing_required}}{{#missing_range}}, {{/missing_range}}{{/missing_required}}{{/missing_valid_values}}pattern or format rules{{/missing_pattern}}"
+enabled: true
+tags: ["validation", "irs", "constraints", "compliance"]
+metadata:
+  author: "compliance-team"
+  created_date: "2025-01-09"
+  review_frequency: "annually"

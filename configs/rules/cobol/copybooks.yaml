@@ -1,0 +1,85 @@
+rule_name: "cobol_data_item_documentation"
+artifact_type: "cobol"
+version: "1.0.0"
+description: "Validates that COBOL copybook data items have proper PIC clause comments and field descriptions"
+evaluation_sql: |
+  WITH cobol_eval AS (
+    SELECT 
+      chunk_id,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'PIC\s+[X9A-Z()\-]+\s+\*.*')
+           THEN true ELSE false END as has_pic_comments,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'\*\s*[A-Z][A-Za-z\s]{10,}')
+           THEN true ELSE false END as has_field_descriptions,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'COPY\s+[A-Z0-9\-]+')
+           THEN true ELSE false END as is_copybook,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'01\s+[A-Z0-9\-]+')
+           THEN true ELSE false END as has_record_structure
+    FROM source_metadata 
+    WHERE artifact_type = 'cobol'
+  )
+  SELECT 
+    chunk_id,
+    (has_pic_comments AND has_field_descriptions AND has_record_structure) as passed,
+    (CAST(has_pic_comments as INT64) * 0.4 + 
+     CAST(has_field_descriptions as INT64) * 0.4 + 
+     CAST(has_record_structure as INT64) * 0.2) as confidence
+  FROM cobol_eval
+  WHERE is_copybook = true OR has_record_structure = true
+confidence_weights:
+  pic_comments_present: 0.4
+  field_descriptions_present: 0.4
+  record_structure_present: 0.2
+severity: 3
+suggested_fix_template: "Add COBOL documentation: {{#missing_pic_comments}}PIC clause comments for data types{{/missing_pic_comments}}{{#missing_descriptions}}{{#missing_pic_comments}}, {{/missing_pic_comments}}field descriptions with business meaning{{/missing_descriptions}}{{#missing_structure}}{{#missing_pic_comments}}{{#missing_descriptions}}, {{/missing_descriptions}}{{/missing_pic_comments}}{{^missing_pic_comments}}{{#missing_descriptions}}, {{/missing_descriptions}}{{/missing_pic_comments}}proper 01-level record structure{{/missing_structure}}"
+enabled: true
+tags: ["documentation", "cobol", "copybooks", "data_structure"]
+quality_thresholds:
+  min_content_length: 20
+  field_patterns:
+    pic_clause: 'PIC\s+[X9A-Z()\-]+'
+    comment_line: '\*\s*[A-Za-z]'
+    record_level: '01\s+[A-Z0-9\-]+'
+metadata:
+  author: "legacy-systems-team"
+  created_date: "2025-01-09"
+  review_frequency: "annually"
+
+---
+rule_name: "cobol_procedure_documentation"
+artifact_type: "cobol"
+version: "1.0.0"
+description: "Validates that COBOL procedures and sections have proper documentation and business logic explanations"
+evaluation_sql: |
+  WITH procedure_eval AS (
+    SELECT 
+      chunk_id,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'PROCEDURE\s+DIVISION')
+           THEN true ELSE false END as has_procedure_division,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'\*\s*PURPOSE:|FUNCTION:|DESCRIPTION:')
+           THEN true ELSE false END as has_purpose_comment,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'SECTION\.')
+           THEN true ELSE false END as has_sections,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'\*\s*INPUT:|PARAMETERS:|ARGUMENTS:')
+           THEN true ELSE false END as has_input_docs
+    FROM source_metadata 
+    WHERE artifact_type = 'cobol'
+      AND REGEXP_CONTAINS(text_content, r'PROCEDURE\s+DIVISION|SECTION\.')
+  )
+  SELECT 
+    chunk_id,
+    (has_purpose_comment AND (NOT has_sections OR has_input_docs)) as passed,
+    (CAST(has_purpose_comment as INT64) * 0.6 + 
+     CAST(has_input_docs as INT64) * 0.4) as confidence
+  FROM procedure_eval
+  WHERE has_procedure_division = true
+confidence_weights:
+  purpose_documented: 0.6
+  input_parameters_documented: 0.4
+severity: 2
+suggested_fix_template: "Add procedure documentation: {{#missing_purpose}}PURPOSE or FUNCTION comment explaining business logic{{/missing_purpose}}{{#missing_input_docs}}{{#missing_purpose}}, {{/missing_purpose}}INPUT or PARAMETERS documentation{{/missing_input_docs}}"
+enabled: true
+tags: ["documentation", "cobol", "procedures", "business_logic"]
+metadata:
+  author: "legacy-systems-team"
+  created_date: "2025-01-09"
+  review_frequency: "annually"
