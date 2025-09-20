@@ -30,6 +30,9 @@ uvicorn[standard]==0.25.0
 # Data processing and numerical computing
 numpy==1.26.3
 pandas==2.2.0
+pyarrow==14.0.2
+db-dtypes==1.1.1
+altair==5.2.0
 
 # Environment and configuration management
 python-dotenv==1.0.0
