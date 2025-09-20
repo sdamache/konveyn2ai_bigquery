@@ -1,0 +1,270 @@
+# Suggested Fix Templates for Gap Analysis Rules
+# 
+# This file defines Mustache templates for generating actionable remediation guidance.
+# Templates are organized by artifact type and rule category for consistency.
+#
+# Template Variables:
+# - Context variables are passed from rule evaluation
+# - Conditional blocks use {{#variable}} syntax
+# - Variable substitution uses {{variable}} syntax
+# - Maximum 500 characters per template output
+
+# =============================================================================
+# Kubernetes Templates
+# =============================================================================
+
+kubernetes_templates:
+  
+  # Documentation Templates
+  deployment_documentation:
+    template: "Add missing documentation: {{#missing_description}}description annotation{{/missing_description}}{{#missing_app_label}}{{#missing_description}}, {{/missing_description}}app label{{/missing_app_label}}{{#missing_resources}}{{#missing_description}}{{#missing_app_label}}, {{/missing_app_label}}{{/missing_description}}{{^missing_description}}{{#missing_app_label}}, {{/missing_app_label}}{{/missing_description}}resource limits{{/missing_resources}}"
+    variables:
+      - missing_description: "boolean - true if description annotation absent"
+      - missing_app_label: "boolean - true if app label missing"
+      - missing_resources: "boolean - true if resource limits not specified"
+    examples:
+      all_missing: "Add missing documentation: description annotation, app label, resource limits"
+      partial_missing: "Add missing documentation: app label, resource limits"
+      single_missing: "Add missing documentation: description annotation"
+
+  service_documentation:
+    template: "Improve service documentation: {{#missing_description}}add description annotation explaining service purpose{{/missing_description}}{{#missing_selector}}{{#missing_description}}, {{/missing_description}}define proper selector labels{{/missing_selector}}{{#missing_ports}}{{#missing_description}}{{#missing_selector}}, {{/missing_selector}}{{/missing_description}}{{^missing_description}}{{#missing_selector}}, {{/missing_selector}}{{/missing_description}}document port configurations{{/missing_ports}}"
+    variables:
+      - missing_description: "boolean - service description absent"
+      - missing_selector: "boolean - selector labels missing"
+      - missing_ports: "boolean - port documentation incomplete"
+
+  # Security Templates  
+  security_context:
+    template: "Add security configurations: {{#missing_non_root}}runAsNonRoot: true{{/missing_non_root}}{{#missing_privilege}}{{#missing_non_root}}, {{/missing_non_root}}allowPrivilegeEscalation: false{{/missing_privilege}}{{#missing_readonly}}{{#missing_non_root}}{{#missing_privilege}}, {{/missing_privilege}}{{/missing_non_root}}{{^missing_non_root}}{{#missing_privilege}}, {{/missing_privilege}}{{/missing_non_root}}readOnlyRootFilesystem: true{{/missing_readonly}}"
+    variables:
+      - missing_non_root: "boolean - runAsNonRoot not set to true"
+      - missing_privilege: "boolean - allowPrivilegeEscalation not set to false"
+      - missing_readonly: "boolean - readOnlyRootFilesystem not set to true"
+    severity_context: "security"
+
+  network_policy:
+    template: "Add network security: {{#missing_policy}}create NetworkPolicy for pod isolation{{/missing_policy}}{{#missing_ingress}}{{#missing_policy}}, {{/missing_policy}}define ingress rules{{/missing_ingress}}{{#missing_egress}}{{#missing_policy}}{{#missing_ingress}}, {{/missing_ingress}}{{/missing_policy}}{{^missing_policy}}{{#missing_ingress}}, {{/missing_ingress}}{{/missing_policy}}specify egress rules{{/missing_egress}}"
+    variables:
+      - missing_policy: "boolean - no NetworkPolicy defined"
+      - missing_ingress: "boolean - ingress rules not specified"
+      - missing_egress: "boolean - egress rules not specified"
+
+# =============================================================================
+# FastAPI Templates
+# =============================================================================
+
+fastapi_templates:
+
+  # Documentation Templates
+  endpoint_documentation:
+    template: "Improve endpoint documentation: {{#missing_docstring}}add comprehensive docstring{{/missing_docstring}}{{#inadequate_docs}}{{#missing_docstring}}, {{/missing_docstring}}expand documentation to explain parameters and return values{{/inadequate_docs}}{{#missing_response_model}}{{#missing_docstring}}{{#inadequate_docs}}, {{/inadequate_docs}}{{/missing_docstring}}{{^missing_docstring}}{{#inadequate_docs}}, {{/inadequate_docs}}{{/missing_docstring}}add response_model parameter{{/missing_response_model}}"
+    variables:
+      - missing_docstring: "boolean - no docstring present"
+      - inadequate_docs: "boolean - docstring too short or incomplete"
+      - missing_response_model: "boolean - response_model not defined"
+    examples:
+      complete_failure: "Improve endpoint documentation: add comprehensive docstring, add response_model parameter"
+      partial_failure: "Improve endpoint documentation: expand documentation to explain parameters and return values"
+
+  parameter_documentation:
+    template: "Add parameter documentation: {{#missing_param_docs}}document all path and query parameters{{/missing_param_docs}}{{#missing_examples}}{{#missing_param_docs}}, {{/missing_param_docs}}include parameter examples{{/missing_examples}}{{#missing_validation}}{{#missing_param_docs}}{{#missing_examples}}, {{/missing_examples}}{{/missing_param_docs}}{{^missing_param_docs}}{{#missing_examples}}, {{/missing_examples}}{{/missing_param_docs}}add validation constraints{{/missing_validation}}"
+    variables:
+      - missing_param_docs: "boolean - parameter documentation absent"
+      - missing_examples: "boolean - no parameter examples provided"
+      - missing_validation: "boolean - validation rules not documented"
+
+  # Error Handling Templates
+  error_handling:
+    template: "Add error handling: {{#missing_error_handling}}implement HTTPException or try/except blocks{{/missing_error_handling}}{{#missing_status_codes}}{{#missing_error_handling}}, {{/missing_error_handling}}include appropriate HTTP status codes (4xx/5xx){{/missing_status_codes}}{{#missing_error_docs}}{{#missing_error_handling}}{{#missing_status_codes}}, {{/missing_status_codes}}{{/missing_error_handling}}{{^missing_error_handling}}{{#missing_status_codes}}, {{/missing_status_codes}}{{/missing_error_handling}}document error response formats{{/missing_error_docs}}"
+    variables:
+      - missing_error_handling: "boolean - no error handling implemented"
+      - missing_status_codes: "boolean - HTTP status codes not specified"
+      - missing_error_docs: "boolean - error response documentation missing"
+
+  # Security Templates
+  authentication_docs:
+    template: "Add security documentation: {{#missing_auth_scheme}}document authentication scheme{{/missing_auth_scheme}}{{#missing_scopes}}{{#missing_auth_scheme}}, {{/missing_auth_scheme}}define required scopes/permissions{{/missing_scopes}}{{#missing_security_headers}}{{#missing_auth_scheme}}{{#missing_scopes}}, {{/missing_scopes}}{{/missing_auth_scheme}}{{^missing_auth_scheme}}{{#missing_scopes}}, {{/missing_scopes}}{{/missing_auth_scheme}}specify security headers{{/missing_security_headers}}"
+    variables:
+      - missing_auth_scheme: "boolean - authentication not documented"
+      - missing_scopes: "boolean - required permissions not specified"
+      - missing_security_headers: "boolean - security headers not documented"
+
+# =============================================================================
+# COBOL Templates
+# =============================================================================
+
+cobol_templates:
+
+  # Data Documentation Templates
+  data_item_documentation:
+    template: "Add COBOL documentation: {{#missing_pic_comments}}PIC clause comments for data types{{/missing_pic_comments}}{{#missing_descriptions}}{{#missing_pic_comments}}, {{/missing_pic_comments}}field descriptions with business meaning{{/missing_descriptions}}{{#missing_structure}}{{#missing_pic_comments}}{{#missing_descriptions}}, {{/missing_descriptions}}{{/missing_pic_comments}}{{^missing_pic_comments}}{{#missing_descriptions}}, {{/missing_descriptions}}{{/missing_pic_comments}}proper 01-level record structure{{/missing_structure}}"
+    variables:
+      - missing_pic_comments: "boolean - PIC clause lacks explanatory comments"
+      - missing_descriptions: "boolean - field business meaning not documented"
+      - missing_structure: "boolean - record structure not properly defined"
+
+  procedure_documentation:
+    template: "Add procedure documentation: {{#missing_purpose}}PURPOSE or FUNCTION comment explaining business logic{{/missing_purpose}}{{#missing_input_docs}}{{#missing_purpose}}, {{/missing_purpose}}INPUT or PARAMETERS documentation{{/missing_input_docs}}{{#missing_output_docs}}{{#missing_purpose}}{{#missing_input_docs}}, {{/missing_input_docs}}{{/missing_purpose}}{{^missing_purpose}}{{#missing_input_docs}}, {{/missing_input_docs}}{{/missing_purpose}}OUTPUT or RETURNS documentation{{/missing_output_docs}}"
+    variables:
+      - missing_purpose: "boolean - procedure purpose not explained"
+      - missing_input_docs: "boolean - input parameters not documented"
+      - missing_output_docs: "boolean - output/return values not documented"
+
+  # Data Validation Templates
+  validation_rules:
+    template: "Add data validation: {{#missing_range_checks}}implement range validation for numeric fields{{/missing_range_checks}}{{#missing_format_validation}}{{#missing_range_checks}}, {{/missing_range_checks}}add format validation for text fields{{/missing_format_validation}}{{#missing_business_rules}}{{#missing_range_checks}}{{#missing_format_validation}}, {{/missing_format_validation}}{{/missing_range_checks}}{{^missing_range_checks}}{{#missing_format_validation}}, {{/missing_format_validation}}{{/missing_range_checks}}document business rule validation{{/missing_business_rules}}"
+    variables:
+      - missing_range_checks: "boolean - numeric range validation absent"
+      - missing_format_validation: "boolean - text format validation missing"
+      - missing_business_rules: "boolean - business logic validation not documented"
+
+# =============================================================================
+# IRS Templates  
+# =============================================================================
+
+irs_templates:
+
+  # Field Documentation Templates
+  field_documentation:
+    template: "Add IRS record documentation: {{#missing_field_names}}field names{{/missing_field_names}}{{#missing_descriptions}}{{#missing_field_names}}, {{/missing_field_names}}field descriptions{{/missing_descriptions}}{{#missing_format}}{{#missing_field_names}}{{#missing_descriptions}}, {{/missing_descriptions}}{{/missing_field_names}}{{^missing_field_names}}{{#missing_descriptions}}, {{/missing_descriptions}}{{/missing_field_names}}format specifications{{/missing_format}}{{#missing_position}}{{#missing_field_names}}{{#missing_descriptions}}{{#missing_format}}, {{/missing_format}}{{/missing_descriptions}}{{/missing_field_names}}{{^missing_field_names}}{{#missing_descriptions}}{{#missing_format}}, {{/missing_format}}{{/missing_descriptions}}{{^missing_descriptions}}{{#missing_format}}, {{/missing_format}}{{/missing_descriptions}}{{/missing_field_names}}position information{{/missing_position}}"
+    variables:
+      - missing_field_names: "boolean - field names not specified"
+      - missing_descriptions: "boolean - field descriptions absent"
+      - missing_format: "boolean - format specifications missing"
+      - missing_position: "boolean - position information not provided"
+
+  # Validation Templates
+  validation_rules:
+    template: "Add validation rules: {{#missing_valid_values}}valid values or allowable entries{{/missing_valid_values}}{{#missing_required}}{{#missing_valid_values}}, {{/missing_valid_values}}required/mandatory field indicators{{/missing_required}}{{#missing_range}}{{#missing_valid_values}}{{#missing_required}}, {{/missing_required}}{{/missing_valid_values}}{{^missing_valid_values}}{{#missing_required}}, {{/missing_required}}{{/missing_valid_values}}range constraints{{/missing_range}}{{#missing_pattern}}{{#missing_valid_values}}{{#missing_required}}{{#missing_range}}, {{/missing_range}}{{/missing_required}}{{/missing_valid_values}}{{^missing_valid_values}}{{#missing_required}}{{#missing_range}}, {{/missing_range}}{{/missing_required}}{{^missing_required}}{{#missing_range}}, {{/missing_range}}{{/missing_required}}{{/missing_valid_values}}pattern or format rules{{/missing_pattern}}"
+    variables:
+      - missing_valid_values: "boolean - valid value lists not provided"
+      - missing_required: "boolean - required field indicators absent"
+      - missing_range: "boolean - range constraints not specified"
+      - missing_pattern: "boolean - pattern/format rules missing"
+
+  # Compliance Templates
+  compliance_documentation:
+    template: "Add compliance documentation: {{#missing_pii_classification}}PII data classification{{/missing_pii_classification}}{{#missing_retention}}{{#missing_pii_classification}}, {{/missing_pii_classification}}data retention requirements{{/missing_retention}}{{#missing_audit_trail}}{{#missing_pii_classification}}{{#missing_retention}}, {{/missing_retention}}{{/missing_pii_classification}}{{^missing_pii_classification}}{{#missing_retention}}, {{/missing_retention}}{{/missing_pii_classification}}audit trail specifications{{/missing_audit_trail}}"
+    variables:
+      - missing_pii_classification: "boolean - PII classification not documented"
+      - missing_retention: "boolean - data retention rules absent"
+      - missing_audit_trail: "boolean - audit requirements not specified"
+
+# =============================================================================
+# MUMPS Templates
+# =============================================================================
+
+mumps_templates:
+
+  # FileMan Documentation Templates  
+  fileman_field_documentation:
+    template: "Add FileMan documentation: {{#missing_dd_ref}}DD reference structure{{/missing_dd_ref}}{{#missing_description}}{{#missing_dd_ref}}, {{/missing_dd_ref}}field description with business meaning{{/missing_description}}{{#missing_type}}{{#missing_dd_ref}}{{#missing_description}}, {{/missing_description}}{{/missing_dd_ref}}{{^missing_dd_ref}}{{#missing_description}}, {{/missing_description}}{{/missing_dd_ref}}field type information{{/missing_type}}{{#missing_help}}{{#missing_dd_ref}}{{#missing_description}}{{#missing_type}}, {{/missing_type}}{{/missing_description}}{{/missing_dd_ref}}{{^missing_dd_ref}}{{#missing_description}}{{#missing_type}}, {{/missing_type}}{{/missing_description}}{{^missing_description}}{{#missing_type}}, {{/missing_type}}{{/missing_description}}{{/missing_dd_ref}}help prompt for users{{/missing_help}}"
+    variables:
+      - missing_dd_ref: "boolean - DD reference structure absent"
+      - missing_description: "boolean - field description missing"
+      - missing_type: "boolean - field type information not provided"
+      - missing_help: "boolean - help prompt not defined"
+
+  # Routine Documentation Templates
+  routine_documentation:
+    template: "Add routine documentation: {{#missing_header}}routine header with name{{/missing_header}}{{#missing_purpose}}{{#missing_header}}, {{/missing_header}}PURPOSE or DESCRIPTION comment{{/missing_purpose}}{{#missing_input}}{{#missing_header}}{{#missing_purpose}}, {{/missing_purpose}}{{/missing_header}}{{^missing_header}}{{#missing_purpose}}, {{/missing_purpose}}{{/missing_header}}INPUT parameter documentation{{/missing_input}}{{#missing_output}}{{#missing_header}}{{#missing_purpose}}{{#missing_input}}, {{/missing_input}}{{/missing_purpose}}{{/missing_header}}{{^missing_header}}{{#missing_purpose}}{{#missing_input}}, {{/missing_input}}{{/missing_purpose}}{{^missing_purpose}}{{#missing_input}}, {{/missing_input}}{{/missing_purpose}}{{/missing_header}}OUTPUT or RETURNS documentation{{/missing_output}}"
+    variables:
+      - missing_header: "boolean - routine header not present"
+      - missing_purpose: "boolean - purpose/description comment absent"
+      - missing_input: "boolean - input parameter documentation missing"
+      - missing_output: "boolean - output documentation not provided"
+
+  # Healthcare-Specific Templates
+  healthcare_compliance:
+    template: "Add healthcare compliance: {{#missing_patient_safety}}patient safety validation rules{{/missing_patient_safety}}{{#missing_hipaa}}{{#missing_patient_safety}}, {{/missing_patient_safety}}HIPAA compliance documentation{{/missing_hipaa}}{{#missing_audit_requirements}}{{#missing_patient_safety}}{{#missing_hipaa}}, {{/missing_hipaa}}{{/missing_patient_safety}}{{^missing_patient_safety}}{{#missing_hipaa}}, {{/missing_hipaa}}{{/missing_patient_safety}}audit trail requirements{{/missing_audit_requirements}}"
+    variables:
+      - missing_patient_safety: "boolean - patient safety rules not documented"
+      - missing_hipaa: "boolean - HIPAA compliance requirements absent"
+      - missing_audit_requirements: "boolean - audit trail specifications missing"
+
+# =============================================================================
+# Cross-Cutting Templates
+# =============================================================================
+
+common_templates:
+
+  # Generic Documentation Template
+  generic_documentation:
+    template: "Improve documentation: {{#missing_description}}add comprehensive description{{/missing_description}}{{#missing_examples}}{{#missing_description}}, {{/missing_description}}include usage examples{{/missing_examples}}{{#missing_context}}{{#missing_description}}{{#missing_examples}}, {{/missing_examples}}{{/missing_description}}{{^missing_description}}{{#missing_examples}}, {{/missing_examples}}{{/missing_description}}provide business context{{/missing_context}}"
+    variables:
+      - missing_description: "boolean - basic description absent"
+      - missing_examples: "boolean - usage examples missing"
+      - missing_context: "boolean - business context not provided"
+
+  # Security Template
+  generic_security:
+    template: "Add security documentation: {{#missing_access_control}}access control requirements{{/missing_access_control}}{{#missing_data_protection}}{{#missing_access_control}}, {{/missing_access_control}}data protection measures{{/missing_data_protection}}{{#missing_audit_logging}}{{#missing_access_control}}{{#missing_data_protection}}, {{/missing_data_protection}}{{/missing_access_control}}{{^missing_access_control}}{{#missing_data_protection}}, {{/missing_data_protection}}{{/missing_access_control}}audit logging requirements{{/missing_audit_logging}}"
+    variables:
+      - missing_access_control: "boolean - access control not documented"
+      - missing_data_protection: "boolean - data protection measures absent"
+      - missing_audit_logging: "boolean - audit logging not specified"
+
+  # Compliance Template
+  generic_compliance:
+    template: "Add compliance documentation: {{#missing_regulatory_requirements}}regulatory requirements{{/missing_regulatory_requirements}}{{#missing_data_classification}}{{#missing_regulatory_requirements}}, {{/missing_regulatory_requirements}}data classification{{/missing_data_classification}}{{#missing_retention_policy}}{{#missing_regulatory_requirements}}{{#missing_data_classification}}, {{/missing_data_classification}}{{/missing_regulatory_requirements}}{{^missing_regulatory_requirements}}{{#missing_data_classification}}, {{/missing_data_classification}}{{/missing_regulatory_requirements}}retention policy{{/missing_retention_policy}}"
+    variables:
+      - missing_regulatory_requirements: "boolean - regulatory requirements not documented"
+      - missing_data_classification: "boolean - data classification absent"
+      - missing_retention_policy: "boolean - retention policy not specified"
+
+# =============================================================================
+# Template Processing Guidelines  
+# =============================================================================
+
+processing_guidelines:
+  
+  character_limits:
+    max_template_output: 500
+    recommended_length: 200
+    minimum_length: 20
+  
+  template_rules:
+    - "Use action-oriented language (Add, Include, Implement, Document)"
+    - "Be specific about field names and requirements"
+    - "Avoid implementation details, focus on what is needed"
+    - "Use conditional logic to provide relevant guidance only"
+    - "Prioritize critical issues first in compound templates"
+  
+  variable_naming:
+    - "Use descriptive boolean variable names (missing_X, absent_Y, incomplete_Z)"
+    - "Group related variables for logical template flow"
+    - "Provide clear variable descriptions for template users"
+  
+  testing_requirements:
+    - "Test all conditional branches with sample data"
+    - "Verify character limits are respected"
+    - "Validate template renders correctly with all variable combinations"
+    - "Ensure templates are helpful and actionable"
+
+# =============================================================================
+# Template Usage Examples
+# =============================================================================
+
+usage_examples:
+  
+  kubernetes_deployment_example:
+    context:
+      missing_description: true
+      missing_app_label: false
+      missing_resources: true
+    rendered: "Add missing documentation: description annotation, resource limits"
+  
+  fastapi_endpoint_example:
+    context:
+      missing_docstring: true
+      inadequate_docs: false
+      missing_response_model: true
+    rendered: "Improve endpoint documentation: add comprehensive docstring, add response_model parameter"
+  
+  cobol_data_example:
+    context:
+      missing_pic_comments: false
+      missing_descriptions: true
+      missing_structure: false
+    rendered: "Add COBOL documentation: field descriptions with business meaning"
