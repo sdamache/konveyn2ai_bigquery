@@ -15,8 +15,9 @@ from enum import Enum
 
 class ConfidenceComponent(Enum):
     """Components that contribute to confidence scoring."""
+
     FIELD_COMPLETENESS = "field_completeness"
-    CONTENT_QUALITY = "content_quality" 
+    CONTENT_QUALITY = "content_quality"
     STRUCTURE_QUALITY = "structure_quality"
     VOCABULARY_QUALITY = "vocabulary_quality"
     CRITICAL_PENALTIES = "critical_penalties"
@@ -27,6 +28,7 @@ class ConfidenceComponent(Enum):
 @dataclass
 class ConfidenceWeights:
     """Weights for confidence calculation components."""
+
     field_completeness: float = 0.6
     content_quality: float = 0.4
     structure_weight: float = 0.3
@@ -35,27 +37,34 @@ class ConfidenceWeights:
     critical_penalty: float = 0.20
     security_penalty: float = 0.15
     compliance_penalty: float = 0.10
-    
+
     def validate(self) -> None:
         """Validate that weights are in valid ranges."""
         if not (0 <= self.field_completeness <= 1):
-            raise ValueError(f"field_completeness must be [0,1], got {self.field_completeness}")
+            raise ValueError(
+                f"field_completeness must be [0,1], got {self.field_completeness}"
+            )
         if not (0 <= self.content_quality <= 1):
-            raise ValueError(f"content_quality must be [0,1], got {self.content_quality}")
-        if not math.isclose(self.field_completeness + self.content_quality, 1.0, rel_tol=1e-9):
+            raise ValueError(
+                f"content_quality must be [0,1], got {self.content_quality}"
+            )
+        if not math.isclose(
+            self.field_completeness + self.content_quality, 1.0, rel_tol=1e-9
+        ):
             raise ValueError("field_completeness + content_quality must sum to 1.0")
 
 
 @dataclass
 class FieldAnalysis:
     """Analysis results for field presence and quality."""
+
     required_fields_present: int
     total_required_fields: int
     optional_fields_present: int
     total_optional_fields: int
     critical_missing_fields: int
     field_values: Dict[str, Any]
-    
+
     @property
     def completeness_ratio(self) -> float:
         """Calculate field completeness ratio."""
@@ -67,6 +76,7 @@ class FieldAnalysis:
 @dataclass
 class ContentQuality:
     """Content quality assessment results."""
+
     total_content_length: int
     meaningful_content_length: int
     min_required_length: int
@@ -76,8 +86,8 @@ class ContentQuality:
     has_placeholders: bool
     structure_score: float
     vocabulary_score: float
-    
-    @property 
+
+    @property
     def length_score(self) -> float:
         """Calculate length-based quality score."""
         if self.min_required_length == 0:
@@ -88,21 +98,22 @@ class ContentQuality:
 @dataclass
 class PenaltyAssessment:
     """Assessment of penalty factors that reduce confidence."""
+
     critical_violations: List[str]
-    security_violations: List[str] 
+    security_violations: List[str]
     compliance_violations: List[str]
     format_violations: List[str]
-    
+
     @property
     def total_critical_penalties(self) -> int:
         """Count of critical violations."""
         return len(self.critical_violations)
-    
+
     @property
     def total_security_penalties(self) -> int:
         """Count of security violations."""
         return len(self.security_violations)
-    
+
     @property
     def total_compliance_penalties(self) -> int:
         """Count of compliance violations."""
@@ -112,67 +123,87 @@ class PenaltyAssessment:
 @dataclass
 class ConfidenceResult:
     """Complete confidence calculation result."""
+
     final_confidence: float
     base_completeness: float
     quality_multiplier: float
     total_penalties: float
     component_scores: Dict[ConfidenceComponent, float]
     breakdown: Dict[str, float]
-    
-    def round_precision(self, decimals: int = 3) -> 'ConfidenceResult':
+
+    def round_precision(self, decimals: int = 3) -> "ConfidenceResult":
         """Round confidence to specified decimal places for consistency."""
         return ConfidenceResult(
             final_confidence=round(self.final_confidence, decimals),
             base_completeness=round(self.base_completeness, decimals),
             quality_multiplier=round(self.quality_multiplier, decimals),
             total_penalties=round(self.total_penalties, decimals),
-            component_scores={k: round(v, decimals) for k, v in self.component_scores.items()},
-            breakdown={k: round(v, decimals) for k, v in self.breakdown.items()}
+            component_scores={
+                k: round(v, decimals) for k, v in self.component_scores.items()
+            },
+            breakdown={k: round(v, decimals) for k, v in self.breakdown.items()},
         )
 
 
 class ConfidenceCalculator:
     """
     Deterministic confidence calculation engine.
-    
+
     Implements the confidence scoring algorithm:
     confidence = base_completeness * quality_multiplier - penalty_deductions
-    
+
     All calculations are deterministic and reproducible.
     """
-    
+
     def __init__(self, weights: Optional[ConfidenceWeights] = None):
         """Initialize calculator with optional custom weights."""
         self.weights = weights or ConfidenceWeights()
         self.weights.validate()
-        
+
         # Precompiled regex patterns for performance
         self._domain_patterns = {
-            'kubernetes': re.compile(r'\b(pod|service|deployment|ingress|configmap|secret|namespace)\b', re.IGNORECASE),
-            'fastapi': re.compile(r'\b(endpoint|route|schema|model|dependency|middleware|response)\b', re.IGNORECASE),
-            'cobol': re.compile(r'\b(pic|copy|section|division|procedure|working|storage)\b', re.IGNORECASE),
-            'irs': re.compile(r'\b(field|record|position|length|format|required|valid)\b', re.IGNORECASE),
-            'mumps': re.compile(r'\b(routine|fileman|input|output|transform|help|prompt)\b', re.IGNORECASE)
+            "kubernetes": re.compile(
+                r"\b(pod|service|deployment|ingress|configmap|secret|namespace)\b",
+                re.IGNORECASE,
+            ),
+            "fastapi": re.compile(
+                r"\b(endpoint|route|schema|model|dependency|middleware|response)\b",
+                re.IGNORECASE,
+            ),
+            "cobol": re.compile(
+                r"\b(pic|copy|section|division|procedure|working|storage)\b",
+                re.IGNORECASE,
+            ),
+            "irs": re.compile(
+                r"\b(field|record|position|length|format|required|valid)\b",
+                re.IGNORECASE,
+            ),
+            "mumps": re.compile(
+                r"\b(routine|fileman|input|output|transform|help|prompt)\b",
+                re.IGNORECASE,
+            ),
         }
-        
-        self._placeholder_patterns = re.compile(r'\b(todo|fixme|tbd|placeholder|replace|change|update)\b', re.IGNORECASE)
+
+        self._placeholder_patterns = re.compile(
+            r"\b(todo|fixme|tbd|placeholder|replace|change|update)\b", re.IGNORECASE
+        )
         
     def calculate_confidence(
         self,
         field_analysis: FieldAnalysis,
-        content_quality: ContentQuality, 
+        content_quality: ContentQuality,
         penalty_assessment: PenaltyAssessment,
-        artifact_type: str = "unknown"
+        artifact_type: str = "unknown",
     ) -> ConfidenceResult:
         """
         Calculate final confidence score using the standard algorithm.
-        
+
         Args:
             field_analysis: Field presence and completeness analysis
             content_quality: Content quality metrics
             penalty_assessment: Penalty factors
             artifact_type: Type of artifact for domain-specific scoring
-            
+
         Returns:
             Complete confidence calculation result
         """
