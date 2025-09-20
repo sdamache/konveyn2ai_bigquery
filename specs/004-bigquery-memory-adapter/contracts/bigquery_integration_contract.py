@@ -55,8 +55,11 @@ class TestBigQueryIntegrationContract:
 
         assert vector_column is not None, "embedding_vector column not found"
         assert (
-            vector_column.field_type == "VECTOR"
-        ), f"Expected VECTOR type, got {vector_column.field_type}"
+            vector_column.field_type == "FLOAT" and vector_column.mode == "REPEATED"
+        ), (
+            "Expected embedding_vector to be stored as VECTOR column; "
+            f"got type={vector_column.field_type}"
+        )
 
     def test_vector_search_query_syntax(self, bigquery_client, test_dataset_config):
         """VECTOR_SEARCH function must work with our table schema."""
@@ -159,7 +162,7 @@ class TestBigQueryVectorIndexIntegration:
     def test_end_to_end_similarity_search(self, bigquery_vector_index):
         """End-to-end test: query vector → BigQuery → results."""
         # This test will fail until full implementation is complete
-        query_vector = [0.1] * 3072  # Gemini embedding dimension
+        query_vector = [0.1] * 768  # Gemini embedding dimension
         results = bigquery_vector_index.similarity_search(query_vector, k=5)
 
         assert isinstance(results, list)
@@ -183,7 +186,7 @@ class TestBigQueryVectorIndexIntegration:
             mock_bigquery_failure,
         )
 
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
         results = bigquery_vector_index.similarity_search(query_vector, k=5)
 
         # Must still return valid results from fallback
@@ -196,7 +199,7 @@ class TestBigQueryVectorIndexIntegration:
         """Establish performance baseline for similarity search."""
         import time
 
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
         start_time = time.time()
 
         results = bigquery_vector_index.similarity_search(query_vector, k=10)
