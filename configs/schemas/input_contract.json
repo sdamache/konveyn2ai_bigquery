@@ -4,6 +4,7 @@
   "title": "Source Metadata Input Contract",
   "description": "Contract definition for source_metadata table fields required for gap analysis rule evaluation",
   "type": "object",
+  "$comment": "T003: Base requirements for source_metadata records feeding Issue #5 pipeline.",
   "required": [
     "chunk_id",
     "artifact_type",
@@ -75,6 +76,48 @@
       "description": "Date for BigQuery partitioning (YYYY-MM-DD)"
     }
   },
+  "allOf": [
+    {
+      "$comment": "Kubernetes manifests require kind and metadata for rule evaluation (T003).",
+      "if": {
+        "properties": {
+          "artifact_type": { "const": "kubernetes" }
+        }
+      },
+      "then": {
+        "required": ["chunk_id", "artifact_type", "text_content", "kind", "metadata"],
+        "properties": {
+          "metadata": {
+            "required": ["annotations", "labels", "spec"]
+          }
+        }
+      }
+    },
+    {
+      "$comment": "FastAPI endpoints must surface API path annotations (T003).",
+      "if": {
+        "properties": {
+          "artifact_type": { "const": "fastapi" }
+        }
+      },
+      "then": {
+        "required": ["chunk_id", "artifact_type", "text_content", "api_path"]
+      }
+    },
+    {
+      "$comment": "COBOL, IRS, and MUMPS artifacts require record names for traceability (T003).",
+      "if": {
+        "properties": {
+          "artifact_type": {
+            "enum": ["cobol", "irs", "mumps"]
+          }
+        }
+      },
+      "then": {
+        "required": ["chunk_id", "artifact_type", "text_content", "record_name"]
+      }
+    }
+  ],
   "artifact_type_mappings": {
     "kubernetes": {
       "description": "Kubernetes YAML/JSON manifests",

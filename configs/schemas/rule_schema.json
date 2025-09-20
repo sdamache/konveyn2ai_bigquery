@@ -44,15 +44,15 @@
     },
     "confidence_weights": {
       "type": "object",
+      "$comment": "T001: Dynamic weight map per rule; actual sum-to-one check handled by rule validator.",
       "description": "Weight factors for confidence calculation components",
       "patternProperties": {
-        "^[a-z_]+$": {
+        "^[a-z_][a-z0-9_]*$": {
           "type": "number",
           "minimum": 0,
           "maximum": 1
         }
       },
-      "additionalProperties": false,
       "minProperties": 1
     },
     "severity": {
