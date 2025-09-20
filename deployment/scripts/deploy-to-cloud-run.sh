@@ -10,6 +10,8 @@ PROJECT_ID=${GOOGLE_CLOUD_PROJECT:-"konveyn2ai"}
 REGION=${GOOGLE_CLOUD_LOCATION:-"us-central1"}
 REPOSITORY_NAME="konveyn2ai-repo"
 SERVICE_ACCOUNT_EMAIL="konveyn2ai-service@${PROJECT_ID}.iam.gserviceaccount.com"
+DASHBOARD_SERVICE_NAME="coverage-dashboard"
+DASHBOARD_DATASET=${DOCUMENTATION_DATASET:-"documentation_ops"}
 
 # Load environment variables from .env file if it exists
 if [ -f .env ]; then
@@ -28,31 +30,15 @@ echo "   Ensure your .env file is not committed to version control."
 # Enhanced environment variable validation
 echo "🔍 Validating environment variables..."
 
-REQUIRED_VARS=("GOOGLE_API_KEY" "INDEX_ID")
-MISSING_VARS=()
-
-for var in "${REQUIRED_VARS[@]}"; do
-    if [ -z "${!var}" ]; then
-        MISSING_VARS+=("$var")
+# Optional variables used by legacy services
+OPTIONAL_VARS=("GOOGLE_API_KEY" "INDEX_ENDPOINT_ID" "INDEX_ID")
+for var in "${OPTIONAL_VARS[@]}"; do
+    if [ -n "${!var}" ]; then
+        echo "ℹ️  $var is set"
     else
-        echo "✅ $var is set"
+        echo "ℹ️  $var is not set (optional)"
     fi
 done
-
-if [ ${#MISSING_VARS[@]} -gt 0 ]; then
-    echo "❌ Error: Missing required environment variables:"
-    for var in "${MISSING_VARS[@]}"; do
-        echo "  - $var"
-    done
-    echo ""
-    echo "📋 Please ensure your .env file contains:"
-    echo "GOOGLE_API_KEY=your_google_api_key_here"
-    echo "INDEX_ENDPOINT_ID=your_index_endpoint_id_here"
-    echo "INDEX_ID=your_index_id_here"
-    echo ""
-    echo "Or set these variables in your environment before running this script."
-    exit 1
-fi
 
 # Validate Docker and gcloud CLI availability
 echo "🔧 Validating required tools..."
@@ -149,13 +135,12 @@ wait_for_service_ready() {
 echo "🔨 Building and pushing Docker images..."
 
 # Build Janapada
+JANAPADA_BUILD_ARGS=("--platform" "linux/amd64" "-f" "Dockerfile.janapada" "-t" "${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY_NAME}/janapada:${IMAGE_TAG}" "-t" "${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY_NAME}/janapada:latest" ".")
+if [ -n "${INDEX_ID}" ]; then
+    JANAPADA_BUILD_ARGS=("--platform" "linux/amd64" "-f" "Dockerfile.janapada" "--build-arg" "INDEX_ID=${INDEX_ID}" "-t" "${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY_NAME}/janapada:${IMAGE_TAG}" "-t" "${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY_NAME}/janapada:latest" ".")
+fi
 echo "📦 Building Janapada Memory Service..."
-docker build --platform linux/amd64 -f Dockerfile.janapada \
-    --build-arg GOOGLE_CLOUD_PROJECT="${PROJECT_ID}" \
-    --build-arg INDEX_ID="${INDEX_ID}" \
-    -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY_NAME}/janapada:${IMAGE_TAG} \
-    -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY_NAME}/janapada:latest \
-    .
+docker build "${JANAPADA_BUILD_ARGS[@]}"
 
 # Verify Janapada build succeeded
 if [ $? -eq 0 ]; then
@@ -190,6 +175,23 @@ docker push ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY_NAME}/amatya:lat
 # Note: Svami will be built after we have Janapada and Amatya URLs
 echo "🎼 Svami Orchestrator will be built after service URLs are available..."
 
+# Build Streamlit dashboard
+echo "📊 Building Documentation Coverage Dashboard..."
+docker build --platform linux/amd64 -f Dockerfile.streamlit \
+    -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY_NAME}/${DASHBOARD_SERVICE_NAME}:${IMAGE_TAG} \
+    -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY_NAME}/${DASHBOARD_SERVICE_NAME}:latest \
+    .
+
+if [ $? -eq 0 ]; then
+    echo "✅ Dashboard build successful"
+else
+    echo "❌ Dashboard build failed"
+    exit 1
+fi
+
+docker push ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY_NAME}/${DASHBOARD_SERVICE_NAME}:${IMAGE_TAG}
+docker push ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY_NAME}/${DASHBOARD_SERVICE_NAME}:latest
+
 # Deploy to Cloud Run
 echo "☁️  Deploying services to Cloud Run..."
 
@@ -205,7 +207,7 @@ gcloud run deploy janapada \
     --max-instances=10 \
     --port=8080 \
     --timeout=300 \
-    --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_LOCATION=${REGION},VECTOR_INDEX_ID=${INDEX_ID},ENVIRONMENT=production,DEBUG=false" \
+    --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_LOCATION=${REGION},ENVIRONMENT=production,DEBUG=false${INDEX_ID:+,VECTOR_INDEX_ID=${INDEX_ID}}" \
     --service-account=${SERVICE_ACCOUNT_EMAIL} \
     --allow-unauthenticated \
     --project=${PROJECT_ID}
@@ -239,7 +241,7 @@ gcloud run deploy amatya \
     --min-instances=1 \
     --max-instances=10 \
     --port=8080 \
-    --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_LOCATION=${REGION},GOOGLE_API_KEY=${GOOGLE_API_KEY},ENVIRONMENT=production,DEBUG=false" \
+    --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},GOOGLE_CLOUD_LOCATION=${REGION},ENVIRONMENT=production,DEBUG=false${GOOGLE_API_KEY:+,GOOGLE_API_KEY=${GOOGLE_API_KEY}}" \
     --timeout=300 \
     --service-account=${SERVICE_ACCOUNT_EMAIL} \
     --allow-unauthenticated \
@@ -317,6 +319,37 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Deploy Streamlit dashboard
+echo "📊 Deploying Documentation Coverage Dashboard..."
+gcloud run deploy ${DASHBOARD_SERVICE_NAME} \
+    --image=${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY_NAME}/${DASHBOARD_SERVICE_NAME}:${IMAGE_TAG} \
+    --region=${REGION} \
+    --platform=managed \
+    --memory=512Mi \
+    --cpu=1 \
+    --min-instances=0 \
+    --max-instances=10 \
+    --port=8080 \
+    --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},DOCUMENTATION_DATASET=${DASHBOARD_DATASET}" \
+    --service-account=${SERVICE_ACCOUNT_EMAIL} \
+    --allow-unauthenticated \
+    --project=${PROJECT_ID}
+
+wait_for_deployment "${DASHBOARD_SERVICE_NAME}" $DEPLOYMENT_TIMEOUT
+if [ $? -ne 0 ]; then
+    echo "❌ Dashboard deployment failed or timed out"
+    exit 1
+fi
+
+DASHBOARD_URL=$(gcloud run services describe ${DASHBOARD_SERVICE_NAME} --region=${REGION} --project=${PROJECT_ID} --format="value(status.url)")
+echo "✅ Dashboard deployed at: $DASHBOARD_URL"
+
+wait_for_service_ready "${DASHBOARD_SERVICE_NAME}" "$DASHBOARD_URL" 300
+if [ $? -ne 0 ]; then
+    echo "❌ Dashboard service failed to become ready"
+    exit 1
+fi
+
 # Test inter-service connectivity before final validation
 echo "🔗 Testing inter-service connectivity..."
 
@@ -373,13 +406,17 @@ AMATYA_HEALTH=$?
 test_health_endpoint "Svami" "$SVAMI_URL"
 SVAMI_HEALTH=$?
 
+test_health_endpoint "${DASHBOARD_SERVICE_NAME}" "$DASHBOARD_URL"
+DASHBOARD_HEALTH=$?
+
 # Check if any health checks failed
-if [ $JANAPADA_HEALTH -ne 0 ] || [ $AMATYA_HEALTH -ne 0 ] || [ $SVAMI_HEALTH -ne 0 ]; then
+if [ $JANAPADA_HEALTH -ne 0 ] || [ $AMATYA_HEALTH -ne 0 ] || [ $SVAMI_HEALTH -ne 0 ] || [ $DASHBOARD_HEALTH -ne 0 ]; then
     echo "⚠️  Some health checks failed. Services may still be starting up."
     echo "💡 You can check service logs with:"
     echo "   gcloud logs tail --service=janapada --project=$PROJECT_ID"
     echo "   gcloud logs tail --service=amatya --project=$PROJECT_ID"  
     echo "   gcloud logs tail --service=svami --project=$PROJECT_ID"
+    echo "   gcloud logs tail --service=${DASHBOARD_SERVICE_NAME} --project=$PROJECT_ID"
 else
     echo "🎉 All health checks passed!"
     
@@ -404,11 +441,12 @@ echo "===================="
 echo "Janapada Memory Service:     $JANAPADA_URL"
 echo "Amatya Role Prompter:        $AMATYA_URL"
 echo "Svami Orchestrator:          $SVAMI_URL"
+echo "Documentation Dashboard:     $DASHBOARD_URL"
 echo ""
 echo "📋 Service Configuration:"
-echo "- Memory: 512Mi (Janapada), 256Mi (Amatya, Svami)"
+echo "- Memory: 512Mi per service"
 echo "- CPU: 1 per service"
-echo "- Min instances: 1 per service"
+echo "- Min instances: 1 (core services), 0 (dashboard)"
 echo "- Max instances: 10 per service"
 echo "- Service account: $SERVICE_ACCOUNT_EMAIL"
 echo ""
@@ -422,3 +460,4 @@ echo "📊 View logs:"
 echo "gcloud logs tail --project=$PROJECT_ID --service=janapada"
 echo "gcloud logs tail --project=$PROJECT_ID --service=amatya"
 echo "gcloud logs tail --project=$PROJECT_ID --service=svami"
+echo "gcloud logs tail --project=$PROJECT_ID --service=${DASHBOARD_SERVICE_NAME}"

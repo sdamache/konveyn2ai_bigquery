@@ -1,6 +1,6 @@
 # Deploying the Documentation Coverage Dashboard to Cloud Run
 
-This guide walks you through packaging the Streamlit dashboard and running it on Google Cloud Run.
+This guide walks you through packaging the Streamlit dashboard and running it on Google Cloud Run. If you prefer an automated deployment of the full microservice stack (Janapada, Amatya, Svami, and the Streamlit dashboard), run `deployment/scripts/deploy-to-cloud-run.sh`; it now builds all four images, pushes them to Artifact Registry, and rolls out the Cloud Run services with health checks.
 
 ## Prerequisites
 
@@ -25,6 +25,10 @@ docker build -f Dockerfile.streamlit -t "$DOCKER_IMAGE" .
 
 # Push to Container / Artifact Registry
 docker push "$DOCKER_IMAGE"
+# Managed build (all services + dashboard)
+./deployment/scripts/deploy-to-cloud-run.sh
+
+# Manual build & push of the dashboard only
 ```
 
 If you prefer to offload the build to Cloud Build:

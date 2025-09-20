@@ -1,5 +1,5 @@
 # Google Cloud Build configuration for KonveyN2AI
-# Builds and deploys all three services (Janapada, Amatya, Svami) to Cloud Run
+# Builds and deploys core services (Janapada, Amatya, Svami) and the Streamlit documentation dashboard to Cloud Run
 
 steps:
   # Build Janapada Memory Service
@@ -41,6 +41,19 @@ steps:
       - '.'
     id: 'build-svami'
 
+  # Build Streamlit documentation dashboard
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'Dockerfile.streamlit'
+      - '-t'
+      - '${_ARTIFACT_REGISTRY_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/coverage-dashboard:${SHORT_SHA}'
+      - '-t'
+      - '${_ARTIFACT_REGISTRY_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/coverage-dashboard:latest'
+      - '.'
+    id: 'build-dashboard'
+
   # Push Janapada image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
     args:
@@ -64,6 +77,14 @@ steps:
       - '${_ARTIFACT_REGISTRY_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/svami:${SHORT_SHA}'
     waitFor: ['build-svami']
     id: 'push-svami'
+
+  # Push dashboard image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '${_ARTIFACT_REGISTRY_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/coverage-dashboard:${SHORT_SHA}'
+    waitFor: ['build-dashboard']
+    id: 'push-dashboard'
 
   # Deploy Janapada to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -158,6 +179,37 @@ steps:
     waitFor: ['deploy-janapada', 'deploy-amatya']
     id: 'deploy-svami'
 
+  # Deploy documentation dashboard to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'coverage-dashboard'
+      - '--image'
+      - '${_ARTIFACT_REGISTRY_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/coverage-dashboard:${SHORT_SHA}'
+      - '--region'
+      - '${_CLOUD_RUN_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--memory'
+      - '512Mi'
+      - '--cpu'
+      - '1'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '10'
+      - '--port'
+      - '8080'
+      - '--set-env-vars'
+      - 'GOOGLE_CLOUD_PROJECT=${PROJECT_ID},DOCUMENTATION_DATASET=${_DOCUMENTATION_DATASET}'
+      - '--service-account'
+      - '${_SERVICE_ACCOUNT_EMAIL}'
+      - '--allow-unauthenticated'
+    waitFor: ['push-dashboard']
+    id: 'deploy-dashboard'
+
 # Build timeout (30 minutes)
 timeout: 1800s
 
@@ -171,6 +223,7 @@ substitutions:
   _INDEX_ID: ${INDEX_ID}
   _GOOGLE_API_KEY: ${GOOGLE_API_KEY}
   _CLOUD_RUN_HASH: uc
+  _DOCUMENTATION_DATASET: documentation_ops
 
 # Options for the build
 options:
