@@ -1,7 +1,7 @@
 """
 Embedding Generation Pipeline for BigQuery Vector Backend
 
-This module generates 768-dimensional embeddings for text chunks using Google Gemini API
+This module generates 768-dimensional embeddings for text chunks using Vertex AI
 and stores them in BigQuery with batching, caching, and idempotent behavior.
 
 Usage:
@@ -10,7 +10,7 @@ Usage:
 Environment Variables:
     GOOGLE_CLOUD_PROJECT: Google Cloud project ID
     BIGQUERY_DATASET_ID: BigQuery dataset ID
-    GOOGLE_API_KEY: Google API key for Gemini
+    GOOGLE_APPLICATION_CREDENTIALS: Path to service account JSON for Vertex AI
     EMBED_BATCH_SIZE: Batch size for API calls (default: 32)
     EMBED_MAX_RETRIES: Max retries for failed requests (default: 3)
     EMBED_CACHE_DIR: Cache directory (default: .cache/embeddings)
@@ -26,12 +26,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import google.generativeai as genai
 from google.cloud import bigquery
+from google.oauth2 import service_account
+import google.auth
+import vertexai
+from vertexai.language_models import TextEmbeddingModel
 
-# EmbedContentResponse import not needed - using embed_content directly
+# Using Vertex AI for embeddings with service account auth
 
-from src.janapada_memory.bigquery_connection import BigQueryConnection
+from src.janapada_memory.config.bigquery_config import BigQueryConfig
+from src.janapada_memory.connections.bigquery_connection import (
+    BigQueryConnectionManager,
+)
 from src.janapada_memory.schema_manager import SchemaManager
 
 
@@ -89,8 +95,8 @@ class EmbeddingGenerator:
 
     def __init__(
         self,
-        api_key: str,
-        model: str = "models/text-embedding-004",
+        api_key: str = None,  # Now optional, using service account
+        model: str = "text-embedding-004",  # Changed from models/ prefix
         batch_size: int = 32,
         max_retries: int = 3,
         cache_dir: str = ".cache/embeddings",
@@ -99,13 +105,47 @@ class EmbeddingGenerator:
         Initialize embedding generator.
 
         Args:
-            api_key: Google API key for Gemini
+            api_key: Deprecated - now uses service account authentication (unused, kept for compatibility)
             model: Embedding model name
             batch_size: Number of texts to process in each batch
             max_retries: Maximum retries for failed requests
             cache_dir: Directory for caching embeddings
         """
-        genai.configure(api_key=api_key)
+        # Initialize Vertex AI with service account
+        sa_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        credentials = None
+        project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "konveyn2ai")
+        location = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+
+        if sa_path and Path(sa_path).exists():
+            try:
+                credentials = service_account.Credentials.from_service_account_file(
+                    sa_path,
+                    scopes=["https://www.googleapis.com/auth/cloud-platform"],
+                )
+            except ValueError as exc:
+                logger.warning(
+                    "Service account at %s could not be loaded (%s); falling back to ADC",
+                    sa_path,
+                    exc,
+                )
+
+        if credentials is None:
+            default_creds, default_project = google.auth.default(
+                scopes=["https://www.googleapis.com/auth/cloud-platform"]
+            )
+            credentials = default_creds
+            if not project_id and default_project:
+                project_id = default_project
+
+        vertexai.init(project=project_id, location=location, credentials=credentials)
+        self.vertex_model = TextEmbeddingModel.from_pretrained(model)
+        logger.info(
+            "Initialized Vertex AI embeddings with model %s using project %s",
+            model,
+            project_id,
+        )
+
         self.model = model
         self.batch_size = batch_size
         self.max_retries = max_retries
@@ -153,11 +193,9 @@ class EmbeddingGenerator:
             try:
                 start_time = time.time()
 
-                response = genai.embed_content(
-                    model=self.model,
-                    content=normalized_content,
-                    task_type="retrieval_document",
-                )
+                # Use Vertex AI for embedding
+                embeddings = self.vertex_model.get_embeddings([normalized_content])
+                response = {"embedding": embeddings[0].values} if embeddings else None
 
                 latency_ms = int((time.time() - start_time) * 1000)
                 self.stats["total_latency_ms"] += latency_ms
@@ -224,7 +262,7 @@ class EmbeddingPipeline:
         project_id: str,
         dataset_id: str,
         api_key: str,
-        embedding_model: str = "models/text-embedding-004",
+        embedding_model: str = "text-embedding-004",
         batch_size: int = 32,
         cache_dir: str = ".cache/embeddings",
     ):
@@ -234,7 +272,7 @@ class EmbeddingPipeline:
         Args:
             project_id: Google Cloud project ID
             dataset_id: BigQuery dataset ID
-            api_key: Google API key for Gemini
+            api_key: Deprecated - now uses service account authentication
             embedding_model: Model name for embeddings
             batch_size: Batch size for processing
             cache_dir: Cache directory for embeddings
@@ -244,9 +282,8 @@ class EmbeddingPipeline:
         self.embedding_model = embedding_model
 
         # Initialize components
-        self.connection = BigQueryConnection(
-            project_id=project_id, dataset_id=dataset_id
-        )
+        config = BigQueryConfig(project_id=project_id, dataset_id=dataset_id)
+        self.connection = BigQueryConnectionManager(config=config)
         self.schema_manager = SchemaManager(connection=self.connection)
         self.generator = EmbeddingGenerator(
             api_key=api_key,
@@ -339,7 +376,7 @@ class EmbeddingPipeline:
                     "chunk_id": item["chunk_id"],
                     "model": self.embedding_model,
                     "content_hash": item["content_hash"],
-                    "embedding": item["embedding"],
+                    "embedding_vector": item["embedding"],
                     "created_at": now.isoformat(),
                     "source_type": item.get("artifact_type"),
                     "artifact_id": item.get("source"),
@@ -469,12 +506,13 @@ def main():
     parser.add_argument("--project", required=True, help="Google Cloud project ID")
     parser.add_argument("--dataset", required=True, help="BigQuery dataset ID")
     parser.add_argument(
-        "--api-key", help="Google API key (or set GOOGLE_API_KEY env var)"
+        "--api-key",
+        help="Deprecated - now uses service account from GOOGLE_APPLICATION_CREDENTIALS",
     )
 
     # Optional arguments
     parser.add_argument(
-        "--model", default="models/text-embedding-004", help="Embedding model name"
+        "--model", default="text-embedding-004", help="Embedding model name"
     )
     parser.add_argument(
         "--batch-size", type=int, default=32, help="Batch size for API calls"
@@ -499,20 +537,20 @@ def main():
         level=log_level, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
 
-    # Get API key
-    api_key = args.api_key or os.getenv("GOOGLE_API_KEY")
-    if not api_key:
+    # Check for service account
+    sa_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    if not sa_path or not Path(sa_path).exists():
         logger.error(
-            "Google API key required. Use --api-key or set GOOGLE_API_KEY environment variable"
+            "Service account not found. Set GOOGLE_APPLICATION_CREDENTIALS to point to your service account JSON file"
         )
         return 1
 
     try:
-        # Initialize pipeline
+        # Initialize pipeline (api_key is deprecated, passing None)
         pipeline = EmbeddingPipeline(
             project_id=args.project,
             dataset_id=args.dataset,
-            api_key=api_key,
+            api_key=None,
             embedding_model=args.model,
             batch_size=args.batch_size,
             cache_dir=args.cache_dir,
