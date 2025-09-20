@@ -29,7 +29,7 @@ class TestBigQueryFallbackContract:
 
     def test_fallback_on_table_not_found(self, bigquery_vector_index):
         """Must fallback to local search when BigQuery table is not found."""
-        query_vector = [0.1] * 3072  # Gemini embedding dimension
+        query_vector = [0.1] * 768  # Gemini embedding dimension
 
         # Mock BigQuery adapter to raise NotFound exception
         with patch.object(
@@ -54,7 +54,7 @@ class TestBigQueryFallbackContract:
 
     def test_fallback_on_permission_denied(self, bigquery_vector_index):
         """Must fallback to local search when BigQuery access is forbidden."""
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
 
         with patch.object(
             bigquery_vector_index.bigquery_adapter, "search_similar_vectors"
@@ -76,7 +76,7 @@ class TestBigQueryFallbackContract:
 
     def test_fallback_on_connection_error(self, bigquery_vector_index):
         """Must fallback to local search when BigQuery connection fails."""
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
 
         with patch.object(
             bigquery_vector_index.bigquery_adapter, "search_similar_vectors"
@@ -101,7 +101,7 @@ class TestBigQueryFallbackContract:
 
     def test_fallback_preserves_interface_contract(self, bigquery_vector_index):
         """Fallback must preserve the same interface contract as normal operation."""
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
 
         # Simulate BigQuery failure
         with patch.object(
@@ -130,7 +130,7 @@ class TestBigQueryFallbackContract:
 
     def test_fallback_maintains_distance_ordering(self, bigquery_vector_index):
         """Fallback results must maintain distance ordering requirement."""
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
 
         with patch.object(
             bigquery_vector_index.bigquery_adapter, "search_similar_vectors"
@@ -147,7 +147,7 @@ class TestBigQueryFallbackContract:
 
     def test_fallback_activation_logging(self, bigquery_vector_index, caplog):
         """Must log fallback activation with structured information."""
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
 
         with patch.object(bigquery_vector_index, "_bigquery_client") as mock_client:
             mock_client.query.side_effect = NotFound("Table missing")
@@ -161,7 +161,7 @@ class TestBigQueryFallbackContract:
 
     def test_fallback_correlation_id_tracking(self, bigquery_vector_index):
         """Must include correlation IDs for fallback operation tracking."""
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
 
         with patch.object(bigquery_vector_index, "_bigquery_client") as mock_client:
             mock_client.query.side_effect = NotFound("Simulated failure")
@@ -174,7 +174,7 @@ class TestBigQueryFallbackContract:
 
     def test_no_fallback_on_successful_bigquery_operation(self, bigquery_vector_index):
         """Must NOT use fallback when BigQuery operations succeed."""
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
 
         # Mock successful BigQuery response
         mock_results = [
@@ -207,7 +207,7 @@ class TestFallbackErrorHandling:
 
     def test_fallback_handles_local_index_failure(self, bigquery_vector_index):
         """Must handle gracefully when both BigQuery AND local fallback fail."""
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
 
         # Simulate both BigQuery and local index failures
         with patch.object(bigquery_vector_index, "_bigquery_client") as mock_bq_client:
@@ -233,7 +233,7 @@ class TestFallbackErrorHandling:
         """Fallback operations must respect timeout constraints."""
         import time
 
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
 
         with patch.object(bigquery_vector_index, "_bigquery_client") as mock_client:
             mock_client.query.side_effect = NotFound("Triggering fallback")

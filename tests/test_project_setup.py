@@ -72,7 +72,7 @@ def test_config_loading():
     # Test that default values are set
     assert config.GOOGLE_CLOUD_PROJECT == "konveyn2ai"
     assert config.GOOGLE_CLOUD_LOCATION == "us-central1"
-    assert config.VECTOR_DIMENSIONS == 3072
+    assert config.VECTOR_DIMENSIONS == 768
     assert config.SIMILARITY_METRIC == "cosine"
     assert config.APPROXIMATE_NEIGHBORS_COUNT == 150
 
@@ -168,7 +168,7 @@ def test_configuration_management():
     assert (
         config.GOOGLE_CLOUD_LOCATION == "us-central1"
     ), "Default location should be set"
-    assert config.VECTOR_DIMENSIONS == 3072, "Default vector dimensions should be set"
+    assert config.VECTOR_DIMENSIONS == 768, "Default vector dimensions should be set"
 
 
 def test_ci_cd_pipeline():

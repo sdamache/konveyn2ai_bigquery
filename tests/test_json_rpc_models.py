@@ -308,7 +308,7 @@ class TestEnhancedVectorSearchModels:
         assert query.filters is None
 
         # Vector search with embedding
-        embedding = [0.1] * 3072  # 3072-dimensional vector
+        embedding = [0.1] * 768  # 768-dimensional vector
         query = SearchQuery(
             text="test query",
             embedding=embedding,
@@ -372,7 +372,7 @@ class TestEnhancedVectorSearchModels:
         assert chunk.embedding is None
 
         # Test with embedding
-        embedding = [0.2] * 3072
+        embedding = [0.2] * 768
         chunk_with_embedding = DocumentChunk(
             content="test content",
             document_id="doc-456",

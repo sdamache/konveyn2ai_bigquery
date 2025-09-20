@@ -219,7 +219,7 @@ class SearchQuery(BaseModel):
         None, description="Minimum relevance score threshold"
     )
     embedding: Optional[list[float]] = Field(
-        None, description="Query embedding vector (3072 dimensions)"
+        None, description="Query embedding vector (768 dimensions)"
     )
 
     model_config = ConfigDict(
@@ -283,7 +283,7 @@ class DocumentChunk(BaseModel):
         ..., ge=0, description="Chunk position in document (0-based)"
     )
     embedding: Optional[list[float]] = Field(
-        None, description="Chunk embedding vector (3072 dimensions)"
+        None, description="Chunk embedding vector (768 dimensions)"
     )
     metadata: Optional[dict[str, Any]] = Field(None, description="Chunk metadata")
 

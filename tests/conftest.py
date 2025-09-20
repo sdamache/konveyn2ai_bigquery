@@ -109,7 +109,7 @@ def mock_vertex_ai():
     ):
         # Mock embedding model
         embedding_mock = MagicMock()
-        embedding_mock.values = [0.1, 0.2, 0.3] * 1024  # 3072 dimensions
+        embedding_mock.values = [0.1, 0.2, 0.3] * 1024  # 768 dimensions
 
         model_instance = MagicMock()
         model_instance.get_embeddings.return_value = [embedding_mock]

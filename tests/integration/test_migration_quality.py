@@ -43,7 +43,7 @@ class TestMigrationQuality:
 
     @pytest.fixture(scope="class")
     def sample_legacy_data(self):
-        """Sample legacy data with 3072-dimensional embeddings."""
+        """Sample legacy data with 768-dimensional embeddings."""
         return [
             {
                 "chunk_id": "legacy_func_001",
@@ -52,7 +52,7 @@ class TestMigrationQuality:
                 "artifact_type": "code",
                 "kind": "function",
                 "record_name": "calculate_similarity",
-                "embedding": np.random.rand(3072).tolist(),  # Legacy 3072 dimensions
+                "embedding": np.random.rand(768).tolist(),  # Legacy 768 dimensions
                 "metadata": {
                     "author": "legacy_user",
                     "created_at": "2023-01-01T00:00:00Z",
@@ -66,7 +66,7 @@ class TestMigrationQuality:
                 "artifact_type": "code",
                 "kind": "class",
                 "record_name": "VectorProcessor",
-                "embedding": np.random.rand(3072).tolist(),
+                "embedding": np.random.rand(768).tolist(),
                 "metadata": {
                     "author": "legacy_user",
                     "created_at": "2023-02-01T00:00:00Z",
@@ -79,7 +79,7 @@ class TestMigrationQuality:
                 "source": "docs/legacy/similarity.md",
                 "artifact_type": "documentation",
                 "kind": "api_doc",
-                "embedding": np.random.rand(3072).tolist(),
+                "embedding": np.random.rand(768).tolist(),
                 "metadata": {
                     "author": "docs_team",
                     "created_at": "2023-03-01T00:00:00Z",
