@@ -29,6 +29,7 @@ except ImportError:
 # Contract interfaces (standardized import)
 # Import common utilities
 from src.common.chunking import ChunkConfig, ChunkingStrategy, ContentChunker
+from src.common.datetime_utils import prepare_metadata_for_json
 from src.common.ids import ArtifactIDGenerator
 from src.common.normalize import ContentNormalizer
 from src.common.parser_interfaces import (
@@ -283,6 +284,25 @@ class KubernetesParserImpl(KubernetesParser):
                         chunk_artifact_id = f"{artifact_id}#chunk-{chunk_index}"
 
                     timestamp = datetime.now(timezone.utc)
+
+                    # Prepare metadata with datetime serialization safety
+                    raw_metadata = {
+                        "kind": kind,
+                        "api_version": api_version,
+                        "namespace": namespace,
+                        "resource_name": name,
+                        "labels": metadata.get("labels", {}),
+                        "annotations": metadata.get("annotations", {}),
+                        "resource_version": metadata.get("resourceVersion"),
+                        "uid": metadata.get("uid"),
+                        "chunk_index": chunk_index,
+                        "total_chunks": len(chunk_texts),
+                        "document_index": doc_index,
+                        "collected_at": timestamp,
+                        "created_at": timestamp,
+                        "updated_at": timestamp,
+                    }
+
                     chunk_metadata = ChunkMetadata(
                         source_type=self.source_type,
                         artifact_id=chunk_artifact_id,
@@ -296,19 +316,7 @@ class KubernetesParserImpl(KubernetesParser):
                         created_at=timestamp,
                         updated_at=timestamp,
                         tool_version=self.version,
-                        source_metadata={
-                            "kind": kind,
-                            "api_version": api_version,
-                            "namespace": namespace,
-                            "resource_name": name,
-                            "labels": metadata.get("labels", {}),
-                            "annotations": metadata.get("annotations", {}),
-                            "resource_version": metadata.get("resourceVersion"),
-                            "uid": metadata.get("uid"),
-                            "chunk_index": chunk_index,
-                            "total_chunks": len(chunk_texts),
-                            "document_index": doc_index,
-                        },
+                        source_metadata=prepare_metadata_for_json(raw_metadata),
                     )
                     chunks.append(chunk_metadata)
 

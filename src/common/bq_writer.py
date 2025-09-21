@@ -16,6 +16,9 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+# Import datetime utilities
+from .datetime_utils import prepare_metadata_for_json, safe_datetime_serializer, json_dumps_safe
+
 from google.api_core import retry
 from google.cloud import bigquery
 from google.cloud.bigquery import WriteDisposition
@@ -571,11 +574,17 @@ class BigQueryWriter:
             source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
         )
 
-        # Convert rows to NDJSON
-        ndjson_data = "\n".join(json.dumps(row) for row in rows)
+        # Prepare rows for BigQuery by converting to JSON-safe format
+        # Use our custom serializer to handle datetime objects
+        safe_rows = []
+        for row in rows:
+            # Convert to JSON string and back to ensure everything is serializable
+            json_str = json_dumps_safe(row)
+            safe_row = json.loads(json_str)
+            safe_rows.append(safe_row)
 
         job = self.client.load_table_from_json(
-            json_rows=rows, destination=table_ref, job_config=job_config
+            json_rows=safe_rows, destination=table_ref, job_config=job_config
         )
 
         job.result(timeout=self.batch_config.timeout_seconds)

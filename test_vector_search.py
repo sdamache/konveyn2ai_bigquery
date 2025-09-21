@@ -11,9 +11,14 @@ Usage:
 import argparse
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from src.janapada_memory.bigquery_connection import BigQueryConnection
+from google.cloud import bigquery
+
+from src.janapada_memory.config.bigquery_config import BigQueryConfig
+from src.janapada_memory.connections.bigquery_connection import (
+    BigQueryConnectionManager,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -32,9 +37,9 @@ class VectorSearchTester:
         """
         self.project_id = project_id
         self.dataset_id = dataset_id
-        self.connection = BigQueryConnection(
-            project_id=project_id, dataset_id=dataset_id
-        )
+
+        config = BigQueryConfig(project_id=project_id, dataset_id=dataset_id)
+        self.connection = BigQueryConnectionManager(config=config)
 
         logger.info(f"Vector search tester initialized for {project_id}.{dataset_id}")
 
@@ -112,27 +117,17 @@ class VectorSearchTester:
             return None
 
     def test_vector_similarity_search(
-        self, query_embedding: List[float], top_k: int = 5, chunk_id: str = None
+        self,
+        query_embedding: List[float],
+        top_k: int = 5,
+        chunk_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """
-        Test vector similarity search using approximate_neighbors.
-
-        Args:
-            query_embedding: Query embedding vector
-            top_k: Number of nearest neighbors to return
-            chunk_id: Optional chunk_id for reference
-
-        Returns:
-            List of similar chunks with distances
-        """
-
-        # Convert embedding to string format for BigQuery
-        embedding_str = "[" + ",".join(map(str, query_embedding)) + "]"
+        """Run BigQuery VECTOR_SEARCH constrained to the specified embedding model."""
 
         query = f"""
         SELECT 
-            base.chunk_id,
-            base.distance,
+            vs.chunk_id,
+            vs.distance,
             sm.text_content,
             sm.source,
             sm.artifact_type,
@@ -140,8 +135,8 @@ class VectorSearchTester:
         FROM VECTOR_SEARCH(
             TABLE `{self.project_id}.{self.dataset_id}.source_embeddings`,
             'embedding',
-            {embedding_str},
-            top_k => {top_k},
+            @query_embedding,
+            top_k => @top_k,
             distance_type => 'COSINE'
         ) AS base
         JOIN `{self.project_id}.{self.dataset_id}.source_metadata` sm
@@ -152,7 +147,16 @@ class VectorSearchTester:
         """
 
         try:
-            results = list(self.connection.execute_query(query))
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ArrayQueryParameter(
+                        "query_embedding", "FLOAT64", query_embedding
+                    ),
+                    bigquery.ScalarQueryParameter("top_k", "INT64", top_k),
+                ]
+            )
+
+            results = list(self.connection.execute_query(query, job_config=job_config))
             similar_chunks = []
 
             for row in results:
@@ -192,9 +196,6 @@ class VectorSearchTester:
             List of similar chunks with distances
         """
 
-        # Convert embedding to string format for BigQuery
-        embedding_str = "[" + ",".join(map(str, query_embedding)) + "]"
-
         query = f"""
         WITH neighbors AS (
             SELECT 
@@ -202,9 +203,9 @@ class VectorSearchTester:
                 distance
             FROM ML.APPROXIMATE_NEIGHBORS(
                 TABLE `{self.project_id}.{self.dataset_id}.source_embeddings`,
-                STRUCT({embedding_str} AS embedding),
+                STRUCT(@query_embedding AS embedding),
                 'COSINE',
-                {top_k}
+                @top_k
             )
         )
         SELECT 
@@ -223,7 +224,16 @@ class VectorSearchTester:
         """
 
         try:
-            results = list(self.connection.execute_query(query))
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ArrayQueryParameter(
+                        "query_embedding", "FLOAT64", query_embedding
+                    ),
+                    bigquery.ScalarQueryParameter("top_k", "INT64", top_k),
+                ]
+            )
+
+            results = list(self.connection.execute_query(query, job_config=job_config))
             similar_chunks = []
 
             for row in results:
@@ -300,7 +310,8 @@ class VectorSearchTester:
             logger.info("Testing ML.APPROXIMATE_NEIGHBORS function...")
             try:
                 approximate_neighbors_results = self.test_approximate_neighbors_legacy(
-                    query_embedding=query_embedding, top_k=5
+                    query_embedding=query_embedding,
+                    top_k=5,
                 )
                 test_results["approximate_neighbors_results"] = (
                     approximate_neighbors_results

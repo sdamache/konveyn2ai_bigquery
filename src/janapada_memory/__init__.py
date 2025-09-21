@@ -9,7 +9,6 @@ __version__ = "1.0.0"
 __author__ = "KonveyN2AI Team"
 
 try:
-    from .bigquery_connection import BigQueryConnection  # Legacy - deprecated
     from .connections.bigquery_connection import BigQueryConnectionManager
     from .bigquery_vector_store import BigQueryVectorStore
     from .bigquery_vector_index import BigQueryVectorIndex
@@ -17,6 +16,9 @@ try:
     from .dimension_reducer import DimensionReducer
     from .migration_manager import MigrationManager
     from .schema_manager import SchemaManager
+
+    # Legacy alias for backward compatibility
+    BigQueryConnection = BigQueryConnectionManager
 except ImportError as e:
     import warnings
 
@@ -25,13 +27,12 @@ except ImportError as e:
     )
 
     # Provide stub classes for missing dependencies
-    class BigQueryConnection:
-        def __init__(self, *args, **kwargs):
-            raise ImportError("google-cloud-bigquery not installed")
-
     class BigQueryConnectionManager:
         def __init__(self, *args, **kwargs):
             raise ImportError("google-cloud-bigquery not installed")
+
+    # Legacy alias for backward compatibility
+    BigQueryConnection = BigQueryConnectionManager
 
     class BigQueryVectorIndex:
         def __init__(self, *args, **kwargs):

@@ -23,6 +23,15 @@ from .agent_manifest import (
 )
 from .bq_writer import BatchConfig, BigQueryWriter, WriteResult, create_bigquery_writer
 
+# Datetime utilities
+from .datetime_utils import (
+    datetime_to_iso,
+    json_dumps_safe,
+    now_iso,
+    prepare_metadata_for_json,
+    safe_datetime_serializer,
+)
+
 # M1 ingestion utilities (T019-T022)
 from .chunking import ChunkConfig, ChunkResult, ContentChunker, create_chunker
 from .ids import (
@@ -92,4 +101,10 @@ __all__ = [
     "WriteResult",
     "BatchConfig",
     "create_bigquery_writer",
+    # Datetime utilities
+    "now_iso",
+    "datetime_to_iso",
+    "safe_datetime_serializer",
+    "json_dumps_safe",
+    "prepare_metadata_for_json",
 ]

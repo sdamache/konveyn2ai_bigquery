@@ -124,10 +124,10 @@ def test_bigquery_connection_standalone():
     print("Testing BigQuery connection (standalone)...")
 
     try:
-        from janapada_memory import BigQueryConnection
+        from janapada_memory import BigQueryConnectionManager
 
         try:
-            connection = BigQueryConnection()
+            connection = BigQueryConnectionManager()
             print("❌ Should have failed with missing dependencies")
             return False
         except ImportError as e:

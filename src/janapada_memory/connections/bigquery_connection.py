@@ -616,7 +616,7 @@ class BigQueryConnectionManager:
                     "connection_id": self.connection_id,
                     "correlation_id": correlation_id,
                     "dataset_ref": dataset_ref,
-                    "created": (
+                    "dataset_created_at": (
                         created_dataset.created.isoformat()
                         if created_dataset.created
                         else None
@@ -639,6 +639,187 @@ class BigQueryConnectionManager:
             raise BigQueryConnectionError(
                 f"Failed to create dataset {dataset_id}: {e}", e
             )
+
+    def delete_dataset(
+        self,
+        dataset_id: Optional[str] = None,
+        delete_contents: bool = False,
+        not_found_ok: bool = True,
+    ) -> None:
+        """
+        Delete BigQuery dataset.
+
+        Args:
+            dataset_id: Dataset ID (defaults to self.config.dataset_id)
+            delete_contents: Whether to delete all tables in dataset
+            not_found_ok: Don't raise error if dataset doesn't exist
+
+        Raises:
+            BigQueryConnectionError: If dataset deletion fails
+        """
+        dataset_id = dataset_id or self.config.dataset_id
+        correlation_id = str(uuid.uuid4())
+
+        try:
+            dataset_ref = bigquery.DatasetReference(self.config.project_id, dataset_id)
+
+            self.logger.info(
+                "Deleting BigQuery dataset",
+                extra={
+                    "connection_id": self.connection_id,
+                    "correlation_id": correlation_id,
+                    "dataset_id": dataset_id,
+                    "delete_contents": delete_contents,
+                },
+            )
+
+            self.client.delete_dataset(
+                dataset_ref, delete_contents=delete_contents, not_found_ok=not_found_ok
+            )
+
+            self.logger.info(
+                "BigQuery dataset deleted successfully",
+                extra={
+                    "connection_id": self.connection_id,
+                    "correlation_id": correlation_id,
+                    "dataset_id": dataset_id,
+                },
+            )
+
+        except Exception as e:
+            self.logger.error(
+                "Failed to delete BigQuery dataset",
+                extra={
+                    "connection_id": self.connection_id,
+                    "correlation_id": correlation_id,
+                    "dataset_id": dataset_id,
+                    "error": str(e),
+                },
+            )
+            raise BigQueryConnectionError(
+                f"Failed to delete dataset {dataset_id}: {e}", e
+            )
+
+    def get_table(self, table_name: str) -> bigquery.Table:
+        """
+        Get BigQuery table metadata.
+
+        Args:
+            table_name: Name of the table
+
+        Returns:
+            BigQuery Table object
+
+        Raises:
+            BigQueryConnectionError: If table access fails
+        """
+        correlation_id = str(uuid.uuid4())
+
+        try:
+            table_ref = self.client.dataset(self.config.dataset_id).table(table_name)
+            table = self.client.get_table(table_ref)
+
+            self.logger.debug(
+                "Retrieved table metadata",
+                extra={
+                    "connection_id": self.connection_id,
+                    "correlation_id": correlation_id,
+                    "table_name": table_name,
+                    "num_rows": table.num_rows,
+                },
+            )
+
+            return table
+
+        except Exception as e:
+            self.logger.error(
+                "Failed to get table metadata",
+                extra={
+                    "connection_id": self.connection_id,
+                    "correlation_id": correlation_id,
+                    "table_name": table_name,
+                    "error": str(e),
+                },
+            )
+            raise BigQueryConnectionError(f"Failed to get table {table_name}") from e
+
+    def list_tables(self) -> list[bigquery.table.TableListItem]:
+        """
+        List all tables in the dataset.
+
+        Returns:
+            List of BigQuery TableListItem objects
+
+        Raises:
+            BigQueryConnectionError: If table listing fails
+        """
+        correlation_id = str(uuid.uuid4())
+
+        try:
+            dataset_ref = self.dataset_ref
+            tables = list(self.client.list_tables(dataset_ref))
+
+            self.logger.debug(
+                "Listed dataset tables",
+                extra={
+                    "connection_id": self.connection_id,
+                    "correlation_id": correlation_id,
+                    "dataset_id": self.config.dataset_id,
+                    "table_count": len(tables),
+                },
+            )
+
+            return tables
+
+        except Exception as e:
+            self.logger.error(
+                "Failed to list tables",
+                extra={
+                    "connection_id": self.connection_id,
+                    "correlation_id": correlation_id,
+                    "dataset_id": self.config.dataset_id,
+                    "error": str(e),
+                },
+            )
+            raise BigQueryConnectionError("Failed to list tables") from e
+
+    def get_dataset(self) -> bigquery.Dataset:
+        """
+        Get BigQuery dataset metadata.
+
+        Returns:
+            BigQuery Dataset object
+
+        Raises:
+            BigQueryConnectionError: If dataset access fails
+        """
+        correlation_id = str(uuid.uuid4())
+
+        try:
+            dataset = self.client.get_dataset(self.dataset_ref)
+
+            self.logger.debug(
+                "Retrieved dataset metadata",
+                extra={
+                    "connection_id": self.connection_id,
+                    "correlation_id": correlation_id,
+                    "dataset_id": self.config.dataset_id,
+                },
+            )
+
+            return dataset
+
+        except Exception as e:
+            self.logger.error(
+                "Failed to get dataset metadata",
+                extra={
+                    "connection_id": self.connection_id,
+                    "correlation_id": correlation_id,
+                    "dataset_id": self.config.dataset_id,
+                    "error": str(e),
+                },
+            )
+            raise BigQueryConnectionError(f"Failed to get dataset {self.config.dataset_id}") from e
 
     def close(self) -> None:
         """

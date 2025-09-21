@@ -83,7 +83,7 @@ class TestEmbeddingPipelineAPI:
 
         # Mock the dependencies to test interface
         with (
-            patch("pipeline.embedding.BigQueryConnection"),
+            patch("pipeline.embedding.BigQueryConnectionManager"),
             patch("pipeline.embedding.SchemaManager"),
             patch("pipeline.embedding.EmbeddingGenerator"),
         ):
