@@ -53,9 +53,11 @@ def prepare_metadata_for_json(metadata: dict[str, Any]) -> dict[str, Any]:
             cleaned_metadata[key] = prepare_metadata_for_json(value)
         elif isinstance(value, list):
             cleaned_metadata[key] = [
-                prepare_metadata_for_json(item) if isinstance(item, dict)
-                else datetime_to_iso(item) if isinstance(item, datetime)
-                else item
+                (
+                    prepare_metadata_for_json(item)
+                    if isinstance(item, dict)
+                    else datetime_to_iso(item) if isinstance(item, datetime) else item
+                )
                 for item in value
             ]
         else:
@@ -66,9 +68,9 @@ def prepare_metadata_for_json(metadata: dict[str, Any]) -> dict[str, Any]:
 
 # Make commonly used functions available at module level
 __all__ = [
-    'now_iso',
-    'datetime_to_iso',
-    'safe_datetime_serializer',
-    'json_dumps_safe',
-    'prepare_metadata_for_json'
+    "now_iso",
+    "datetime_to_iso",
+    "safe_datetime_serializer",
+    "json_dumps_safe",
+    "prepare_metadata_for_json",
 ]

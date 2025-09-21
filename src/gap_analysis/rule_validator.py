@@ -107,7 +107,9 @@ class RuleConfigValidator:
 
         query_text = probe.get("query_text")
         if not isinstance(query_text, str) or not query_text.strip():
-            raise RuleValidationError("semantic_probe.query_text must be a non-empty string")
+            raise RuleValidationError(
+                "semantic_probe.query_text must be a non-empty string"
+            )
         if len(query_text.strip()) < 10:
             raise RuleValidationError(
                 "semantic_probe.query_text must be at least 10 characters to yield meaningful search context"
@@ -115,11 +117,16 @@ class RuleConfigValidator:
 
         top_k = probe.get("top_k", 5)
         if not isinstance(top_k, int) or not 1 <= top_k <= 50:
-            raise RuleValidationError("semantic_probe.top_k must be an integer between 1 and 50")
+            raise RuleValidationError(
+                "semantic_probe.top_k must be an integer between 1 and 50"
+            )
 
         threshold = probe.get("similarity_threshold")
         if threshold is not None:
-            if not isinstance(threshold, (int, float)) or not 0.0 <= float(threshold) <= 1.0:
+            if (
+                not isinstance(threshold, (int, float))
+                or not 0.0 <= float(threshold) <= 1.0
+            ):
                 raise RuleValidationError(
                     "semantic_probe.similarity_threshold must be a number between 0 and 1"
                 )
@@ -132,7 +139,9 @@ class RuleConfigValidator:
                 )
 
         vector_table = probe.get("vector_table")
-        if vector_table is not None and (not isinstance(vector_table, str) or not vector_table.strip()):
+        if vector_table is not None and (
+            not isinstance(vector_table, str) or not vector_table.strip()
+        ):
             raise RuleValidationError(
                 "semantic_probe.vector_table, when provided, must be a non-empty string"
             )

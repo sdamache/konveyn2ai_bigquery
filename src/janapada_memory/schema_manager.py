@@ -379,8 +379,12 @@ class SchemaManager:
                     "table_type": table.table_type,
                     "num_rows": full_table.num_rows,
                     "num_bytes": full_table.num_bytes,
-                    "created": full_table.created.isoformat() if full_table.created else None,
-                    "modified": full_table.modified.isoformat() if full_table.modified else None,
+                    "created": (
+                        full_table.created.isoformat() if full_table.created else None
+                    ),
+                    "modified": (
+                        full_table.modified.isoformat() if full_table.modified else None
+                    ),
                 }
 
                 if include_schema:

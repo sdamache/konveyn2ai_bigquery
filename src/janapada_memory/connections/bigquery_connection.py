@@ -819,7 +819,9 @@ class BigQueryConnectionManager:
                     "error": str(e),
                 },
             )
-            raise BigQueryConnectionError(f"Failed to get dataset {self.config.dataset_id}") from e
+            raise BigQueryConnectionError(
+                f"Failed to get dataset {self.config.dataset_id}"
+            ) from e
 
     def close(self) -> None:
         """

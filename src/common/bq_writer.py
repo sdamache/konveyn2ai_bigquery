@@ -17,7 +17,11 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 # Import datetime utilities
-from .datetime_utils import prepare_metadata_for_json, safe_datetime_serializer, json_dumps_safe
+from .datetime_utils import (
+    prepare_metadata_for_json,
+    safe_datetime_serializer,
+    json_dumps_safe,
+)
 
 from google.api_core import retry
 from google.cloud import bigquery
