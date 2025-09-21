@@ -12,7 +12,7 @@ All models use Pydantic for validation and serialization.
 import uuid
 from datetime import datetime, timezone
 from enum import Enum, IntEnum
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -434,6 +434,127 @@ class AnswerResponse(BaseModel):
             "example": {
                 "answer": "To implement authentication middleware, create a FastAPI middleware...",
                 "sources": ["src/auth/middleware.py", "src/auth/tokens.py"],
+                "request_id": "req-123",
+            }
+        },
+    )
+
+
+class GapFinding(BaseModel):
+    """Gap analysis finding enriched with metadata and suggested fix."""
+
+    chunk_id: str = Field(..., description="Unique identifier for the analyzed chunk")
+    artifact_type: str = Field(..., description="Artifact type associated with the gap")
+    rule_name: str = Field(..., description="Rule that detected the gap")
+    severity: int = Field(
+        ..., ge=1, le=5, description="Severity score from 1 (low) to 5 (critical)"
+    )
+    confidence: float = Field(
+        ..., ge=0.0, le=1.0, description="Confidence score between 0 and 1"
+    )
+    summary: str = Field(..., description="Short summary describing the gap")
+    suggested_fix: Optional[str] = Field(
+        None, description="Suggested remediation to resolve the gap"
+    )
+    source_path: Optional[str] = Field(
+        None, description="Repository path or document location for the gap"
+    )
+    source_url: Optional[str] = Field(
+        None, description="Optional URL pointing to the artifact location"
+    )
+    metadata: Optional[dict[str, Any]] = Field(
+        None, description="Additional structured metadata for the finding"
+    )
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "chunk_id": "chunk-123",
+                "artifact_type": "fastapi",
+                "rule_name": "missing_openapi_description",
+                "severity": 4,
+                "confidence": 0.82,
+                "summary": "Endpoint /users/{id} is missing a docstring and OpenAPI description.",
+                "suggested_fix": "Add a descriptive docstring and update router documentation.",
+                "source_path": "src/api/routes/users.py",
+                "source_url": "https://example.com/src/api/routes/users.py#L120",
+                "metadata": {"owner": "platform-team", "last_updated": "2025-01-20"},
+            }
+        },
+    )
+
+
+class GapAnalysisRequest(BaseModel):
+    """Request payload for semantic gap analysis."""
+
+    topic: str = Field(..., description="Topic or question used for semantic search")
+    artifact_type: Optional[str] = Field(
+        None, description="Optional artifact type filter (e.g., 'fastapi', 'kubernetes')"
+    )
+    rule_name: Optional[str] = Field(
+        None, description="Optional specific rule to filter gap metrics"
+    )
+    limit: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+        description="Maximum number of gap findings to return",
+    )
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "topic": "FastAPI authentication",
+                "artifact_type": "fastapi",
+                "rule_name": "missing_auth_doc",
+                "limit": 3,
+            }
+        },
+    )
+
+
+class GapAnalysisResponse(BaseModel):
+    """Response payload summarizing semantic gap findings."""
+
+    topic: str = Field(..., description="Topic that was analyzed")
+    summary: str = Field(..., description="Human-friendly summary of key gaps")
+    findings: List[GapFinding] = Field(
+        default_factory=list,
+        description="Ordered gap findings matching the request",
+    )
+    total_results: int = Field(
+        ..., description="Total number of findings returned in the response"
+    )
+    filters: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Filters that were applied while computing the analysis",
+    )
+    request_id: str = Field(
+        ..., description="Request identifier propagated across services"
+    )
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "topic": "FastAPI authentication",
+                "summary": "Top gaps for 'FastAPI authentication':\n- [sev 4 | conf 0.82] missing_auth_doc at src/api/routes/users.py - Add a docstring covering auth flow.\n- [sev 3 | conf 0.74] missing_owner_tag at docs/auth.md - Tag the owning team for the auth guide.",
+                "findings": [
+                    {
+                        "chunk_id": "chunk-123",
+                        "artifact_type": "fastapi",
+                        "rule_name": "missing_auth_doc",
+                        "severity": 4,
+                        "confidence": 0.82,
+                        "summary": "Endpoint /users/{id} is missing a docstring and OpenAPI description.",
+                        "suggested_fix": "Add a descriptive docstring and update router documentation.",
+                        "source_path": "src/api/routes/users.py",
+                    }
+                ],
+                "total_results": 1,
+                "filters": {"artifact_type": "fastapi", "rule_name": "missing_auth_doc"},
                 "request_id": "req-123",
             }
         },

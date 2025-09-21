@@ -19,7 +19,7 @@ import sys
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -28,7 +28,16 @@ from fastapi.responses import JSONResponse
 # Add path for common modules
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from common.models import AnswerResponse, JsonRpcError, QueryRequest, Snippet
+from common.models import (
+    AnswerResponse,
+    GapAnalysisRequest,
+    GapAnalysisResponse,
+    GapFinding,
+    JsonRpcError,
+    JsonRpcErrorCode,
+    QueryRequest,
+    Snippet,
+)
 from common.rpc_client import JsonRpcClient
 from guard_fort import init_guard_fort
 
@@ -269,6 +278,141 @@ def get_conversational_response(question: str, role: str) -> str:
     # Generic friendly response with full KonveyN2AI value proposition
     return f"Hello! 😊 I'm your KonveyN2AI assistant, designed to help reduce developer onboarding time through AI-powered knowledge transfer. I can help you understand code, navigate documentation, and get up to speed on projects with {expertise}. What can I help you with today?"
 
+def normalize_gap_record(record: dict[str, Any]) -> Optional[dict[str, Any]]:
+    """Normalize raw gap metric records before Pydantic validation."""
+
+    if not isinstance(record, dict):
+        return None
+
+    normalized: dict[str, Any] = dict(record)
+
+    chunk_id = (
+        normalized.get("chunk_id")
+        or normalized.get("id")
+        or normalized.get("source_id")
+        or normalized.get("document_id")
+    )
+    if not chunk_id:
+        return None
+    normalized["chunk_id"] = str(chunk_id)
+
+    summary = (
+        normalized.get("summary")
+        or normalized.get("gap_summary")
+        or normalized.get("description")
+        or normalized.get("details")
+    )
+    if not summary:
+        return None
+    normalized["summary"] = str(summary).strip()
+    if not normalized["summary"]:
+        return None
+
+    rule_name = (
+        normalized.get("rule_name")
+        or normalized.get("rule")
+        or normalized.get("metric")
+    )
+    if not rule_name:
+        return None
+    normalized["rule_name"] = str(rule_name)
+
+    artifact_type = (
+        normalized.get("artifact_type")
+        or normalized.get("artifactType")
+        or normalized.get("type")
+        or "unknown"
+    )
+    normalized["artifact_type"] = str(artifact_type)
+
+    if normalized.get("file_path") and not normalized.get("source_path"):
+        normalized["source_path"] = normalized["file_path"]
+    if normalized.get("location") and not normalized.get("source_path"):
+        normalized["source_path"] = normalized["location"]
+    if normalized.get("source_path") is not None:
+        normalized["source_path"] = str(normalized["source_path"])
+
+    url_value = normalized.get("source_url") or normalized.get("url") or normalized.get("link")
+    if url_value:
+        normalized["source_url"] = str(url_value)
+
+    fix_value = (
+        normalized.get("suggested_fix")
+        or normalized.get("fix")
+        or normalized.get("recommendation")
+        or normalized.get("remediation")
+    )
+    normalized["suggested_fix"] = str(fix_value).strip() if fix_value else None
+
+    severity_raw = normalized.get("severity") or normalized.get("priority")
+    try:
+        severity_int = int(severity_raw)
+    except (TypeError, ValueError):
+        severity_int = 3
+    severity_int = max(1, min(5, severity_int))
+    normalized["severity"] = severity_int
+
+    confidence_raw = normalized.get("confidence") or normalized.get("score")
+    try:
+        confidence_float = float(confidence_raw)
+    except (TypeError, ValueError):
+        confidence_float = 0.5
+    if confidence_float > 1:
+        confidence_float = confidence_float / 100 if confidence_float <= 100 else 1.0
+    normalized["confidence"] = max(0.0, min(1.0, confidence_float))
+
+    metadata_value = normalized.get("metadata")
+    if metadata_value is not None and not isinstance(metadata_value, dict):
+        metadata_value = {"raw": metadata_value}
+    normalized["metadata"] = metadata_value
+
+    return normalized
+
+
+def format_gap_summary(topic: str, findings: list[GapFinding]) -> str:
+    """Build a user-friendly bullet list summarizing gaps."""
+
+    if not findings:
+        return f"No documented gaps found for '{topic}'."
+
+    lines = [f"Top gaps for '{topic}':"]
+    for finding in findings:
+        if finding.source_url:
+            label = ((finding.source_path or finding.source_url)
+                .replace("\n", " ")
+                .replace("\r", " ")
+                .strip()
+            )
+            location = f"[{label}]({finding.source_url})"
+        elif finding.source_path:
+            location = (finding.source_path.replace("\n", " ")
+                .replace("\r", " ")
+                .strip()
+            )
+        else:
+            location = f"chunk {finding.chunk_id}"
+
+        summary_text = (finding.summary.replace("\n", " ")
+            .replace("\r", " ")
+            .strip()
+        )
+        bullet = (
+            f"- [sev {finding.severity} | conf {finding.confidence:.2f}] "
+            f"{finding.rule_name} at {location} - {summary_text}"
+        )
+        if finding.suggested_fix:
+            fix_text = (finding.suggested_fix.replace("\n", " ")
+                .replace("\r", " ")
+                .strip()
+            )
+            if fix_text:
+                bullet += f" Fix: {fix_text}"
+        lines.append(bullet)
+
+    return "\n".join(lines)
+
+
+
 
 @app.get("/.well-known/agent.json")
 async def agent_manifest():
@@ -298,10 +442,39 @@ async def agent_manifest():
                     "required": ["question"],
                 },
                 "return_type": "AnswerResponse",
-            }
+            },
+            "gap_analysis": {
+                "name": "gap_analysis",
+                "description": "Retrieve semantic gap metrics joined with suggested fixes",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "topic": {
+                            "type": "string",
+                            "description": "Topic or query text used for semantic search",
+                        },
+                        "artifact_type": {
+                            "type": "string",
+                            "description": "Optional artifact type filter (e.g., 'fastapi', 'kubernetes')",
+                        },
+                        "rule_name": {
+                            "type": "string",
+                            "description": "Optional rule identifier to narrow gap metrics",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Maximum number of gap findings to return",
+                            "default": 5,
+                        },
+                    },
+                    "required": ["topic"],
+                },
+                "return_type": "GapAnalysisResponse",
+            },
         },
         "endpoints": {
             "answer": "/answer",
+            "gap_analysis": "/gap-analysis",
             "health": "/health",
             "metrics": "/metrics",
             "services": "/services",
@@ -311,6 +484,11 @@ async def agent_manifest():
                 "name": "query-orchestration",
                 "version": "1.0",
                 "description": "Multi-agent query workflow orchestration",
+            },
+            {
+                "name": "semantic-gap-analysis",
+                "version": "1.0",
+                "description": "Access to BigQuery-backed gap metrics via Svami orchestrator",
             },
             {
                 "name": "json-rpc-2.0",
@@ -487,6 +665,142 @@ def handle_rpc_error(error: JsonRpcError, request_id: str) -> AnswerResponse:
         request_id=request_id,
     )
 
+@app.post("/gap-analysis", response_model=GapAnalysisResponse)
+async def gap_analysis(
+    query: GapAnalysisRequest, request_id: str = Depends(get_request_id)
+) -> GapAnalysisResponse:
+    """Expose BigQuery-backed gap analysis through the orchestrator."""
+
+    if request_id == "unknown":
+        request_id = generate_request_id()
+
+    if not janapada_client:
+        raise HTTPException(
+            status_code=503,
+            detail="Gap analysis service is not ready - memory agent unavailable",
+        )
+
+    print(f"[{request_id}] Starting gap analysis for topic '{query.topic}'...")
+
+    filters: dict[str, Any] = {}
+    if query.artifact_type:
+        filters["artifact_type"] = query.artifact_type
+    if query.rule_name:
+        filters["rule_name"] = query.rule_name
+
+    params: dict[str, Any] = {"topic": query.topic, "limit": query.limit}
+    params.update({k: v for k, v in filters.items() if v is not None})
+
+    rpc_response = None
+    last_error: Any = None
+
+    for method in ("semantic_gap_analysis", "gap_analysis"):
+        try:
+            candidate_response = await janapada_client.call(
+                method=method,
+                params=params,
+                id=request_id,
+            )
+        except Exception as exc:
+            print(f"[{request_id}] Gap analysis RPC '{method}' failed: {exc}")
+            last_error = exc
+            continue
+
+        if candidate_response.error:
+            print(
+                f"[{request_id}] Gap analysis RPC '{method}' returned error: {candidate_response.error.message}"
+            )
+            if (
+                candidate_response.error.code == JsonRpcErrorCode.METHOD_NOT_FOUND
+                and method == "semantic_gap_analysis"
+            ):
+                last_error = candidate_response.error
+                continue
+
+            error_message = candidate_response.error.message
+            if candidate_response.error.data and isinstance(
+                candidate_response.error.data, dict
+            ):
+                reason = candidate_response.error.data.get("reason")
+                if reason:
+                    error_message += f" ({reason})"
+
+            raise HTTPException(
+                status_code=502,
+                detail=f"Gap analysis service error: {error_message}",
+            )
+
+        rpc_response = candidate_response
+        break
+
+    if rpc_response is None:
+        if isinstance(last_error, Exception):
+            raise HTTPException(
+                status_code=502,
+                detail=f"Gap analysis service unavailable: {last_error}",
+            )
+        raise HTTPException(
+            status_code=501,
+            detail="Gap analysis method is not supported by the memory service yet.",
+        )
+
+    payload = rpc_response.result or {}
+
+    raw_findings = None
+    if isinstance(payload, dict):
+        for key in ("findings", "gaps", "results", "matches"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                raw_findings = value
+                break
+    elif isinstance(payload, list):
+        raw_findings = payload
+
+    findings: list[GapFinding] = []
+    if raw_findings:
+        for record in raw_findings:
+            normalized = normalize_gap_record(record)
+            if not normalized:
+                print(f"[{request_id}] Skipping invalid gap record: {record}")
+                continue
+            try:
+                finding = GapFinding(**normalized)
+                findings.append(finding)
+            except Exception as exc:
+                print(f"[{request_id}] Failed to parse gap record: {exc}")
+                continue
+
+    if findings:
+        findings = findings[: query.limit]
+
+    if isinstance(payload, dict) and isinstance(payload.get("filters"), dict):
+        filters_payload = {
+            key: value
+            for key, value in payload["filters"].items()
+            if value is not None
+        }
+    else:
+        filters_payload = dict(filters)
+
+    summary_text = format_gap_summary(query.topic, findings)
+    total_results = len(findings)
+
+    print(
+        f"[{request_id}] Gap analysis completed with {total_results} findings for topic '{query.topic}'"
+    )
+
+    topic_value = query.topic
+    if isinstance(payload, dict) and isinstance(payload.get("topic"), str):
+        topic_value = payload["topic"] or query.topic
+
+    return GapAnalysisResponse(
+        topic=topic_value,
+        summary=summary_text,
+        findings=findings,
+        total_results=total_results,
+        filters=filters_payload,
+        request_id=request_id,
+    )
 
 @app.post("/answer", response_model=AnswerResponse)
 async def answer_query(
