@@ -357,6 +357,50 @@ compute_metrics:
 	@echo "Results available in BigQuery dataset: $(BIGQUERY_DATASET_ID).gap_metrics"
 ```
 
+### Semantic Enrichment Workflow
+
+Hybrid scoring relies on semantic context in addition to deterministic SQL.
+Before kicking off `make compute_metrics`, ensure the following prerequisites are
+fresh for the target dataset:
+
+1. **Regenerate chunk embeddings**
+   ```bash
+   make embeddings PROJECT=$GOOGLE_CLOUD_PROJECT DATASET=$BIGQUERY_DATASET_ID LIMIT=<optional>
+   ```
+   This keeps `source_embeddings` aligned with the latest `source_metadata`
+   records and guarantees downstream VECTOR_SEARCH calls operate on consistent
+   dimensions.
+
+2. **Materialise semantic neighbors**
+   ```bash
+   python -m src.gap_analysis.semantic_candidates --project $GOOGLE_CLOUD_PROJECT --dataset $BIGQUERY_DATASET_ID
+   ```
+   The command embeds every `semantic_probe` declared in the rule YAML,
+   stores probe vectors in `semantic_probe_embeddings`, and rebuilds the
+   `semantic_candidates` table. Optional: create a dataset-scoped view using
+   `configs/sql/gap_analysis/semantic_candidates.sql` for ad-hoc inspection.
+
+3. **Run the hybrid metrics job**
+   After the above steps, execute `make compute_metrics` (or the dedicated CLI
+   entry point described in the next section) so `GapMetricsRunner` blends
+   deterministic scores with semantic similarity before writing to
+   `gap_metrics`.
+
+#### Direct CLI invocation
+To trigger just the metrics stage without the rest of the Makefile pipeline:
+```bash
+python -m src.gap_analysis.pipeline.run_metrics \
+  --project $GOOGLE_CLOUD_PROJECT \
+  --dataset $BIGQUERY_DATASET_ID \
+  --analysis-id semantic_hybrid_test \
+  --ruleset-version v1.0.0
+```
+Use `--dry-run --json` to inspect candidate records without persisting them, or
+omit `--dry-run` to append results into the existing `gap_metrics` table.
+
+If any of the steps are skipped, semantic-aware rules will fall back to
+deterministic confidence only, which may underrepresent documentation quality.
+
 #### `make validate_rulesets`
 **Purpose**: Validate all rule configurations against schema and business rules
 

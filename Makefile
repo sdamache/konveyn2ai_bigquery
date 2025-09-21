@@ -15,7 +15,7 @@
 #   make ingest_mumps    - Ingest MUMPS/VistA dictionaries
 
 .PHONY: help setup migrate run test clean install lint format check-env
-.PHONY: setup-bigquery validate-env install-deps
+.PHONY: setup-bigquery validate-env install-deps compute_metrics
 .PHONY: ingest_k8s ingest_fastapi ingest_cobol ingest_irs ingest_mumps
 
 # Default target
@@ -27,6 +27,7 @@ help:
 	@echo "  make setup     - Create BigQuery dataset, tables and indexes"
 	@echo "  make embeddings - Generate embeddings for BigQuery vector store"
 	@echo "  make migrate   - Migrate vectors from Vertex AI to BigQuery"
+	@echo "  make compute_metrics - Run hybrid gap metrics job"
 	@echo "  make run       - Start BigQuery vector backend API server"
 	@echo "  make test      - Run all tests (contract, integration, unit)"
 	@echo "  make install   - Install all dependencies"
@@ -125,6 +126,20 @@ embeddings: check-env setup
 		--verbose
 	@echo "✅ Embedding generation completed"
 
+compute_metrics: check-env
+	@echo "📊 Running hybrid gap metrics job..."
+	@PROJECT=$$GOOGLE_CLOUD_PROJECT DATASET=$$BIGQUERY_DATASET_ID; \
+	CMD="venv/bin/python -m src.gap_analysis.pipeline.run_metrics --project $$PROJECT --dataset $$DATASET"; \
+	if [ -n "$$ANALYSIS_ID" ]; then CMD="$$CMD --analysis-id $$ANALYSIS_ID"; fi; \
+	if [ -n "$$RULESET_VERSION" ]; then CMD="$$CMD --ruleset-version $$RULESET_VERSION"; fi; \
+	if [ -n "$$LIMIT" ]; then CMD="$$CMD --limit $$LIMIT"; fi; \
+	if [ "$$DRY_RUN" = "1" ]; then CMD="$$CMD --dry-run"; fi; \
+	if [ "$$JSON" = "1" ]; then CMD="$$CMD --json"; fi; \
+	if [ "$$VERBOSE" = "1" ]; then CMD="$$CMD --verbose"; fi; \
+	echo "Executing: $$CMD"; \
+	eval "$$CMD"
+	@echo "✅ Hybrid gap metrics job finished"
+
 # Run the vector backend API
 run: check-env
 	@echo "🚀 Starting BigQuery vector backend..."
@@ -199,6 +214,76 @@ verify-migration: check-env
 demo: check-env setup
 	@echo "🎪 Running end-to-end demo..."
 	python demo.py
+
+# BigQuery AI Hackathon Demo Pipeline
+demo_hackathon: check-env
+	@echo "🚀 Running BigQuery AI Hackathon Demo Pipeline..."
+	@echo "=================================================="
+
+	# Step 1: Setup and validate environment
+	@echo "📋 Step 1: Setting up BigQuery environment..."
+	$(MAKE) setup
+
+	# Step 2: Ingest sample data (using test_data)
+	@echo "📥 Step 2: Ingesting sample K8s artifacts..."
+	@if [ ! -d "test_data/k8s-manifests" ]; then \
+		echo "⚠️  test_data/k8s-manifests not found, creating sample data..."; \
+		mkdir -p test_data/k8s-manifests; \
+	fi
+	@if [ -d "test_data/k8s-manifests" ] && [ "$$(ls -A test_data/k8s-manifests)" ]; then \
+		export BQ_PROJECT=$$GOOGLE_CLOUD_PROJECT BQ_DATASET=$$BIGQUERY_DATASET_ID SOURCE_PATH=test_data/k8s-manifests; \
+		$(MAKE) ingest_k8s; \
+	else \
+		echo "❌ No K8s manifest files found in test_data/k8s-manifests"; \
+		echo "   Please ensure test data exists before running demo"; \
+		exit 1; \
+	fi
+
+	# Step 3: Generate embeddings with BigQuery native vectors
+	@echo "🧠 Step 3: Generating embeddings with BigQuery native vectors..."
+	$(MAKE) embeddings LIMIT=50
+
+	# Step 4: Build semantic candidates with vector search
+	@echo "🔍 Step 4: Building semantic candidates with vector search..."
+	python -m src.gap_analysis.semantic_candidates \
+		--project $$GOOGLE_CLOUD_PROJECT \
+		--dataset $$BIGQUERY_DATASET_ID
+
+	# Step 5: Run hybrid gap analysis
+	@echo "📊 Step 5: Running hybrid gap analysis..."
+	$(MAKE) compute_metrics ANALYSIS_ID=hackathon_demo_$$(date +%Y%m%d_%H%M%S) LIMIT=50
+
+	# Step 6: Create summary view for notebook consumption
+	@echo "📈 Step 6: Creating summary view for notebook..."
+	@echo "Creating gap_metrics_summary view..."
+	sed 's/{project}/$$GOOGLE_CLOUD_PROJECT/g; s/{dataset}/$$BIGQUERY_DATASET_ID/g' configs/sql/gap_analysis_summary_view.sql | bq query --use_legacy_sql=false
+
+	# Step 7: Validate pipeline output
+	@echo "📊 Step 7: Validating pipeline output..."
+	@echo "Checking gap_metrics table for data..."
+	bq query --use_legacy_sql=false --format=prettyjson \
+		"SELECT COUNT(*) as total_records, COUNT(DISTINCT analysis_id) as analysis_runs FROM \`$$GOOGLE_CLOUD_PROJECT.$$BIGQUERY_DATASET_ID.gap_metrics\`" | head -10
+	@echo "Sample from gap_metrics_summary view:"
+	bq query --use_legacy_sql=false --max_rows=3 \
+		"SELECT artifact_type, rule_name, count_passed, count_failed, avg_confidence FROM \`$$GOOGLE_CLOUD_PROJECT.$$BIGQUERY_DATASET_ID.gap_metrics_summary\` LIMIT 3"
+
+	@echo "✅ Pipeline complete! Data ready for notebook visualization."
+	@echo ""
+	@echo "📓 Next steps:"
+	@echo "   1. Open issue6_notebook.py in Jupyter/Colab"
+	@echo "   2. Update BigQuery connection to point to: $$GOOGLE_CLOUD_PROJECT.$$BIGQUERY_DATASET_ID"
+	@echo "   3. Run notebook to generate heat maps and dashboards"
+	@echo ""
+	@echo "🎯 Demo Points for Judges:"
+	@echo "   • BigQuery Native Vector Search (768-dimensional embeddings)"
+	@echo "   • Hybrid scoring (deterministic SQL + semantic similarity)"
+	@echo "   • Real-time gap analysis with confidence scoring"
+	@echo "   • Scalable processing of 100+ artifacts in minutes"
+
+# Quick test with minimal data
+demo_test: check-env
+	@echo "🧪 Running quick demo test with minimal data..."
+	$(MAKE) demo_hackathon LIMIT=5
 
 quickstart-validate:
 	@echo "📋 Validating quickstart guide..."

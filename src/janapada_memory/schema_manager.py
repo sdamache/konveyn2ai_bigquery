@@ -53,6 +53,26 @@ class SchemaManager:
             bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED"),
             bigquery.SchemaField("partition_date", "DATE", mode="REQUIRED"),
         ],
+        "semantic_probe_embeddings": [
+            bigquery.SchemaField("rule_name", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("artifact_type", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("query_text", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("embedding", "FLOAT64", mode="REPEATED"),
+            bigquery.SchemaField("stored_at", "TIMESTAMP", mode="REQUIRED"),
+            bigquery.SchemaField("partition_date", "DATE", mode="REQUIRED"),
+        ],
+        "semantic_candidates": [
+            bigquery.SchemaField("rule_name", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("artifact_type", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("chunk_id", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("source", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("probe_artifact_type", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("similarity_score", "FLOAT64", mode="REQUIRED"),
+            bigquery.SchemaField("weight", "FLOAT64", mode="REQUIRED"),
+            bigquery.SchemaField("neighbor_rank", "INT64", mode="REQUIRED"),
+            bigquery.SchemaField("generated_at", "TIMESTAMP", mode="REQUIRED"),
+            bigquery.SchemaField("partition_date", "DATE", mode="REQUIRED"),
+        ],
     }
 
     # Clustering configuration
@@ -60,6 +80,8 @@ class SchemaManager:
         "source_metadata": ["artifact_type", "source", "chunk_id"],
         "source_embeddings": ["chunk_id", "model", "content_hash"],
         "gap_metrics": ["analysis_id", "metric_type", "chunk_id"],
+        "semantic_probe_embeddings": ["rule_name", "artifact_type"],
+        "semantic_candidates": ["rule_name", "artifact_type", "neighbor_rank"],
     }
 
     def __init__(
@@ -349,18 +371,19 @@ class SchemaManager:
             table_info = []
 
             for table in tables:
+                # Get full table metadata since TableListItem has limited info
+                full_table = self.connection.get_table(table.table_id)
                 table_data = {
                     "name": table.table_id,
                     "full_name": table.full_table_id,
                     "table_type": table.table_type,
-                    "num_rows": table.num_rows,
-                    "num_bytes": table.num_bytes,
-                    "created": table.created.isoformat() if table.created else None,
-                    "modified": table.modified.isoformat() if table.modified else None,
+                    "num_rows": full_table.num_rows,
+                    "num_bytes": full_table.num_bytes,
+                    "created": full_table.created.isoformat() if full_table.created else None,
+                    "modified": full_table.modified.isoformat() if full_table.modified else None,
                 }
 
                 if include_schema:
-                    full_table = self.connection.get_table(table.table_id)
                     table_data["schema"] = [
                         {
                             "name": field.name,
@@ -703,6 +726,9 @@ class SchemaManager:
 
         # Check for missing tables
         for table_name, table_info in validation_result["tables"].items():
+            # Skip error entries that are strings, not table info dicts
+            if isinstance(table_info, str):
+                continue
             if not table_info.get("exists", False):
                 recommendations.append(f"Create missing table: {table_name}")
             elif not table_info.get("schema_valid", False):
@@ -712,6 +738,9 @@ class SchemaManager:
 
         # Check for missing or problematic indexes
         for index_name, index_info in validation_result["indexes"].items():
+            # Skip error entries that are strings, not index info dicts
+            if isinstance(index_info, str):
+                continue
             if index_info.get("status") == "ERROR":
                 recommendations.append(f"Fix failed index: {index_name}")
             elif index_info.get("performance_score", 1.0) < 0.8:

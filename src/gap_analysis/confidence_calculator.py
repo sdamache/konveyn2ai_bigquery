@@ -20,6 +20,7 @@ class ConfidenceComponent(Enum):
     CONTENT_QUALITY = "content_quality"
     STRUCTURE_QUALITY = "structure_quality"
     VOCABULARY_QUALITY = "vocabulary_quality"
+    SEMANTIC_SUPPORT = "semantic_support"
     CRITICAL_PENALTIES = "critical_penalties"
     SECURITY_PENALTIES = "security_penalties"
     COMPLIANCE_PENALTIES = "compliance_penalties"
@@ -27,10 +28,11 @@ class ConfidenceComponent(Enum):
 
 @dataclass
 class ConfidenceWeights:
-    """Weights for confidence calculation components."""
+    """Weights for confidence calculation components (Issue #5 T006)."""
 
     field_completeness: float = 0.6
     content_quality: float = 0.4
+    semantic_support_weight: float = 0.0
     structure_weight: float = 0.3
     vocabulary_weight: float = 0.3
     length_weight: float = 0.4
@@ -39,7 +41,8 @@ class ConfidenceWeights:
     compliance_penalty: float = 0.10
 
     def validate(self) -> None:
-        """Validate that weights are in valid ranges."""
+        """Validate that weights are in valid ranges and properly normalized."""
+
         if not (0 <= self.field_completeness <= 1):
             raise ValueError(
                 f"field_completeness must be [0,1], got {self.field_completeness}"
@@ -52,6 +55,38 @@ class ConfidenceWeights:
             self.field_completeness + self.content_quality, 1.0, rel_tol=1e-9
         ):
             raise ValueError("field_completeness + content_quality must sum to 1.0")
+
+        if not (0 <= self.semantic_support_weight <= 1):
+            raise ValueError(
+                f"semantic_support_weight must be [0,1], got {self.semantic_support_weight}"
+            )
+
+        if not (0 <= self.length_weight <= 1):
+            raise ValueError(f"length_weight must be [0,1], got {self.length_weight}")
+        if not (0 <= self.structure_weight <= 1):
+            raise ValueError(
+                f"structure_weight must be [0,1], got {self.structure_weight}"
+            )
+        if not (0 <= self.vocabulary_weight <= 1):
+            raise ValueError(
+                f"vocabulary_weight must be [0,1], got {self.vocabulary_weight}"
+            )
+        if not math.isclose(
+            self.length_weight + self.structure_weight + self.vocabulary_weight,
+            1.0,
+            rel_tol=1e-9,
+        ):
+            raise ValueError(
+                "length_weight + structure_weight + vocabulary_weight must sum to 1.0"
+            )
+
+        for label, value in (
+            ("critical_penalty", self.critical_penalty),
+            ("security_penalty", self.security_penalty),
+            ("compliance_penalty", self.compliance_penalty),
+        ):
+            if not (0 <= value <= 1):
+                raise ValueError(f"{label} must be [0,1], got {value}")
 
 
 @dataclass
@@ -150,7 +185,9 @@ class ConfidenceCalculator:
     Deterministic confidence calculation engine.
 
     Implements the confidence scoring algorithm:
-    confidence = base_completeness * quality_multiplier - penalty_deductions
+    confidence = (base_completeness * base_weight)
+                  + (quality_multiplier * quality_weight)
+                  - penalty_deductions
 
     All calculations are deterministic and reproducible.
     """
@@ -194,9 +231,10 @@ class ConfidenceCalculator:
         content_quality: ContentQuality,
         penalty_assessment: PenaltyAssessment,
         artifact_type: str = "unknown",
+        semantic_similarity: float | None = None,
     ) -> ConfidenceResult:
         """
-        Calculate final confidence score using the standard algorithm.
+        Calculate final confidence score using the weighted algorithm (Issue #5 T006).
 
         Args:
             field_analysis: Field presence and completeness analysis
@@ -218,16 +256,30 @@ class ConfidenceCalculator:
         # Step 3: Calculate penalty deductions
         total_penalties = self._calculate_penalties(penalty_assessment)
 
-        # Step 4: Apply final formula with bounds checking
-        raw_confidence = base_completeness * quality_multiplier - total_penalties
+        # Step 4: Apply final formula with bounds checking. Weighting makes the
+        # configurable split between raw completeness and quality explicit for
+        # downstream consumers.
+        weighted_base = base_completeness * self.weights.field_completeness
+        weighted_quality = quality_multiplier * self.weights.content_quality
+        semantic_component = 0.0
+        if semantic_similarity is not None:
+            semantic_component = (
+                max(0.0, min(1.0, semantic_similarity))
+                * self.weights.semantic_support_weight
+            )
+
+        raw_confidence = (
+            weighted_base + weighted_quality + semantic_component - total_penalties
+        )
         final_confidence = max(0.0, min(1.0, raw_confidence))
 
         # Step 5: Build component breakdown
         component_scores = {
-            ConfidenceComponent.FIELD_COMPLETENESS: base_completeness,
-            ConfidenceComponent.CONTENT_QUALITY: quality_multiplier,
+            ConfidenceComponent.FIELD_COMPLETENESS: weighted_base,
+            ConfidenceComponent.CONTENT_QUALITY: weighted_quality,
             ConfidenceComponent.STRUCTURE_QUALITY: content_quality.structure_score,
             ConfidenceComponent.VOCABULARY_QUALITY: content_quality.vocabulary_score,
+            ConfidenceComponent.SEMANTIC_SUPPORT: semantic_component,
             ConfidenceComponent.CRITICAL_PENALTIES: penalty_assessment.total_critical_penalties
             * self.weights.critical_penalty,
             ConfidenceComponent.SECURITY_PENALTIES: penalty_assessment.total_security_penalties
@@ -239,9 +291,12 @@ class ConfidenceCalculator:
         breakdown = {
             "base_completeness": base_completeness,
             "quality_multiplier": quality_multiplier,
+            "weighted_base": weighted_base,
+            "weighted_quality": weighted_quality,
             "length_score": content_quality.length_score,
             "structure_score": content_quality.structure_score,
             "vocabulary_score": content_quality.vocabulary_score,
+            "semantic_component": semantic_component,
             "critical_penalties": penalty_assessment.total_critical_penalties,
             "security_penalties": penalty_assessment.total_security_penalties,
             "compliance_penalties": penalty_assessment.total_compliance_penalties,
