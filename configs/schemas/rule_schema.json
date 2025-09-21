@@ -132,12 +132,57 @@
           "enum": ["monthly", "quarterly", "annually"],
           "description": "How often the rule should be reviewed"
         },
+        "semantic_guidance": {
+          "type": "string",
+          "description": "Human-readable notes describing how the semantic probe supports this rule"
+        },
         "related_rules": {
           "type": "array",
           "items": {
             "type": "string"
           },
           "description": "Names of related or dependent rules"
+        }
+      },
+      "additionalProperties": false
+    },
+    "semantic_probe": {
+      "type": "object",
+      "description": "Optional semantic search configuration that augments deterministic rule evaluation with vector similarity context",
+      "required": ["query_text"],
+      "properties": {
+        "query_text": {
+          "type": "string",
+          "minLength": 10,
+          "description": "Natural language description used to probe the vector index for relevant neighbors"
+        },
+        "top_k": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "default": 5,
+          "description": "Maximum number of semantic neighbors to retrieve"
+        },
+        "similarity_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Minimum cosine similarity score required for a neighbor to be considered"
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Optional weight to apply to semantic support when blending with deterministic confidence"
+        },
+        "vector_table": {
+          "type": "string",
+          "default": "source_embeddings",
+          "description": "Override the default embeddings table when probing semantics"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Free-form guidance for future maintainers documenting how the probe should be interpreted"
         }
       },
       "additionalProperties": false
@@ -188,6 +233,13 @@
         "author": "platform-team",
         "created_date": "2025-01-09",
         "review_frequency": "quarterly"
+      },
+      "semantic_probe": {
+        "query_text": "Deployment manifest includes an annotations.description that clearly summarises service purpose",
+        "top_k": 8,
+        "similarity_threshold": 0.55,
+        "weight": 0.2,
+        "notes": "Boost confidence when nearby deployments document intent even if this manifest is sparse."
       }
     }
   ]

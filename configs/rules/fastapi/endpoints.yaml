@@ -44,6 +44,14 @@ metadata:
   author: "api-team"
   created_date: "2025-01-09"
   review_frequency: "quarterly"
+  semantic_guidance: "Probe nearby endpoint docstrings when deterministic checks are inconclusive."
+semantic_probe:
+  query_text: |
+    FastAPI endpoint docstring thoroughly documents parameters, responses, and usage examples.
+  top_k: 6
+  similarity_threshold: 0.6
+  weight: 0.25
+  notes: "Boosts confidence if similar endpoints already maintain strong documentation patterns."
 
 ---
 rule_name: "fastapi_error_handling"
@@ -83,3 +91,11 @@ metadata:
   author: "api-team"
   created_date: "2025-01-09"
   review_frequency: "monthly"
+  semantic_guidance: "Search for peers that demonstrate structured HTTP exception handling."
+semantic_probe:
+  query_text: |
+    FastAPI endpoint demonstrates HTTPException usage with specific status codes and contextual messages.
+  top_k: 5
+  similarity_threshold: 0.55
+  weight: 0.2
+  notes: "Uses semantic neighbors to infer best-practice patterns for robust error handling."
