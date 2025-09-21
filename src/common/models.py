@@ -520,6 +520,10 @@ class GapAnalysisResponse(BaseModel):
 
     topic: str = Field(..., description="Topic that was analyzed")
     summary: str = Field(..., description="Human-friendly summary of key gaps")
+    message: str = Field(
+        ...,
+        description="Chat-friendly formatted message with bullet points highlighting the top gaps",
+    )
     findings: List[GapFinding] = Field(
         default_factory=list,
         description="Ordered gap findings matching the request",
@@ -541,6 +545,7 @@ class GapAnalysisResponse(BaseModel):
             "example": {
                 "topic": "FastAPI authentication",
                 "summary": "Top gaps for 'FastAPI authentication':\n- [sev 4 | conf 0.82] missing_auth_doc at src/api/routes/users.py - Add a docstring covering auth flow.\n- [sev 3 | conf 0.74] missing_owner_tag at docs/auth.md - Tag the owning team for the auth guide.",
+                "message": "Top gaps for 'FastAPI authentication':\n- [sev 4 | conf 0.82] missing_auth_doc at [src/api/routes/users.py](https://example.com/src/api/routes/users.py#L120) - Add a descriptive docstring and update router documentation.\n- [sev 3 | conf 0.74] missing_owner_tag at docs/auth.md - Tag the owning team for the auth guide.",
                 "findings": [
                     {
                         "chunk_id": "chunk-123",

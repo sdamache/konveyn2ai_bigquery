@@ -783,6 +783,7 @@ async def gap_analysis(
         filters_payload = dict(filters)
 
     summary_text = format_gap_summary(query.topic, findings)
+    chat_message = summary_text
     total_results = len(findings)
 
     print(
@@ -796,6 +797,7 @@ async def gap_analysis(
     return GapAnalysisResponse(
         topic=topic_value,
         summary=summary_text,
+        message=chat_message,
         findings=findings,
         total_results=total_results,
         filters=filters_payload,

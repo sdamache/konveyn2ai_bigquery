@@ -227,6 +227,7 @@ def test_gap_analysis_success():
     assert body["total_results"] == 1
     assert body["findings"][0]["rule_name"] == "missing_auth_doc"
     assert "Top gaps" in body["summary"]
+    assert body["message"] == body["summary"]
 
     assert mock_janapada.call.await_count == 1
     rpc_call = mock_janapada.call.call_args
@@ -266,6 +267,7 @@ def test_gap_analysis_fallback_to_legacy_method():
     body = response.json()
     assert body["total_results"] == 0
     assert "No documented gaps" in body["summary"]
+    assert body["message"] == body["summary"]
 
     assert mock_janapada.call.await_count == 2
 
