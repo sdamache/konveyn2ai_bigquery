@@ -383,11 +383,12 @@ class BigQueryAdapter:
 
             # Query for vector index information
             index_query = f"""
-            SELECT 
+            SELECT
+                table_name,
                 index_name,
-                index_status,
-                covering_columns,
-                index_usage_bytes
+                ddl,
+                coverage_percentage,
+                index_status
             FROM `{self.connection.config.project_id}.{self.connection.config.dataset_id}.INFORMATION_SCHEMA.VECTOR_INDEXES`
             WHERE table_name = @table_name AND index_status = 'ACTIVE'
             """
@@ -407,10 +408,11 @@ class BigQueryAdapter:
                 "table_info": table_info,
                 "vector_indexes": [
                     {
+                        "table_name": row.table_name,
                         "index_name": row.index_name,
+                        "ddl": row.ddl,
+                        "coverage_percentage": row.coverage_percentage,
                         "status": row.index_status,
-                        "covering_columns": row.covering_columns,
-                        "usage_bytes": row.index_usage_bytes,
                     }
                     for row in index_results
                 ],
