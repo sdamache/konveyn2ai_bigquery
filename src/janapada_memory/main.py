@@ -69,9 +69,7 @@ async def lifespan(app: FastAPI):
 
         # Initialize memory service
         memory_service = JanapadaMemoryService(
-            connection=connection,
-            enable_fallback=True,
-            fallback_max_entries=1000
+            connection=connection, enable_fallback=True, fallback_max_entries=1000
         )
         logger.info("Memory service initialized successfully")
 
@@ -126,7 +124,7 @@ async def search(
     query_embedding: List[float],
     k: int = 10,
     artifact_types: Optional[List[str]] = None,
-    request_id: str = None
+    request_id: str = None,
 ) -> dict:
     """
     Search for similar vectors using BigQuery vector search.
@@ -184,9 +182,7 @@ async def search(
 
         # Perform similarity search
         results = memory_service.similarity_search(
-            query_embedding=query_embedding,
-            k=k,
-            artifact_types=artifact_types
+            query_embedding=query_embedding, k=k, artifact_types=artifact_types
         )
 
         # Performance logging
@@ -243,12 +239,14 @@ async def health_check():
                     "status": "healthy",
                     "service": SERVICE_NAME,
                     "version": APP_VERSION,
-                    "bigquery_status": health_status.get("bigquery_connection", "unknown"),
+                    "bigquery_status": health_status.get(
+                        "bigquery_connection", "unknown"
+                    ),
                     "fallback_status": health_status.get("fallback_index", "unknown"),
                     "configuration": {
                         "dataset_id": config.dataset_id if config else "unknown",
                         "project_id": config.project_id if config else "unknown",
-                    }
+                    },
                 }
             else:
                 return JSONResponse(
@@ -299,19 +297,19 @@ async def agent_manifest():
                         "query_embedding": {
                             "type": "array",
                             "description": "Query vector to search for",
-                            "items": {"type": "number"}
+                            "items": {"type": "number"},
                         },
                         "k": {
                             "type": "integer",
                             "description": "Number of results to return",
                             "minimum": 1,
                             "maximum": MAX_RESULTS_LIMIT,
-                            "default": 10
+                            "default": 10,
                         },
                         "artifact_types": {
                             "type": "array",
                             "description": "Optional filter by artifact types",
-                            "items": {"type": "string"}
+                            "items": {"type": "string"},
                         },
                     },
                     "required": ["query_embedding"],
