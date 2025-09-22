@@ -52,7 +52,7 @@ class ServiceImporter:
         service_paths = {
             "svami": "svami-orchestrator",
             "amatya": "amatya-role-prompter",
-            "janapada": "janapada-memory",
+            "janapada": "janapada_memory",
         }
 
         if service_name not in service_paths:
