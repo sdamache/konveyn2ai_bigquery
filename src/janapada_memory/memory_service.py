@@ -17,6 +17,7 @@ except ImportError:
     # Fallback to absolute imports when run directly
     import sys
     import os
+
     sys.path.insert(0, os.path.dirname(__file__))
     from bigquery_vector_index import BigQueryVectorIndex, SearchMode
     from connections.bigquery_connection import BigQueryConnectionManager

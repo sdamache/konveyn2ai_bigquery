@@ -26,6 +26,7 @@ except ImportError:
     # Fallback to absolute imports when run directly
     import sys
     import os
+
     sys.path.insert(0, os.path.dirname(__file__))
     from adapters.bigquery_adapter import BigQueryAdapter, BigQueryAdapterError
     from connections.bigquery_connection import (

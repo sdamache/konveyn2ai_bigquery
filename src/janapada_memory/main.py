@@ -36,6 +36,7 @@ except ImportError:
     # Fallback to absolute imports when run directly
     import sys
     import os
+
     sys.path.insert(0, os.path.dirname(__file__))
     from memory_service import JanapadaMemoryService
     from connections.bigquery_connection import BigQueryConnectionManager
@@ -66,6 +67,7 @@ async def lifespan(app: FastAPI):
     try:
         # Initialize configuration
         from config.bigquery_config import BigQueryConfigManager
+
         config = BigQueryConfigManager.load_from_environment()
         logger.info("Configuration loaded successfully")
 
