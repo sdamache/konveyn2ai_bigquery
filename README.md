@@ -369,8 +369,8 @@ mypy src/
 #### Environment Setup
 ```bash
 # Production environment variables
-export BQ_PROJECT=your-project-id
-export BQ_DATASET=source_ingestion
+export GOOGLE_CLOUD_PROJECT=your-project-id
+export BIGQUERY_INGESTION_DATASET_ID=source_ingestion
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 
 # Verify BigQuery access

@@ -40,8 +40,7 @@ jobs:
           DEMO_TOKEN: ${{ vars.DEMO_TOKEN }}
           GOOGLE_CLOUD_PROJECT: 'konveyn2ai'
           BIGQUERY_DATASET_ID: 'semantic_gap_detector'
-          BQ_DATASET: 'source_ingestion'
-          BQ_PROJECT: 'konveyn2ai'
+          BIGQUERY_INGESTION_DATASET_ID: 'source_ingestion'
           
       - name: Validate Deployment
         run: |

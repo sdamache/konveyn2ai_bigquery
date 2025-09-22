@@ -15,14 +15,14 @@ from google.cloud.exceptions import NotFound
 @pytest.fixture
 def bigquery_client():
     """Create BigQuery client for testing"""
-    project_id = os.getenv("BQ_PROJECT", "konveyn2ai")
+    project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "konveyn2ai")
     return bigquery.Client(project=project_id)
 
 
 @pytest.fixture
 def dataset_id():
     """Get BigQuery dataset ID from environment"""
-    return os.getenv("BQ_DATASET", "source_ingestion")
+    return os.getenv("BIGQUERY_INGESTION_DATASET_ID", "source_ingestion")
 
 
 @pytest.mark.contract

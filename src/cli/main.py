@@ -48,8 +48,8 @@ Examples:
   m1-ingest irs --source ./layouts/ --output json --max-rows 1000
 
 Environment Variables:
-  BQ_PROJECT          BigQuery project ID (default: konveyn2ai)
-  BQ_DATASET          BigQuery dataset name (default: source_ingestion)
+  GOOGLE_CLOUD_PROJECT          BigQuery project ID (default: konveyn2ai)
+  BIGQUERY_INGESTION_DATASET_ID          BigQuery dataset name (default: source_ingestion)
   LOG_LEVEL           Logging level: DEBUG, INFO, WARNING, ERROR (default: INFO)
   LOG_FILE            Log file path (default: console only)
   LOG_CONSOLE         Enable console logging: true/false (default: true)
@@ -181,13 +181,13 @@ def add_bigquery_args(parser: argparse.ArgumentParser):
     """Add BigQuery-specific arguments"""
     parser.add_argument(
         "--project",
-        default=os.getenv("BQ_PROJECT", "konveyn2ai"),
+        default=os.getenv("GOOGLE_CLOUD_PROJECT", "konveyn2ai"),
         help="BigQuery project ID",
     )
 
     parser.add_argument(
         "--dataset",
-        default=os.getenv("BQ_DATASET", "source_ingestion"),
+        default=os.getenv("BIGQUERY_INGESTION_DATASET_ID", "source_ingestion"),
         help="BigQuery dataset name",
     )
 

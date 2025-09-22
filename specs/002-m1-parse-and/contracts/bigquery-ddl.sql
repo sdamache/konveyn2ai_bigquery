@@ -3,7 +3,7 @@
 -- Optimized for high-volume ingestion with partitioning and clustering
 
 -- Main source metadata table with unified schema
-CREATE TABLE `${BQ_PROJECT}.${BQ_DATASET}.source_metadata` (
+CREATE TABLE `${GOOGLE_CLOUD_PROJECT}.${BIGQUERY_INGESTION_DATASET_ID}.source_metadata` (
   -- Common fields for all source types
   source_type STRING NOT NULL OPTIONS(description="Source family: kubernetes, fastapi, cobol, irs, mumps"),
   artifact_id STRING NOT NULL OPTIONS(description="Deterministic semantic identifier"),
@@ -73,7 +73,7 @@ OPTIONS(
 );
 
 -- Error tracking table for parsing and ingestion failures
-CREATE TABLE `${BQ_PROJECT}.${BQ_DATASET}.source_metadata_errors` (
+CREATE TABLE `${GOOGLE_CLOUD_PROJECT}.${BIGQUERY_INGESTION_DATASET_ID}.source_metadata_errors` (
   error_id STRING NOT NULL OPTIONS(description="ULID-generated unique error identifier"),
   source_type STRING NOT NULL OPTIONS(description="Source family where error occurred"),
   source_uri STRING NOT NULL OPTIONS(description="Original source location"),
@@ -93,7 +93,7 @@ OPTIONS(
 );
 
 -- Ingestion run tracking for monitoring and performance analysis
-CREATE TABLE `${BQ_PROJECT}.${BQ_DATASET}.ingestion_log` (
+CREATE TABLE `${GOOGLE_CLOUD_PROJECT}.${BIGQUERY_INGESTION_DATASET_ID}.ingestion_log` (
   run_id STRING NOT NULL OPTIONS(description="ULID-generated unique run identifier"),
   source_type STRING NOT NULL OPTIONS(description="Source family processed"),
   started_at TIMESTAMP NOT NULL OPTIONS(description="Run start timestamp"),
@@ -118,8 +118,8 @@ OPTIONS(
 );
 
 -- Create dataset-level permissions and labels
--- Note: Replace ${BQ_PROJECT} and ${BQ_DATASET} with actual values during deployment
-ALTER SCHEMA `${BQ_PROJECT}.${BQ_DATASET}`
+-- Note: Replace ${GOOGLE_CLOUD_PROJECT} and ${BIGQUERY_INGESTION_DATASET_ID} with actual values during deployment
+ALTER SCHEMA `${GOOGLE_CLOUD_PROJECT}.${BIGQUERY_INGESTION_DATASET_ID}`
 SET OPTIONS(
   description="M1 Multi-Source Ingestion for KonveyN2AI BigQuery Hackathon",
   labels=[("environment", "hackathon"), ("milestone", "m1"), ("purpose", "ingestion")]

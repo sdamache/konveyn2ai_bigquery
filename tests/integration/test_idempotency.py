@@ -32,7 +32,7 @@ except ImportError:
 @pytest.fixture
 def bigquery_client():
     """BigQuery client for testing"""
-    project_id = os.getenv("BQ_PROJECT", "konveyn2ai")
+    project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "konveyn2ai")
     return bigquery.Client(project=project_id)
 
 
@@ -66,8 +66,8 @@ def create_test_tables(bigquery_client, temp_bigquery_dataset):
         ddl_content = f.read()
 
     # Replace placeholders
-    ddl_content = ddl_content.replace("${BQ_PROJECT}", bigquery_client.project)
-    ddl_content = ddl_content.replace("${BQ_DATASET}", dataset_id)
+    ddl_content = ddl_content.replace("${GOOGLE_CLOUD_PROJECT}", bigquery_client.project)
+    ddl_content = ddl_content.replace("${BIGQUERY_INGESTION_DATASET_ID}", dataset_id)
 
     # Execute DDL statements
     for statement in ddl_content.split(";"):

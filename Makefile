@@ -231,7 +231,7 @@ demo_hackathon: check-env
 		mkdir -p test_data/k8s-manifests; \
 	fi
 	@if [ -d "test_data/k8s-manifests" ] && [ "$$(ls -A test_data/k8s-manifests)" ]; then \
-		export BQ_PROJECT=$$GOOGLE_CLOUD_PROJECT BQ_DATASET=$$BIGQUERY_DATASET_ID SOURCE_PATH=test_data/k8s-manifests; \
+		export GOOGLE_CLOUD_PROJECT=$$GOOGLE_CLOUD_PROJECT BIGQUERY_INGESTION_DATASET_ID=$$BIGQUERY_DATASET_ID SOURCE_PATH=test_data/k8s-manifests; \
 		$(MAKE) ingest_k8s; \
 	else \
 		echo "❌ No K8s manifest files found in test_data/k8s-manifests"; \
@@ -358,14 +358,14 @@ backup-data:
 # M1 Environment Setup
 validate-env:
 	@echo "🔍 Validating M1 environment configuration..."
-	@if [ -z "$$BQ_PROJECT" ]; then \
-		echo "❌ BQ_PROJECT environment variable not set"; \
-		echo "   Run: export BQ_PROJECT=konveyn2ai"; \
+	@if [ -z "$$GOOGLE_CLOUD_PROJECT" ]; then \
+		echo "❌ GOOGLE_CLOUD_PROJECT environment variable not set"; \
+		echo "   Run: export GOOGLE_CLOUD_PROJECT=konveyn2ai"; \
 		exit 1; \
 	fi
-	@if [ -z "$$BQ_DATASET" ]; then \
-		echo "❌ BQ_DATASET environment variable not set"; \
-		echo "   Run: export BQ_DATASET=source_ingestion"; \
+	@if [ -z "$$BIGQUERY_INGESTION_DATASET_ID" ]; then \
+		echo "❌ BIGQUERY_INGESTION_DATASET_ID environment variable not set"; \
+		echo "   Run: export BIGQUERY_INGESTION_DATASET_ID=source_ingestion"; \
 		exit 1; \
 	fi
 	@echo "✅ M1 environment variables configured"
@@ -384,9 +384,9 @@ install-deps:
 # Setup M1 BigQuery environment
 setup-bigquery: validate-env
 	@echo "🚀 Setting up M1 BigQuery tables and environment..."
-	@echo "Project: $$BQ_PROJECT"
-	@echo "Dataset: $$BQ_DATASET"
-	bash -c "source venv/bin/activate && cd src && python -m cli.main setup --project $$BQ_PROJECT --dataset $$BQ_DATASET"
+	@echo "Project: $$GOOGLE_CLOUD_PROJECT"
+	@echo "Dataset: $$BIGQUERY_INGESTION_DATASET_ID"
+	bash -c "source venv/bin/activate && cd src && python -m cli.main setup --project $$GOOGLE_CLOUD_PROJECT --dataset $$BIGQUERY_INGESTION_DATASET_ID"
 	@echo "✅ M1 BigQuery setup completed"
 
 # =============================================================================
@@ -402,7 +402,7 @@ ingest_k8s: validate-env
 		echo "   Example: make ingest_k8s SOURCE_PATH=./examples/k8s-manifests/"; \
 		exit 1; \
 	fi
-	bash -c "source venv/bin/activate && cd src && python -m cli.main k8s --source ../$$SOURCE_PATH --project $$BQ_PROJECT --dataset $$BQ_DATASET --output bigquery"
+	bash -c "source venv/bin/activate && cd src && python -m cli.main k8s --source ../$$SOURCE_PATH --project $$GOOGLE_CLOUD_PROJECT --dataset $$BIGQUERY_INGESTION_DATASET_ID --output bigquery"
 	@echo "✅ Kubernetes ingestion completed"
 
 # FastAPI project ingestion
@@ -414,7 +414,7 @@ ingest_fastapi: validate-env
 		echo "   Example: make ingest_fastapi SOURCE_PATH=./examples/fastapi-project/"; \
 		exit 1; \
 	fi
-	bash -c "source venv/bin/activate && cd src && python -m cli.main fastapi --source ../$$SOURCE_PATH --project $$BQ_PROJECT --dataset $$BQ_DATASET --output bigquery"
+	bash -c "source venv/bin/activate && cd src && python -m cli.main fastapi --source ../$$SOURCE_PATH --project $$GOOGLE_CLOUD_PROJECT --dataset $$BIGQUERY_INGESTION_DATASET_ID --output bigquery"
 	@echo "✅ FastAPI ingestion completed"
 
 # COBOL copybook ingestion
@@ -426,7 +426,7 @@ ingest_cobol: validate-env
 		echo "   Example: make ingest_cobol SOURCE_PATH=./examples/cobol-copybooks/"; \
 		exit 1; \
 	fi
-	bash -c "source venv/bin/activate && cd src && python -m cli.main cobol --source ../$$SOURCE_PATH --project $$BQ_PROJECT --dataset $$BQ_DATASET --output bigquery"
+	bash -c "source venv/bin/activate && cd src && python -m cli.main cobol --source ../$$SOURCE_PATH --project $$GOOGLE_CLOUD_PROJECT --dataset $$BIGQUERY_INGESTION_DATASET_ID --output bigquery"
 	@echo "✅ COBOL ingestion completed"
 
 # IRS record layout ingestion
@@ -438,7 +438,7 @@ ingest_irs: validate-env
 		echo "   Example: make ingest_irs SOURCE_PATH=./examples/irs-layouts/"; \
 		exit 1; \
 	fi
-	bash -c "source venv/bin/activate && cd src && python -m cli.main irs --source ../$$SOURCE_PATH --project $$BQ_PROJECT --dataset $$BQ_DATASET --output bigquery"
+	bash -c "source venv/bin/activate && cd src && python -m cli.main irs --source ../$$SOURCE_PATH --project $$GOOGLE_CLOUD_PROJECT --dataset $$BIGQUERY_INGESTION_DATASET_ID --output bigquery"
 	@echo "✅ IRS ingestion completed"
 
 # MUMPS/VistA dictionary ingestion
@@ -450,7 +450,7 @@ ingest_mumps: validate-env
 		echo "   Example: make ingest_mumps SOURCE_PATH=./examples/mumps-dictionaries/"; \
 		exit 1; \
 	fi
-	bash -c "source venv/bin/activate && cd src && python -m cli.main mumps --source ../$$SOURCE_PATH --project $$BQ_PROJECT --dataset $$BQ_DATASET --output bigquery"
+	bash -c "source venv/bin/activate && cd src && python -m cli.main mumps --source ../$$SOURCE_PATH --project $$GOOGLE_CLOUD_PROJECT --dataset $$BIGQUERY_INGESTION_DATASET_ID --output bigquery"
 	@echo "✅ MUMPS ingestion completed"
 
 # =============================================================================

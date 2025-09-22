@@ -11,8 +11,8 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # 3. Set environment variables
-export BQ_PROJECT="konveyn2ai"
-export BQ_DATASET="source_ingestion"
+export GOOGLE_CLOUD_PROJECT="konveyn2ai"
+export BIGQUERY_INGESTION_DATASET_ID="source_ingestion"
 export GOOGLE_APPLICATION_CREDENTIALS="path/to/service-account.json"
 ```
 
@@ -22,7 +22,7 @@ export GOOGLE_APPLICATION_CREDENTIALS="path/to/service-account.json"
 make setup
 
 # Verify tables exist
-bq ls ${BQ_DATASET}
+bq ls ${BIGQUERY_INGESTION_DATASET_ID}
 ```
 
 ## Basic Usage
@@ -95,7 +95,7 @@ make ingest_mumps SOURCE=./fileman-dicts/ DRY_RUN=1
 SELECT
   source_type,
   COUNT(*) as row_count
-FROM `${BQ_PROJECT}.${BQ_DATASET}.source_metadata`
+FROM `${GOOGLE_CLOUD_PROJECT}.${BIGQUERY_INGESTION_DATASET_ID}.source_metadata`
 GROUP BY source_type
 ORDER BY source_type;
 ```
@@ -109,7 +109,7 @@ SELECT
   COUNT(CASE WHEN content_text IS NULL OR content_text = '' THEN 1 END) as empty_content,
   COUNT(CASE WHEN artifact_id IS NULL OR artifact_id = '' THEN 1 END) as missing_artifact_id,
   COUNT(CASE WHEN content_hash IS NULL OR LENGTH(content_hash) != 64 THEN 1 END) as invalid_hash
-FROM `${BQ_PROJECT}.${BQ_DATASET}.source_metadata`
+FROM `${GOOGLE_CLOUD_PROJECT}.${BIGQUERY_INGESTION_DATASET_ID}.source_metadata`
 GROUP BY source_type;
 ```
 
@@ -122,7 +122,7 @@ SELECT
   MIN(content_tokens) as min_tokens,
   MAX(content_tokens) as max_tokens,
   STDDEV(content_tokens) as token_stddev
-FROM `${BQ_PROJECT}.${BQ_DATASET}.source_metadata`
+FROM `${GOOGLE_CLOUD_PROJECT}.${BIGQUERY_INGESTION_DATASET_ID}.source_metadata`
 WHERE content_tokens IS NOT NULL
 GROUP BY source_type;
 ```
@@ -137,7 +137,7 @@ SELECT
   rows_written,
   errors_count,
   processing_duration_ms / 1000 as duration_seconds
-FROM `${BQ_PROJECT}.${BQ_DATASET}.ingestion_log`
+FROM `${GOOGLE_CLOUD_PROJECT}.${BIGQUERY_INGESTION_DATASET_ID}.ingestion_log`
 ORDER BY started_at DESC
 LIMIT 20;
 ```
@@ -150,7 +150,7 @@ SELECT
   error_class,
   COUNT(*) as error_count,
   STRING_AGG(DISTINCT SUBSTR(error_msg, 1, 100), '; ' LIMIT 3) as sample_errors
-FROM `${BQ_PROJECT}.${BQ_DATASET}.source_metadata_errors`
+FROM `${GOOGLE_CLOUD_PROJECT}.${BIGQUERY_INGESTION_DATASET_ID}.source_metadata_errors`
 WHERE DATE(collected_at) = CURRENT_DATE()
 GROUP BY source_type, error_class
 ORDER BY error_count DESC;
@@ -203,7 +203,7 @@ make ingest_mumps SOURCE=./vista-large/
    ```bash
    # Test credentials
    gcloud auth application-default login
-   bq ls ${BQ_DATASET}
+   bq ls ${BIGQUERY_INGESTION_DATASET_ID}
    ```
 
 2. **Missing Dependencies**

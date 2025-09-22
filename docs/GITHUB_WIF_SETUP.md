@@ -78,7 +78,7 @@ jobs:
     - name: Run tests
       env:
         GOOGLE_CLOUD_PROJECT: 'konveyn2ai'
-        BIGQUERY_DATASET_ID: 'source_ingestion'
+        BIGQUERY_INGESTION_DATASET_ID: 'source_ingestion'
       run: |
         # Your tests run here with automatic authentication
         python -m pytest tests/
@@ -101,7 +101,7 @@ client = bigquery.Client(credentials=credentials, project=project)
 
 The following environment variables are automatically set in GitHub Actions:
 - `GOOGLE_CLOUD_PROJECT`: konveyn2ai
-- `BIGQUERY_DATASET_ID`: source_ingestion
+- `BIGQUERY_INGESTION_DATASET_ID`: source_ingestion
 - ADC is automatically configured by the auth action
 
 ## Security Notes

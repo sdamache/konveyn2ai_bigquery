@@ -13,7 +13,7 @@ Create or update `.env` file:
 ```bash
 # BigQuery Configuration
 GOOGLE_CLOUD_PROJECT=konveyn2ai
-BIGQUERY_DATASET_ID=source_ingestion
+BIGQUERY_DATASET_ID=semantic_gap_detector
 BIGQUERY_TABLE_PREFIX=source_
 
 # Optional: Explicit credentials (if not using ADC)
@@ -29,7 +29,7 @@ BIGQUERY_TABLE_PREFIX=source_
 python -c "
 from google.cloud import bigquery
 client = bigquery.Client()
-table = client.get_table('konveyn2ai.source_ingestion.source_embeddings')
+table = client.get_table('konveyn2ai.semantic_gap_detector.source_embeddings')
 print(f'Table exists: {table.table_id}')
 print(f'Schema: {[f.name for f in table.schema]}')
 "
@@ -51,7 +51,7 @@ pytest specs/004-bigquery-memory-adapter/contracts/bigquery_integration_contract
 # Validate VECTOR_SEARCH function works
 bq query --use_legacy_sql=false "
 SELECT COUNT(*) as embedding_count
-FROM \`konveyn2ai.source_ingestion.source_embeddings\`
+FROM \`konveyn2ai.semantic_gap_detector.source_embeddings\`
 "
 ```
 
@@ -138,7 +138,7 @@ gcloud projects add-iam-policy-binding konveyn2ai \
 make setup
 
 # Verify table creation
-bq ls konveyn2ai:source_ingestion
+bq ls konveyn2ai:semantic_gap_detector
 ```
 
 ### Vector Dimension Mismatch
@@ -149,7 +149,7 @@ bq query --use_legacy_sql=false "
 SELECT
   ARRAY_LENGTH(embedding_vector) as dimension_count,
   COUNT(*) as row_count
-FROM \`konveyn2ai.source_ingestion.source_embeddings\`
+FROM \`konveyn2ai.semantic_gap_detector.source_embeddings\`
 GROUP BY ARRAY_LENGTH(embedding_vector)
 "
 ```

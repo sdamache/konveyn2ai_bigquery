@@ -14,13 +14,13 @@ from google.cloud.exceptions import Conflict
 
 def get_env_vars():
     """Get required environment variables"""
-    project_id = os.getenv("BQ_PROJECT", "konveyn2ai")
-    dataset_id = os.getenv("BQ_DATASET", "source_ingestion")
+    project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "konveyn2ai")
+    dataset_id = os.getenv("BIGQUERY_INGESTION_DATASET_ID", "source_ingestion")
 
     if not project_id:
-        raise ValueError("BQ_PROJECT environment variable is required")
+        raise ValueError("GOOGLE_CLOUD_PROJECT environment variable is required")
     if not dataset_id:
-        raise ValueError("BQ_DATASET environment variable is required")
+        raise ValueError("BIGQUERY_INGESTION_DATASET_ID environment variable is required")
 
     return project_id, dataset_id
 
@@ -78,8 +78,8 @@ def load_ddl_from_file():
 
 def substitute_variables(ddl_content: str, project_id: str, dataset_id: str):
     """Substitute environment variables in DDL"""
-    ddl_content = ddl_content.replace("${BQ_PROJECT}", project_id)
-    ddl_content = ddl_content.replace("${BQ_DATASET}", dataset_id)
+    ddl_content = ddl_content.replace("${GOOGLE_CLOUD_PROJECT}", project_id)
+    ddl_content = ddl_content.replace("${BIGQUERY_INGESTION_DATASET_ID}", dataset_id)
     return ddl_content
 
 
