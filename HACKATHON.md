@@ -5,7 +5,7 @@
 **Project Name**: KonveyN2AI - Intelligent Knowledge Gap Detection with BigQuery AI  
 **Team**: Solo Submission  
 **Hackathon**: BigQuery AI Hackathon on Kaggle  
-**Demo Video**: [3-minute Demo](https://www.loom.com/share/819aaf1a42fd414da4f04f0fc54cb120)  
+**Demo Video**: [3-minute Demo](https://youtu.be/wJY4wYffFuc)  
 **Public Repository**: https://github.com/sdamache/konveyn2ai_bigquery  
 
 ## 🎯 Problem Statement
