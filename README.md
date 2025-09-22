@@ -842,6 +842,18 @@ curl -X POST http://localhost:8080/answer \
     "role": "backend_developer"
   }'
 ```
+```bash
+curl -X POST http://localhost:8003/gap-analysis \
+  -H "Authorization: Bearer demo-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "topic": "FastAPI authentication",
+    "artifact_type": "fastapi",
+    "limit": 3
+  }'
+```
+The Svami orchestrator now joins semantic search results with the `gap_metrics` table and returns severity, confidence, and remediation guidance for each finding. The JSON payload includes a conversational summary plus the structured list of gap findings.
+
 
 ## 🎬 Demo Showcase
 

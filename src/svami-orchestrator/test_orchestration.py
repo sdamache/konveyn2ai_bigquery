@@ -185,3 +185,90 @@ if __name__ == "__main__":
     test_janapada_failure()
     test_no_snippets_found()
     print("\n✅ All orchestration tests completed!")
+
+def test_gap_analysis_success():
+    """Gap analysis endpoint should format findings and call Janapada."""
+    import main
+
+    mock_janapada = AsyncMock()
+    mock_janapada.call.return_value = JsonRpcResponse(
+        id="gap-req",
+        result={
+            "topic": "FastAPI authentication",
+            "filters": {"artifact_type": "fastapi"},
+            "findings": [
+                {
+                    "chunk_id": "chunk-123",
+                    "artifact_type": "fastapi",
+                    "rule_name": "missing_auth_doc",
+                    "severity": 4,
+                    "confidence": 0.82,
+                    "summary": "Endpoint lacks authentication docstring.",
+                    "suggested_fix": "Add docstring with auth description.",
+                    "source_path": "src/api/routes/users.py",
+                    "source_url": "https://example.com/src/api/routes/users.py#L42",
+                }
+            ],
+        },
+    )
+
+    mock_amatya = AsyncMock()
+    main.janapada_client = mock_janapada
+    main.amatya_client = mock_amatya
+
+    client = TestClient(app)
+    headers = {"Authorization": "Bearer demo-token"}
+    payload = {"topic": "FastAPI authentication", "artifact_type": "fastapi", "limit": 5}
+
+    response = client.post("/gap-analysis", json=payload, headers=headers)
+    assert response.status_code == 200
+
+    body = response.json()
+    assert body["total_results"] == 1
+    assert body["findings"][0]["rule_name"] == "missing_auth_doc"
+    assert "Top gaps" in body["summary"]
+    assert body["message"] == body["summary"]
+
+    assert mock_janapada.call.await_count == 1
+    rpc_call = mock_janapada.call.call_args
+    assert rpc_call.kwargs["params"]["topic"] == "FastAPI authentication"
+    assert rpc_call.kwargs["params"]["limit"] == 5
+
+    # Cleanup for subsequent tests
+    main.janapada_client = None
+
+
+def test_gap_analysis_fallback_to_legacy_method():
+    """Fallback when semantic method is unavailable should retry with legacy name."""
+    import main
+
+    mock_janapada = AsyncMock()
+    mock_janapada.call.side_effect = [
+        JsonRpcResponse(
+            id="gap-req",
+            error=JsonRpcError(code=-32601, message="Method not found"),
+        ),
+        JsonRpcResponse(
+            id="gap-req",
+            result={"findings": [], "topic": "FastAPI authentication"},
+        ),
+    ]
+
+    main.janapada_client = mock_janapada
+    main.amatya_client = AsyncMock()
+
+    client = TestClient(app)
+    headers = {"Authorization": "Bearer demo-token"}
+    payload = {"topic": "FastAPI authentication"}
+
+    response = client.post("/gap-analysis", json=payload, headers=headers)
+    assert response.status_code == 200
+
+    body = response.json()
+    assert body["total_results"] == 0
+    assert "No documented gaps" in body["summary"]
+    assert body["message"] == body["summary"]
+
+    assert mock_janapada.call.await_count == 2
+
+    main.janapada_client = None
