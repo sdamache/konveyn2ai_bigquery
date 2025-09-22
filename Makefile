@@ -49,6 +49,11 @@ help:
 	@echo "  make setup-bigquery  - Setup M1 BigQuery tables and environment"
 	@echo "  make validate-env    - Validate M1 environment configuration"
 	@echo "  make install-deps    - Install M1 parser dependencies"
+	@echo ""
+	@echo "Environment setup:"
+	@echo "  make env-embeddings  - Set environment for vector/embedding operations"
+	@echo "  make env-ingestion   - Set environment for M1 ingestion operations"
+	@echo "  make env-help        - Show environment variable documentation"
 
 # Environment check
 check-env:
@@ -450,7 +455,7 @@ ingest_mumps: validate-env
 		echo "   Example: make ingest_mumps SOURCE_PATH=./examples/mumps-dictionaries/"; \
 		exit 1; \
 	fi
-	bash -c "source venv/bin/activate && cd src && python -m cli.main mumps --source ../$$SOURCE_PATH --project $$GOOGLE_CLOUD_PROJECT --dataset $$BIGQUERY_INGESTION_DATASET_ID --output bigquery"
+	bash -c "source venv/bin/activate && cd src && python -m cli.main mumps --source ../$$SOURCE_PATH --project $$BQ_PROJECT --dataset $$BIGQUERY_INGESTION_DATASET_ID --output bigquery"
 	@echo "✅ MUMPS ingestion completed"
 
 # =============================================================================
@@ -488,3 +493,53 @@ test-m1-integration:
 validate-m1-complete: setup-bigquery test-m1-parsers dry-run-examples
 	@echo "🎯 Complete M1 validation pipeline executed"
 	@echo "✅ M1 Multi-Source Ingestion system ready for production"
+
+# Environment setup commands
+env-embeddings:
+	@echo "🧠 Setting up environment for Vector/Embedding operations..."
+	@echo "export BIGQUERY_EMBEDDINGS_DATASET_ID=semantic_gap_detector"
+	@echo "export BIGQUERY_DATASET_ID=semantic_gap_detector  # Legacy compatibility"
+	@echo ""
+	@echo "Use this for:"
+	@echo "  - janapada_memory tests"
+	@echo "  - Vector search operations"
+	@echo "  - Gap analysis"
+	@echo "  - Embedding schema tests"
+	@echo ""
+	@echo "Run: source <(make env-embeddings)"
+
+env-ingestion:
+	@echo "🔧 Setting up environment for M1 Ingestion operations..."
+	@echo "export BIGQUERY_INGESTION_DATASET_ID=source_ingestion"
+	@echo "export BQ_DATASET=source_ingestion                    # Legacy compatibility"
+	@echo "export BQ_PROJECT=konveyn2ai                          # Legacy compatibility"
+	@echo ""
+	@echo "Use this for:"
+	@echo "  - CLI ingestion commands"
+	@echo "  - Parser tests (K8s, FastAPI, COBOL, etc.)"
+	@echo "  - Source metadata operations"
+	@echo ""
+	@echo "Run: source <(make env-ingestion)"
+
+env-help:
+	@echo "📋 BigQuery Environment Variables Guide"
+	@echo "======================================="
+	@echo ""
+	@echo "🧠 EMBEDDING/VECTOR OPERATIONS (Dataset: semantic_gap_detector):"
+	@echo "   BIGQUERY_EMBEDDINGS_DATASET_ID=semantic_gap_detector"
+	@echo "   Contains: source_embeddings, gap_metrics, semantic_candidates"
+	@echo "   Used by: janapada_memory, vector search, embedding tests"
+	@echo ""
+	@echo "🔧 M1 INGESTION OPERATIONS (Dataset: source_ingestion):"
+	@echo "   BIGQUERY_INGESTION_DATASET_ID=source_ingestion"
+	@echo "   Contains: source_metadata, source_metadata_errors, ingestion_log"
+	@echo "   Used by: CLI parsers, ingestion tests, source metadata"
+	@echo ""
+	@echo "📊 COMMON VARIABLES:"
+	@echo "   GOOGLE_CLOUD_PROJECT=konveyn2ai"
+	@echo "   GOOGLE_CLOUD_LOCATION=us-central1"
+	@echo "   BIGQUERY_LOCATION=us-central1"
+	@echo ""
+	@echo "🔧 SETUP COMMANDS:"
+	@echo "   make env-embeddings  # Set up for vector/embedding work"
+	@echo "   make env-ingestion   # Set up for M1 ingestion work"
