@@ -107,10 +107,14 @@ class SchemaManager:
             from .config import BigQueryConfig
 
             config = BigQueryConfig(
-                project_id=project_id or os.getenv("GOOGLE_CLOUD_PROJECT", "konveyn2ai"),
-                dataset_id=dataset_id or (
-                    os.getenv("BIGQUERY_EMBEDDINGS_DATASET_ID") or
-                    os.getenv("BIGQUERY_DATASET_ID", "semantic_gap_detector")  # Legacy fallback
+                project_id=project_id
+                or os.getenv("GOOGLE_CLOUD_PROJECT", "konveyn2ai"),
+                dataset_id=dataset_id
+                or (
+                    os.getenv("BIGQUERY_EMBEDDINGS_DATASET_ID")
+                    or os.getenv(
+                        "BIGQUERY_DATASET_ID", "semantic_gap_detector"
+                    )  # Legacy fallback
                 ),
             )
             self.connection = BigQueryConnectionManager(config=config)

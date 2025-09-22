@@ -59,7 +59,7 @@ def check_environment_variables():
         "GOOGLE_CLOUD_PROJECT": "konveyn2ai",
         "BIGQUERY_DATASET_ID": "semantic_gap_detector",
         "BIGQUERY_INGESTION_DATASET_ID": "source_ingestion",
-        "BIGQUERY_LOCATION": "us-central1"
+        "BIGQUERY_LOCATION": "us-central1",
     }
 
     print("🔑 Checking environment variables...")

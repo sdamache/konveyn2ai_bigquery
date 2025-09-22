@@ -118,8 +118,8 @@ class BigQueryWriter:
     ):
         self.project_id = project_id or os.getenv("GOOGLE_CLOUD_PROJECT", "konveyn2ai")
         self.dataset_id = dataset_id or (
-            os.getenv("BIGQUERY_INGESTION_DATASET_ID") or
-            os.getenv("BQ_DATASET", "source_ingestion")  # Legacy fallback
+            os.getenv("BIGQUERY_INGESTION_DATASET_ID")
+            or os.getenv("BQ_DATASET", "source_ingestion")  # Legacy fallback
         )
         self.location = location
         self.batch_config = batch_config or BatchConfig()

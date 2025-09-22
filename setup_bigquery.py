@@ -20,7 +20,9 @@ def get_env_vars():
     if not project_id:
         raise ValueError("GOOGLE_CLOUD_PROJECT environment variable is required")
     if not dataset_id:
-        raise ValueError("BIGQUERY_INGESTION_DATASET_ID environment variable is required")
+        raise ValueError(
+            "BIGQUERY_INGESTION_DATASET_ID environment variable is required"
+        )
 
     return project_id, dataset_id
 

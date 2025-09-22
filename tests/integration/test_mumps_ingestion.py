@@ -166,7 +166,9 @@ class TestMUMPSIngestion:
 
         # Replace placeholders with actual values
         ddl_content = ddl_content.replace("${GOOGLE_CLOUD_PROJECT}", project_id)
-        ddl_content = ddl_content.replace("${BIGQUERY_INGESTION_DATASET_ID}", temp_dataset)
+        ddl_content = ddl_content.replace(
+            "${BIGQUERY_INGESTION_DATASET_ID}", temp_dataset
+        )
 
         # Split DDL into individual CREATE statements
         ddl_statements = [

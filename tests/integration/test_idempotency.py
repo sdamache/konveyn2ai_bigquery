@@ -66,7 +66,9 @@ def create_test_tables(bigquery_client, temp_bigquery_dataset):
         ddl_content = f.read()
 
     # Replace placeholders
-    ddl_content = ddl_content.replace("${GOOGLE_CLOUD_PROJECT}", bigquery_client.project)
+    ddl_content = ddl_content.replace(
+        "${GOOGLE_CLOUD_PROJECT}", bigquery_client.project
+    )
     ddl_content = ddl_content.replace("${BIGQUERY_INGESTION_DATASET_ID}", dataset_id)
 
     # Execute DDL statements

@@ -560,9 +560,7 @@ class BigQueryVectorStore:
                 embedding_record = {
                     "chunk_id": chunk_id,
                     "embedding": embedding,
-                    "model": data.get(
-                        "model", self.embedding_model
-                    ),
+                    "model": data.get("model", self.embedding_model),
                     "created_at": now.isoformat(),
                     "partition_date": now.date().isoformat(),
                 }

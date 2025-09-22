@@ -98,10 +98,9 @@ class BigQueryConfigManager:
         try:
             project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
             # Try new standardized variable first, then fall back to legacy
-            dataset_id = (
-                os.getenv("BIGQUERY_EMBEDDINGS_DATASET_ID") or
-                os.getenv("BIGQUERY_DATASET_ID")  # Legacy fallback
-            )
+            dataset_id = os.getenv("BIGQUERY_EMBEDDINGS_DATASET_ID") or os.getenv(
+                "BIGQUERY_DATASET_ID"
+            )  # Legacy fallback
             table_prefix = os.getenv("BIGQUERY_TABLE_PREFIX", "")
             location = os.getenv("BIGQUERY_LOCATION", "us-central1")
 
@@ -115,7 +114,8 @@ class BigQueryConfigManager:
             if not dataset_id:
                 dataset_id = "semantic_gap_detector"
                 logger.warning(
-                    "BIGQUERY_EMBEDDINGS_DATASET_ID not set, using default: %s", dataset_id
+                    "BIGQUERY_EMBEDDINGS_DATASET_ID not set, using default: %s",
+                    dataset_id,
                 )
 
             config = BigQueryConfig(

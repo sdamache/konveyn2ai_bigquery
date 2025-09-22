@@ -191,7 +191,6 @@ class BigQueryVectorIndex(VectorIndex):
             },
         )
 
-
     def similarity_search(
         self,
         query_embedding: List[float],
