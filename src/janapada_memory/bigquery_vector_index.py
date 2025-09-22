@@ -160,6 +160,9 @@ class BigQueryVectorIndex(VectorIndex):
         else:
             self.local_index = None
 
+        # Alias for test compatibility
+        self._local_index = self.local_index
+
         # Statistics tracking
         self.stats = {
             "total_searches": 0,
@@ -171,6 +174,9 @@ class BigQueryVectorIndex(VectorIndex):
         }
 
         self.logger = logging.getLogger(f"{__name__}.{self.index_id[:8]}")
+
+        # For test compatibility - allow direct access to _bigquery_client
+        self._bigquery_client = self.connection.client
 
         self.logger.info(
             "BigQuery vector index initialized",

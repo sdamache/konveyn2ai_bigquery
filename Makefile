@@ -15,7 +15,7 @@
 #   make ingest_mumps    - Ingest MUMPS/VistA dictionaries
 
 .PHONY: help setup migrate run test clean install lint format check-env
-.PHONY: setup-bigquery validate-env install-deps
+.PHONY: setup-bigquery validate-env install-deps compute_metrics
 .PHONY: ingest_k8s ingest_fastapi ingest_cobol ingest_irs ingest_mumps
 
 # Default target
@@ -27,6 +27,7 @@ help:
 	@echo "  make setup     - Create BigQuery dataset, tables and indexes"
 	@echo "  make embeddings - Generate embeddings for BigQuery vector store"
 	@echo "  make migrate   - Migrate vectors from Vertex AI to BigQuery"
+	@echo "  make compute_metrics - Run hybrid gap metrics job"
 	@echo "  make run       - Start BigQuery vector backend API server"
 	@echo "  make test      - Run all tests (contract, integration, unit)"
 	@echo "  make install   - Install all dependencies"
@@ -48,6 +49,11 @@ help:
 	@echo "  make setup-bigquery  - Setup M1 BigQuery tables and environment"
 	@echo "  make validate-env    - Validate M1 environment configuration"
 	@echo "  make install-deps    - Install M1 parser dependencies"
+	@echo ""
+	@echo "Environment setup:"
+	@echo "  make env-embeddings  - Set environment for vector/embedding operations"
+	@echo "  make env-ingestion   - Set environment for M1 ingestion operations"
+	@echo "  make env-help        - Show environment variable documentation"
 
 # Environment check
 check-env:
@@ -125,6 +131,20 @@ embeddings: check-env setup
 		--verbose
 	@echo "✅ Embedding generation completed"
 
+compute_metrics: check-env
+	@echo "📊 Running hybrid gap metrics job..."
+	@PROJECT=$$GOOGLE_CLOUD_PROJECT DATASET=$$BIGQUERY_DATASET_ID; \
+	CMD="venv/bin/python -m src.gap_analysis.pipeline.run_metrics --project $$PROJECT --dataset $$DATASET"; \
+	if [ -n "$$ANALYSIS_ID" ]; then CMD="$$CMD --analysis-id $$ANALYSIS_ID"; fi; \
+	if [ -n "$$RULESET_VERSION" ]; then CMD="$$CMD --ruleset-version $$RULESET_VERSION"; fi; \
+	if [ -n "$$LIMIT" ]; then CMD="$$CMD --limit $$LIMIT"; fi; \
+	if [ "$$DRY_RUN" = "1" ]; then CMD="$$CMD --dry-run"; fi; \
+	if [ "$$JSON" = "1" ]; then CMD="$$CMD --json"; fi; \
+	if [ "$$VERBOSE" = "1" ]; then CMD="$$CMD --verbose"; fi; \
+	echo "Executing: $$CMD"; \
+	eval "$$CMD"
+	@echo "✅ Hybrid gap metrics job finished"
+
 # Run the vector backend API
 run: check-env
 	@echo "🚀 Starting BigQuery vector backend..."
@@ -200,6 +220,76 @@ demo: check-env setup
 	@echo "🎪 Running end-to-end demo..."
 	python demo.py
 
+# BigQuery AI Hackathon Demo Pipeline
+demo_hackathon: check-env
+	@echo "🚀 Running BigQuery AI Hackathon Demo Pipeline..."
+	@echo "=================================================="
+
+	# Step 1: Setup and validate environment
+	@echo "📋 Step 1: Setting up BigQuery environment..."
+	$(MAKE) setup
+
+	# Step 2: Ingest sample data (using test_data)
+	@echo "📥 Step 2: Ingesting sample K8s artifacts..."
+	@if [ ! -d "test_data/k8s-manifests" ]; then \
+		echo "⚠️  test_data/k8s-manifests not found, creating sample data..."; \
+		mkdir -p test_data/k8s-manifests; \
+	fi
+	@if [ -d "test_data/k8s-manifests" ] && [ "$$(ls -A test_data/k8s-manifests)" ]; then \
+		export GOOGLE_CLOUD_PROJECT=$$GOOGLE_CLOUD_PROJECT BIGQUERY_INGESTION_DATASET_ID=$$BIGQUERY_DATASET_ID SOURCE_PATH=test_data/k8s-manifests; \
+		$(MAKE) ingest_k8s; \
+	else \
+		echo "❌ No K8s manifest files found in test_data/k8s-manifests"; \
+		echo "   Please ensure test data exists before running demo"; \
+		exit 1; \
+	fi
+
+	# Step 3: Generate embeddings with BigQuery native vectors
+	@echo "🧠 Step 3: Generating embeddings with BigQuery native vectors..."
+	$(MAKE) embeddings LIMIT=50
+
+	# Step 4: Build semantic candidates with vector search
+	@echo "🔍 Step 4: Building semantic candidates with vector search..."
+	python -m src.gap_analysis.semantic_candidates \
+		--project $$GOOGLE_CLOUD_PROJECT \
+		--dataset $$BIGQUERY_DATASET_ID
+
+	# Step 5: Run hybrid gap analysis
+	@echo "📊 Step 5: Running hybrid gap analysis..."
+	$(MAKE) compute_metrics ANALYSIS_ID=hackathon_demo_$$(date +%Y%m%d_%H%M%S) LIMIT=50
+
+	# Step 6: Create summary view for notebook consumption
+	@echo "📈 Step 6: Creating summary view for notebook..."
+	@echo "Creating gap_metrics_summary view..."
+	sed 's/{project}/$$GOOGLE_CLOUD_PROJECT/g; s/{dataset}/$$BIGQUERY_DATASET_ID/g' configs/sql/gap_analysis_summary_view.sql | bq query --use_legacy_sql=false
+
+	# Step 7: Validate pipeline output
+	@echo "📊 Step 7: Validating pipeline output..."
+	@echo "Checking gap_metrics table for data..."
+	bq query --use_legacy_sql=false --format=prettyjson \
+		"SELECT COUNT(*) as total_records, COUNT(DISTINCT analysis_id) as analysis_runs FROM \`$$GOOGLE_CLOUD_PROJECT.$$BIGQUERY_DATASET_ID.gap_metrics\`" | head -10
+	@echo "Sample from gap_metrics_summary view:"
+	bq query --use_legacy_sql=false --max_rows=3 \
+		"SELECT artifact_type, rule_name, count_passed, count_failed, avg_confidence FROM \`$$GOOGLE_CLOUD_PROJECT.$$BIGQUERY_DATASET_ID.gap_metrics_summary\` LIMIT 3"
+
+	@echo "✅ Pipeline complete! Data ready for notebook visualization."
+	@echo ""
+	@echo "📓 Next steps:"
+	@echo "   1. Open issue6_notebook.py in Jupyter/Colab"
+	@echo "   2. Update BigQuery connection to point to: $$GOOGLE_CLOUD_PROJECT.$$BIGQUERY_DATASET_ID"
+	@echo "   3. Run notebook to generate heat maps and dashboards"
+	@echo ""
+	@echo "🎯 Demo Points for Judges:"
+	@echo "   • BigQuery Native Vector Search (768-dimensional embeddings)"
+	@echo "   • Hybrid scoring (deterministic SQL + semantic similarity)"
+	@echo "   • Real-time gap analysis with confidence scoring"
+	@echo "   • Scalable processing of 100+ artifacts in minutes"
+
+# Quick test with minimal data
+demo_test: check-env
+	@echo "🧪 Running quick demo test with minimal data..."
+	$(MAKE) demo_hackathon LIMIT=5
+
 quickstart-validate:
 	@echo "📋 Validating quickstart guide..."
 	@echo "This will execute the complete quickstart guide end-to-end"
@@ -273,14 +363,14 @@ backup-data:
 # M1 Environment Setup
 validate-env:
 	@echo "🔍 Validating M1 environment configuration..."
-	@if [ -z "$$BQ_PROJECT" ]; then \
-		echo "❌ BQ_PROJECT environment variable not set"; \
-		echo "   Run: export BQ_PROJECT=konveyn2ai"; \
+	@if [ -z "$$GOOGLE_CLOUD_PROJECT" ]; then \
+		echo "❌ GOOGLE_CLOUD_PROJECT environment variable not set"; \
+		echo "   Run: export GOOGLE_CLOUD_PROJECT=konveyn2ai"; \
 		exit 1; \
 	fi
-	@if [ -z "$$BQ_DATASET" ]; then \
-		echo "❌ BQ_DATASET environment variable not set"; \
-		echo "   Run: export BQ_DATASET=source_ingestion"; \
+	@if [ -z "$$BIGQUERY_INGESTION_DATASET_ID" ]; then \
+		echo "❌ BIGQUERY_INGESTION_DATASET_ID environment variable not set"; \
+		echo "   Run: export BIGQUERY_INGESTION_DATASET_ID=source_ingestion"; \
 		exit 1; \
 	fi
 	@echo "✅ M1 environment variables configured"
@@ -299,9 +389,9 @@ install-deps:
 # Setup M1 BigQuery environment
 setup-bigquery: validate-env
 	@echo "🚀 Setting up M1 BigQuery tables and environment..."
-	@echo "Project: $$BQ_PROJECT"
-	@echo "Dataset: $$BQ_DATASET"
-	bash -c "source venv/bin/activate && cd src && python -m cli.main setup --project $$BQ_PROJECT --dataset $$BQ_DATASET"
+	@echo "Project: $$GOOGLE_CLOUD_PROJECT"
+	@echo "Dataset: $$BIGQUERY_INGESTION_DATASET_ID"
+	bash -c "source venv/bin/activate && cd src && python -m cli.main setup --project $$GOOGLE_CLOUD_PROJECT --dataset $$BIGQUERY_INGESTION_DATASET_ID"
 	@echo "✅ M1 BigQuery setup completed"
 
 # =============================================================================
@@ -317,7 +407,7 @@ ingest_k8s: validate-env
 		echo "   Example: make ingest_k8s SOURCE_PATH=./examples/k8s-manifests/"; \
 		exit 1; \
 	fi
-	bash -c "source venv/bin/activate && cd src && python -m cli.main k8s --source ../$$SOURCE_PATH --project $$BQ_PROJECT --dataset $$BQ_DATASET --output bigquery"
+	bash -c "source venv/bin/activate && cd src && python -m cli.main k8s --source ../$$SOURCE_PATH --project $$GOOGLE_CLOUD_PROJECT --dataset $$BIGQUERY_INGESTION_DATASET_ID --output bigquery"
 	@echo "✅ Kubernetes ingestion completed"
 
 # FastAPI project ingestion
@@ -329,7 +419,7 @@ ingest_fastapi: validate-env
 		echo "   Example: make ingest_fastapi SOURCE_PATH=./examples/fastapi-project/"; \
 		exit 1; \
 	fi
-	bash -c "source venv/bin/activate && cd src && python -m cli.main fastapi --source ../$$SOURCE_PATH --project $$BQ_PROJECT --dataset $$BQ_DATASET --output bigquery"
+	bash -c "source venv/bin/activate && cd src && python -m cli.main fastapi --source ../$$SOURCE_PATH --project $$GOOGLE_CLOUD_PROJECT --dataset $$BIGQUERY_INGESTION_DATASET_ID --output bigquery"
 	@echo "✅ FastAPI ingestion completed"
 
 # COBOL copybook ingestion
@@ -341,7 +431,7 @@ ingest_cobol: validate-env
 		echo "   Example: make ingest_cobol SOURCE_PATH=./examples/cobol-copybooks/"; \
 		exit 1; \
 	fi
-	bash -c "source venv/bin/activate && cd src && python -m cli.main cobol --source ../$$SOURCE_PATH --project $$BQ_PROJECT --dataset $$BQ_DATASET --output bigquery"
+	bash -c "source venv/bin/activate && cd src && python -m cli.main cobol --source ../$$SOURCE_PATH --project $$GOOGLE_CLOUD_PROJECT --dataset $$BIGQUERY_INGESTION_DATASET_ID --output bigquery"
 	@echo "✅ COBOL ingestion completed"
 
 # IRS record layout ingestion
@@ -353,7 +443,7 @@ ingest_irs: validate-env
 		echo "   Example: make ingest_irs SOURCE_PATH=./examples/irs-layouts/"; \
 		exit 1; \
 	fi
-	bash -c "source venv/bin/activate && cd src && python -m cli.main irs --source ../$$SOURCE_PATH --project $$BQ_PROJECT --dataset $$BQ_DATASET --output bigquery"
+	bash -c "source venv/bin/activate && cd src && python -m cli.main irs --source ../$$SOURCE_PATH --project $$GOOGLE_CLOUD_PROJECT --dataset $$BIGQUERY_INGESTION_DATASET_ID --output bigquery"
 	@echo "✅ IRS ingestion completed"
 
 # MUMPS/VistA dictionary ingestion
@@ -365,7 +455,7 @@ ingest_mumps: validate-env
 		echo "   Example: make ingest_mumps SOURCE_PATH=./examples/mumps-dictionaries/"; \
 		exit 1; \
 	fi
-	bash -c "source venv/bin/activate && cd src && python -m cli.main mumps --source ../$$SOURCE_PATH --project $$BQ_PROJECT --dataset $$BQ_DATASET --output bigquery"
+	bash -c "source venv/bin/activate && cd src && python -m cli.main mumps --source ../$$SOURCE_PATH --project $$BQ_PROJECT --dataset $$BIGQUERY_INGESTION_DATASET_ID --output bigquery"
 	@echo "✅ MUMPS ingestion completed"
 
 # =============================================================================
@@ -403,3 +493,53 @@ test-m1-integration:
 validate-m1-complete: setup-bigquery test-m1-parsers dry-run-examples
 	@echo "🎯 Complete M1 validation pipeline executed"
 	@echo "✅ M1 Multi-Source Ingestion system ready for production"
+
+# Environment setup commands
+env-embeddings:
+	@echo "🧠 Setting up environment for Vector/Embedding operations..."
+	@echo "export BIGQUERY_EMBEDDINGS_DATASET_ID=semantic_gap_detector"
+	@echo "export BIGQUERY_DATASET_ID=semantic_gap_detector  # Legacy compatibility"
+	@echo ""
+	@echo "Use this for:"
+	@echo "  - janapada_memory tests"
+	@echo "  - Vector search operations"
+	@echo "  - Gap analysis"
+	@echo "  - Embedding schema tests"
+	@echo ""
+	@echo "Run: source <(make env-embeddings)"
+
+env-ingestion:
+	@echo "🔧 Setting up environment for M1 Ingestion operations..."
+	@echo "export BIGQUERY_INGESTION_DATASET_ID=source_ingestion"
+	@echo "export BQ_DATASET=source_ingestion                    # Legacy compatibility"
+	@echo "export BQ_PROJECT=konveyn2ai                          # Legacy compatibility"
+	@echo ""
+	@echo "Use this for:"
+	@echo "  - CLI ingestion commands"
+	@echo "  - Parser tests (K8s, FastAPI, COBOL, etc.)"
+	@echo "  - Source metadata operations"
+	@echo ""
+	@echo "Run: source <(make env-ingestion)"
+
+env-help:
+	@echo "📋 BigQuery Environment Variables Guide"
+	@echo "======================================="
+	@echo ""
+	@echo "🧠 EMBEDDING/VECTOR OPERATIONS (Dataset: semantic_gap_detector):"
+	@echo "   BIGQUERY_EMBEDDINGS_DATASET_ID=semantic_gap_detector"
+	@echo "   Contains: source_embeddings, gap_metrics, semantic_candidates"
+	@echo "   Used by: janapada_memory, vector search, embedding tests"
+	@echo ""
+	@echo "🔧 M1 INGESTION OPERATIONS (Dataset: source_ingestion):"
+	@echo "   BIGQUERY_INGESTION_DATASET_ID=source_ingestion"
+	@echo "   Contains: source_metadata, source_metadata_errors, ingestion_log"
+	@echo "   Used by: CLI parsers, ingestion tests, source metadata"
+	@echo ""
+	@echo "📊 COMMON VARIABLES:"
+	@echo "   GOOGLE_CLOUD_PROJECT=konveyn2ai"
+	@echo "   GOOGLE_CLOUD_LOCATION=us-central1"
+	@echo "   BIGQUERY_LOCATION=us-central1"
+	@echo ""
+	@echo "🔧 SETUP COMMANDS:"
+	@echo "   make env-embeddings  # Set up for vector/embedding work"
+	@echo "   make env-ingestion   # Set up for M1 ingestion work"

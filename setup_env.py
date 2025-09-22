@@ -54,6 +54,14 @@ def check_environment_variables():
 
     optional_vars = ["PERPLEXITY_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS"]
 
+    # BigQuery configuration variables
+    bigquery_vars = {
+        "GOOGLE_CLOUD_PROJECT": "konveyn2ai",
+        "BIGQUERY_DATASET_ID": "semantic_gap_detector",
+        "BIGQUERY_INGESTION_DATASET_ID": "source_ingestion",
+        "BIGQUERY_LOCATION": "us-central1",
+    }
+
     print("🔑 Checking environment variables...")
 
     missing_required = []
@@ -69,6 +77,14 @@ def check_environment_variables():
             print(f"✅ {var} is set (optional)")
         else:
             print(f"⚠️  {var} is not set (optional)")
+
+    print("\n📊 BigQuery Configuration:")
+    for var, default in bigquery_vars.items():
+        value = os.getenv(var)
+        if value:
+            print(f"✅ {var} = {value}")
+        else:
+            print(f"⚠️  {var} not set, will use default: {default}")
 
     return len(missing_required) == 0
 
@@ -133,8 +149,13 @@ def main():
     print("\n📋 Next steps:")
     print("1. Set up your API keys in environment variables")
     print("2. Configure Google Cloud credentials if needed")
-    print("3. Run: python vector_index.py to set up AI Platform")
-    print("4. Start development with the three-tier architecture")
+    print("3. Set appropriate BigQuery dataset for your task:")
+    print("   📊 For embedding/vector tests:")
+    print("      export BIGQUERY_DATASET_ID=semantic_gap_detector")
+    print("   🔧 For ingestion/parser tests:")
+    print("      export BIGQUERY_INGESTION_DATASET_ID=source_ingestion")
+    print("4. Run: python vector_index.py to set up AI Platform")
+    print("5. Start development with the three-tier architecture")
 
     # Check if .memory folder exists
     if Path(".memory").exists():

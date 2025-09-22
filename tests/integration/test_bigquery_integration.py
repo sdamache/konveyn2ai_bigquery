@@ -138,8 +138,8 @@ class TestBigQueryIntegration:
 
     def test_empty_similarity_search(self, bigquery_vector_index):
         """Test similarity search with empty table (should not error)."""
-        # Use a dummy 3072-dimension vector (Gemini embedding size)
-        query_vector = [0.1] * 3072
+        # Use a dummy 768-dimension vector (Gemini embedding size)
+        query_vector = [0.1] * 768
 
         try:
             results = bigquery_vector_index.similarity_search(query_vector, k=5)
@@ -157,8 +157,8 @@ class TestBigQueryIntegration:
         """Test adding vectors and searching for them."""
         # Test data
         test_vectors = [
-            ("test_chunk_1", [0.1] * 3072),
-            ("test_chunk_2", [0.2] * 3072),
+            ("test_chunk_1", [0.1] * 768),
+            ("test_chunk_2", [0.2] * 768),
         ]
 
         try:
@@ -167,7 +167,7 @@ class TestBigQueryIntegration:
             assert add_result["success"] or len(add_result["errors"]) == 0
 
             # Search for similar vectors
-            query_vector = [0.15] * 3072  # Between the test vectors
+            query_vector = [0.15] * 768  # Between the test vectors
             results = bigquery_vector_index.similarity_search(query_vector, k=5)
 
             assert isinstance(results, list)
@@ -211,7 +211,7 @@ class TestBigQueryIntegration:
             mock_search_failure,
         )
 
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
         results = bigquery_vector_index.similarity_search(query_vector, k=5)
 
         # Should still return results (potentially empty) from fallback
@@ -224,7 +224,7 @@ class TestBigQueryIntegration:
         """Test that similarity search meets performance requirements."""
         import time
 
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
         start_time = time.time()
 
         try:
@@ -250,7 +250,7 @@ class TestBigQueryIntegration:
         initial_stats = bigquery_vector_index.get_stats()
         initial_searches = initial_stats["total_searches"]
 
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
         try:
             bigquery_vector_index.similarity_search(query_vector, k=5)
         except Exception:

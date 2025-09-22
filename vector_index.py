@@ -15,7 +15,7 @@ load_dotenv()
 # Project configuration from CLAUDE.md
 PROJECT_ID = "konveyn2ai"
 LOCATION = "us-central1"
-VECTOR_DIMENSIONS = 3072
+VECTOR_DIMENSIONS = 768
 APPROXIMATE_NEIGHBORS_COUNT = 150
 DISTANCE_MEASURE_TYPE = "COSINE_DISTANCE"
 
@@ -62,7 +62,7 @@ def create_vector_index(index_display_name="konveyn2ai-code-index"):
     try:
         print(f"🔧 Creating vector index: {index_display_name}")
 
-        # Create a 3072-dim index for code/doc embeddings, using cosine similarity
+        # Create a 768-dim index for code/doc embeddings, using cosine similarity
         index = aiplatform.MatchingEngineIndex.create_tree_ah_index(
             display_name=index_display_name,
             dimensions=VECTOR_DIMENSIONS,

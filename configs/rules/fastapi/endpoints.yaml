@@ -1,0 +1,101 @@
+rule_name: "fastapi_endpoint_documentation"
+artifact_type: "fastapi"
+version: "1.0.0"
+description: "Validates that FastAPI endpoints have comprehensive docstrings and parameter documentation"
+evaluation_sql: |
+  WITH doc_eval AS (
+    SELECT 
+      chunk_id,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'"""[\s\S]*?"""') 
+           THEN true ELSE false END as has_docstring,
+      CASE WHEN LENGTH(REGEXP_EXTRACT(text_content, r'"""([\s\S]*?)"""')) > 50
+           THEN true ELSE false END as has_adequate_docs,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'@app\.(get|post|put|delete|patch)')
+           THEN true ELSE false END as is_endpoint,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'response_model\s*=')
+           THEN true ELSE false END as has_response_model
+    FROM source_metadata 
+    WHERE artifact_type = 'fastapi' 
+      AND (api_path LIKE '%endpoint%' OR REGEXP_CONTAINS(text_content, r'@app\.'))
+  )
+  SELECT 
+    chunk_id,
+    (has_docstring AND has_adequate_docs AND has_response_model) as passed,
+    (CAST(has_docstring as INT64) * 0.4 + 
+     CAST(has_adequate_docs as INT64) * 0.4 + 
+     CAST(has_response_model as INT64) * 0.2) as confidence
+  FROM doc_eval
+  WHERE is_endpoint = true
+confidence_weights:
+  docstring_present: 0.4
+  adequate_documentation: 0.4
+  response_model_defined: 0.2
+severity: 2
+suggested_fix_template: "Improve endpoint documentation: {{#missing_docstring}}Add comprehensive docstring{{/missing_docstring}}{{#inadequate_docs}}{{#missing_docstring}}, {{/missing_docstring}}expand documentation to explain parameters and return values{{/inadequate_docs}}{{#missing_response_model}}{{#missing_docstring}}{{#inadequate_docs}}, {{/inadequate_docs}}{{/missing_docstring}}{{^missing_docstring}}{{#inadequate_docs}}, {{/inadequate_docs}}{{/missing_docstring}}add response_model parameter{{/missing_response_model}}"
+enabled: true
+tags: ["documentation", "fastapi", "endpoints", "api"]
+quality_thresholds:
+  min_content_length: 50
+  required_fields: []
+  field_patterns:
+    docstring: '"""[\s\S]*?"""'
+    endpoint_decorator: '@app\.(get|post|put|delete|patch)'
+metadata:
+  author: "api-team"
+  created_date: "2025-01-09"
+  review_frequency: "quarterly"
+  semantic_guidance: "Probe nearby endpoint docstrings when deterministic checks are inconclusive."
+semantic_probe:
+  query_text: |
+    FastAPI endpoint docstring thoroughly documents parameters, responses, and usage examples.
+  top_k: 6
+  similarity_threshold: 0.6
+  weight: 0.25
+  notes: "Boosts confidence if similar endpoints already maintain strong documentation patterns."
+
+---
+rule_name: "fastapi_error_handling"
+artifact_type: "fastapi"
+version: "1.0.0"
+description: "Validates that FastAPI endpoints implement proper error handling with HTTP exception responses"
+evaluation_sql: |
+  WITH error_eval AS (
+    SELECT 
+      chunk_id,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'HTTPException|raise|except')
+           THEN true ELSE false END as has_error_handling,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'status_code\s*=\s*[45]\d\d')
+           THEN true ELSE false END as has_http_status,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'try:\s*[\s\S]*?except')
+           THEN true ELSE false END as has_try_except
+    FROM source_metadata 
+    WHERE artifact_type = 'fastapi'
+      AND REGEXP_CONTAINS(text_content, r'@app\.(get|post|put|delete|patch)')
+  )
+  SELECT 
+    chunk_id,
+    (has_error_handling AND (has_http_status OR has_try_except)) as passed,
+    (CAST(has_error_handling as INT64) * 0.6 + 
+     CAST(has_http_status as INT64) * 0.2 + 
+     CAST(has_try_except as INT64) * 0.2) as confidence
+  FROM error_eval
+confidence_weights:
+  error_handling_present: 0.6
+  http_status_codes: 0.2
+  try_except_blocks: 0.2
+severity: 4
+suggested_fix_template: "Add error handling: {{#missing_error_handling}}implement HTTPException or try/except blocks{{/missing_error_handling}}{{#missing_status_codes}}{{#missing_error_handling}}, {{/missing_error_handling}}include appropriate HTTP status codes (4xx/5xx){{/missing_status_codes}}"
+enabled: true
+tags: ["error_handling", "fastapi", "reliability", "best_practices"]
+metadata:
+  author: "api-team"
+  created_date: "2025-01-09"
+  review_frequency: "monthly"
+  semantic_guidance: "Search for peers that demonstrate structured HTTP exception handling."
+semantic_probe:
+  query_text: |
+    FastAPI endpoint demonstrates HTTPException usage with specific status codes and contextual messages.
+  top_k: 5
+  similarity_threshold: 0.55
+  weight: 0.2
+  notes: "Uses semantic neighbors to infer best-practice patterns for robust error handling."

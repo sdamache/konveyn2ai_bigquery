@@ -1,0 +1,6 @@
+Preface — Issue #5 (Deterministic Rules & Scoring → gap_metrics)
+What: Define deterministic, configurable rules and scoring functions to flag insufficient documentation/metadata across artifact types (Kubernetes, FastAPI, COBOL, IRS, MUMPS). Compute a gap_metrics table with chunk_id, artifact_type, rule_name, passed, confidence (0–1), severity (1–5), suggested_fix.
+Why: Transparent, reproducible rubric that powers heat maps and progress views.
+Constraints: Config-driven rules; deterministic & idempotent compute; single command to run; store rule version/config hash for traceability.
+Source Issue (verbatim): <<< paste Issue #5 text here, unedited >>>
+Acceptance Criteria (verbatim): <<< paste AC bullets here, unedited >>>

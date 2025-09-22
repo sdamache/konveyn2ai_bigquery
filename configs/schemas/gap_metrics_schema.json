@@ -1,0 +1,305 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://konveyn2ai.com/schemas/gap_metrics_schema.json",
+  "title": "Gap Metrics Output Schema",
+  "description": "Conceptual schema definition for gap_metrics table columns with field semantics, ranges, and constraints",
+  "type": "object",
+  "required": [
+    "chunk_id",
+    "artifact_type", 
+    "rule_name",
+    "passed",
+    "confidence",
+    "severity",
+    "suggested_fix",
+    "analysis_id",
+    "created_at",
+    "ruleset_version",
+    "partition_date"
+  ],
+  "properties": {
+    "chunk_id": {
+      "type": "string",
+      "description": "Foreign key linking to source_metadata.chunk_id for traceability",
+      "pattern": "^[a-zA-Z0-9_\\-:/\\.]+$",
+      "minLength": 1,
+      "maxLength": 255,
+      "semantic_meaning": "Unique identifier for the evaluated content chunk",
+      "data_lineage": "source_metadata.chunk_id",
+      "examples": [
+        "k8s-manifests/deployment.yaml:chunk_1",
+        "src/api/users.py:get_user_profile",
+        "copybooks/CUSTOMER.cpy:record_def"
+      ]
+    },
+    "artifact_type": {
+      "type": "string",
+      "enum": ["kubernetes", "fastapi", "cobol", "irs", "mumps"],
+      "description": "Type of artifact that was evaluated, must match source_metadata.artifact_type",
+      "semantic_meaning": "Classification of the evaluated content for rule applicability",
+      "data_lineage": "source_metadata.artifact_type",
+      "validation_rule": "Must match source_metadata.artifact_type for the same chunk_id"
+    },
+    "rule_name": {
+      "type": "string", 
+      "pattern": "^[a-z0-9_]+$",
+      "minLength": 3,
+      "maxLength": 50,
+      "description": "Unique identifier of the rule that was applied",
+      "semantic_meaning": "Reference to the specific rule configuration used for evaluation",
+      "data_lineage": "configs/rules/{artifact_type}/*.yaml:rule_name",
+      "examples": [
+        "kubernetes_deployment_description",
+        "fastapi_endpoint_documentation", 
+        "cobol_data_item_documentation"
+      ]
+    },
+    "passed": {
+      "type": "boolean",
+      "description": "Binary result of rule evaluation: true if all criteria met, false otherwise",
+      "semantic_meaning": "Deterministic pass/fail outcome based on rule-specific criteria",
+      "calculation_logic": "true = all required fields present AND quality thresholds met; false = any requirement failed",
+      "examples": [true, false]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "multipleOf": 0.001,
+      "description": "Confidence score indicating evaluation certainty (0.0 = no confidence, 1.0 = perfect confidence)",
+      "semantic_meaning": "Quantitative measure of how certain the evaluation is, based on completeness and quality factors",
+      "calculation_formula": "base_completeness * quality_multiplier - penalty_deductions",
+      "range_interpretation": {
+        "0.9-1.0": "High confidence - comprehensive documentation present",
+        "0.7-0.89": "Good confidence - most requirements met with minor gaps",
+        "0.5-0.69": "Moderate confidence - significant requirements met but notable issues",
+        "0.3-0.49": "Low confidence - many gaps or quality issues present", 
+        "0.0-0.29": "Very low confidence - critical information missing or poor quality"
+      },
+      "examples": [0.875, 0.234, 1.0, 0.0]
+    },
+    "severity": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Impact severity level following 5x5 risk matrix standard",
+      "semantic_meaning": "Business impact assessment of the identified gap",
+      "severity_levels": {
+        "1": {
+          "label": "Low",
+          "description": "Cosmetic issues, minor documentation improvements",
+          "impact": "No operational impact",
+          "examples": ["Missing optional descriptions", "Formatting inconsistencies"]
+        },
+        "2": {
+          "label": "Moderate", 
+          "description": "Minor functionality gaps, incomplete parameter documentation",
+          "impact": "Minor inconvenience to developers/operators",
+          "examples": ["Missing API parameter docs", "Incomplete help text"]
+        },
+        "3": {
+          "label": "Medium",
+          "description": "Operational impact, missing required fields or incomplete specifications", 
+          "impact": "May cause confusion or inefficiency",
+          "examples": ["Missing resource constraints", "No error handling documentation"]
+        },
+        "4": {
+          "label": "High",
+          "description": "Service degradation risk, critical metadata absent",
+          "impact": "Could lead to operational issues or security risks",
+          "examples": ["No security specifications", "Missing validation rules"]
+        },
+        "5": {
+          "label": "Critical",
+          "description": "System failure risk, fundamental documentation missing",
+          "impact": "High risk of system failure or security breach",
+          "examples": ["No authentication specs", "Critical process undocumented"]
+        }
+      },
+      "escalation_rules": {
+        "confidence_based": "confidence < 0.2 → minimum severity 4",
+        "critical_fields": "missing critical security/safety fields → severity 5",
+        "compliance": "regulatory compliance gaps → severity 4-5"
+      },
+      "examples": [1, 2, 3, 4, 5]
+    },
+    "suggested_fix": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "description": "Actionable remediation guidance for addressing the identified gap",
+      "semantic_meaning": "Human-readable instructions for fixing the documentation gap",
+      "content_requirements": {
+        "tone": "Action-oriented language using imperative verbs (Add, Update, Include)",
+        "specificity": "Include specific field names and expected values where possible",
+        "constraints": "No implementation details or code snippets, focus on what not how",
+        "length": "Maximum 500 characters for readability in dashboards"
+      },
+      "template_source": "Generated from rule-specific Mustache templates with context substitution",
+      "examples": [
+        "Add description annotation: metadata.annotations.description = 'Service purpose and functionality'",
+        "Include response_model parameter and comprehensive docstring explaining parameters and return values",
+        "Add PIC clause comments for data types and field descriptions with business meaning"
+      ]
+    },
+    "analysis_id": {
+      "type": "string",
+      "pattern": "^[0-9]{8}-[0-9]{6}-[a-f0-9]{6}$",
+      "description": "Unique identifier for the batch execution run",
+      "semantic_meaning": "Groups all metrics generated in a single pipeline execution for traceability",
+      "format": "YYYYMMDD-HHMMSS-RANDOM6",
+      "examples": ["20250109-143022-abc123", "20250109-150045-def456"]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the gap metric was calculated (ISO 8601 format)",
+      "semantic_meaning": "Audit trail for when the evaluation occurred",
+      "timezone": "UTC",
+      "examples": ["2025-01-09T14:30:22.123Z", "2025-01-09T15:00:45.789Z"]
+    },
+    "ruleset_version": {
+      "type": "string",
+      "pattern": "^v\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of the rule configuration used for evaluation",
+      "semantic_meaning": "Enables tracking of rule evolution and result comparability over time",
+      "format": "vX.Y.Z following semantic versioning",
+      "version_strategy": {
+        "major": "Breaking changes to evaluation logic",
+        "minor": "New rules added, backward compatible", 
+        "patch": "Bug fixes, clarifications"
+      },
+      "examples": ["v1.0.0", "v1.2.3", "v2.0.0"]
+    },
+    "rule_metadata": {
+      "type": "object",
+      "description": "Additional context about the rule evaluation (optional)",
+      "properties": {
+        "execution_time_ms": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Time taken to evaluate this rule in milliseconds"
+        },
+        "rule_author": {
+          "type": "string",
+          "description": "Team or individual who authored the rule"
+        },
+        "confidence_breakdown": {
+          "type": "object",
+          "description": "Detailed breakdown of confidence score components"
+        }
+      }
+    },
+    "partition_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date for BigQuery partitioning optimization (YYYY-MM-DD)",
+      "semantic_meaning": "Enables efficient querying and data lifecycle management",
+      "partitioning_strategy": "Daily partitions for efficient queries and data retention",
+      "examples": ["2025-01-09", "2025-01-10"]
+    }
+  },
+  "conceptual_keys": {
+    "primary_key": {
+      "description": "Logical primary key for idempotency and uniqueness",
+      "components": ["chunk_id", "rule_name", "ruleset_version"],
+      "rationale": "Ensures one result per chunk-rule-version combination"
+    },
+    "foreign_keys": {
+      "source_metadata": {
+        "local_field": "chunk_id",
+        "reference_table": "source_metadata", 
+        "reference_field": "chunk_id",
+        "relationship": "many-to-one"
+      }
+    },
+    "indexes": {
+      "performance_indexes": [
+        "chunk_id",
+        "rule_name", 
+        "analysis_id",
+        "partition_date"
+      ],
+      "analytical_indexes": [
+        "artifact_type",
+        "passed",
+        "severity",
+        "ruleset_version"
+      ]
+    }
+  },
+  "data_quality_constraints": {
+    "referential_integrity": [
+      {
+        "constraint": "chunk_id_exists",
+        "description": "Every gap_metrics.chunk_id must exist in source_metadata.chunk_id",
+        "validation_sql": "SELECT COUNT(*) FROM gap_metrics gm LEFT JOIN source_metadata sm ON gm.chunk_id = sm.chunk_id WHERE sm.chunk_id IS NULL"
+      }
+    ],
+    "business_rules": [
+      {
+        "rule": "confidence_severity_correlation",
+        "description": "Very low confidence (< 0.2) should have severity >= 4",
+        "validation_sql": "SELECT COUNT(*) FROM gap_metrics WHERE confidence < 0.2 AND severity < 4"
+      },
+      {
+        "rule": "passed_confidence_alignment", 
+        "description": "Passed rules should generally have higher confidence than failed rules",
+        "validation_sql": "SELECT AVG(confidence) as avg_conf, passed FROM gap_metrics GROUP BY passed"
+      }
+    ],
+    "data_freshness": [
+      {
+        "requirement": "analysis_currency",
+        "description": "Gap metrics should not be older than 30 days for active monitoring",
+        "validation_sql": "SELECT COUNT(*) FROM gap_metrics WHERE created_at < DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)"
+      }
+    ]
+  },
+  "aggregation_patterns": {
+    "coverage_metrics": {
+      "description": "Calculate rule coverage across artifact types",
+      "sql": "SELECT artifact_type, COUNT(DISTINCT rule_name) as rules_applied, COUNT(*) as total_evaluations FROM gap_metrics GROUP BY artifact_type"
+    },
+    "quality_trends": {
+      "description": "Track documentation quality over time",
+      "sql": "SELECT DATE(created_at) as eval_date, AVG(confidence) as avg_confidence, AVG(CAST(passed as INT64)) as pass_rate FROM gap_metrics GROUP BY DATE(created_at) ORDER BY eval_date"
+    },
+    "severity_distribution": {
+      "description": "Analyze severity distribution for prioritization",
+      "sql": "SELECT severity, COUNT(*) as issue_count, AVG(confidence) as avg_confidence FROM gap_metrics WHERE passed = false GROUP BY severity ORDER BY severity"
+    }
+  },
+  "examples": [
+    {
+      "kubernetes_deployment_pass": {
+        "chunk_id": "k8s-manifests/deployment.yaml:chunk_1",
+        "artifact_type": "kubernetes",
+        "rule_name": "kubernetes_deployment_description", 
+        "passed": true,
+        "confidence": 0.875,
+        "severity": 3,
+        "suggested_fix": "Documentation meets requirements",
+        "analysis_id": "20250109-143022-abc123",
+        "created_at": "2025-01-09T14:30:22.123Z",
+        "ruleset_version": "v1.0.0",
+        "partition_date": "2025-01-09"
+      }
+    },
+    {
+      "fastapi_endpoint_fail": {
+        "chunk_id": "src/api/users.py:get_user_profile",
+        "artifact_type": "fastapi",
+        "rule_name": "fastapi_endpoint_documentation",
+        "passed": false,
+        "confidence": 0.234,
+        "severity": 2,
+        "suggested_fix": "Add comprehensive docstring explaining parameters and return values, include response_model parameter",
+        "analysis_id": "20250109-143022-abc123", 
+        "created_at": "2025-01-09T14:30:25.456Z",
+        "ruleset_version": "v1.0.0",
+        "partition_date": "2025-01-09"
+      }
+    }
+  ]
+}

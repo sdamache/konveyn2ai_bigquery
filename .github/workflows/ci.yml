@@ -114,8 +114,7 @@ jobs:
       env:
         GOOGLE_CLOUD_PROJECT: 'konveyn2ai'
         BIGQUERY_DATASET_ID: 'semantic_gap_detector'
-        BQ_DATASET: 'source_ingestion'
-        BQ_PROJECT: 'konveyn2ai'
+        BIGQUERY_INGESTION_DATASET_ID: 'source_ingestion'
       run: |
         echo "🧪 Running tests with TDD-aware evaluation"
         PYTHONPATH=src python -c "

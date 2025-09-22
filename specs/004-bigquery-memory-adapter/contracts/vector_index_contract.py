@@ -15,7 +15,7 @@ class VectorIndex(ABC):
     """Abstract interface that MUST be preserved exactly."""
 
     @abstractmethod
-    def similarity_search(self, query_vector: List[float], top_k: int) -> List[dict]:
+    def similarity_search(self, query_vector: List[float], k: int) -> List[dict]:
         """Return top_k most similar vectors ordered by ascending distance."""
         pass
 
@@ -42,7 +42,7 @@ class TestVectorIndexContract:
 
     def test_similarity_search_returns_correct_type(self, vector_index):
         """similarity_search must return List[dict] with required fields."""
-        query_vector = [0.1] * 3072  # Gemini embedding dimension
+        query_vector = [0.1] * 768  # Gemini embedding dimension
         results = vector_index.similarity_search(query_vector, k=5)
 
         assert isinstance(results, list)
@@ -56,7 +56,7 @@ class TestVectorIndexContract:
 
     def test_similarity_search_orders_by_distance(self, vector_index):
         """Results must be ordered by ascending distance."""
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
         results = vector_index.similarity_search(query_vector, k=10)
 
         if len(results) > 1:
@@ -67,7 +67,7 @@ class TestVectorIndexContract:
 
     def test_similarity_search_respects_top_k(self, vector_index):
         """Must not return more than top_k results."""
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
 
         for k in [1, 5, 10, 50]:
             results = vector_index.similarity_search(query_vector, k=k)
@@ -75,7 +75,7 @@ class TestVectorIndexContract:
 
     def test_similarity_search_handles_empty_index(self, vector_index):
         """Must handle empty index gracefully."""
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
         results = vector_index.similarity_search(query_vector, k=5)
         assert isinstance(results, list)  # May be empty, but must be list
 
@@ -90,7 +90,7 @@ class TestVectorIndexContract:
 
     def test_add_vectors_interface(self, vector_index):
         """add_vectors must accept List[Tuple[str, List[float]]]."""
-        vectors = [("test_chunk_1", [0.1] * 3072), ("test_chunk_2", [0.2] * 3072)]
+        vectors = [("test_chunk_1", [0.1] * 768), ("test_chunk_2", [0.2] * 768)]
 
         # Should not raise exception
         vector_index.add_vectors(vectors)
@@ -103,7 +103,7 @@ class TestVectorIndexContract:
     def test_bigquery_fallback_transparency(self, vector_index):
         """BigQuery failures must be transparent to interface contract."""
         # This test will verify fallback behavior maintains interface
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
 
         # Force BigQuery error (mocked in actual implementation)
         results = vector_index.similarity_search(query_vector, k=5)
@@ -135,7 +135,7 @@ class TestBigQuerySpecificContract:
 
     def test_fallback_activation_logging(self, bigquery_index, caplog, monkeypatch):
         """Must log fallback activation with structured data."""
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
 
         # Force BigQuery error to trigger fallback
         from src.janapada_memory.adapters.bigquery_adapter import BigQueryAdapterError

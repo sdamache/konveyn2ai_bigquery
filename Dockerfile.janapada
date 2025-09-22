@@ -13,12 +13,8 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy requirements first for better caching
-COPY src/janapada-memory/requirements.txt ./janapada-requirements.txt
-COPY src/common/requirements.txt ./common-requirements.txt
-
-# Create consolidated requirements file
-RUN cat janapada-requirements.txt common-requirements.txt > requirements.txt
+# Copy consolidated requirements file
+COPY requirements.txt ./requirements.txt
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --user -r requirements.txt
@@ -44,7 +40,7 @@ COPY --from=builder /root/.local /home/appuser/.local
 # Copy application code
 COPY src/common/ ./src/common/
 COPY src/guard_fort/ ./src/guard_fort/
-COPY src/janapada-memory/ ./src/janapada-memory/
+COPY src/janapada_memory/ ./src/janapada_memory/
 
 # Set ownership to appuser
 RUN chown -R appuser:appuser /app
@@ -75,5 +71,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
 # Run the application  
-WORKDIR /app/src/janapada-memory
+WORKDIR /app/src/janapada_memory
 CMD ["sh", "-c", "PYTHONPATH=/app:/app/src python -m uvicorn main:app --host 0.0.0.0 --port 8080"]

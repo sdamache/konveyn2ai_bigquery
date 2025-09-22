@@ -16,6 +16,13 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+# Import datetime utilities
+from .datetime_utils import (
+    prepare_metadata_for_json,
+    safe_datetime_serializer,
+    json_dumps_safe,
+)
+
 from google.api_core import retry
 from google.cloud import bigquery
 from google.cloud.bigquery import WriteDisposition
@@ -109,8 +116,11 @@ class BigQueryWriter:
         batch_config: Optional[BatchConfig] = None,
         tool_version: Optional[str] = None,
     ):
-        self.project_id = project_id or os.getenv("BQ_PROJECT", "konveyn2ai")
-        self.dataset_id = dataset_id or os.getenv("BQ_DATASET", "source_ingestion")
+        self.project_id = project_id or os.getenv("GOOGLE_CLOUD_PROJECT", "konveyn2ai")
+        self.dataset_id = dataset_id or (
+            os.getenv("BIGQUERY_INGESTION_DATASET_ID")
+            or os.getenv("BQ_DATASET", "source_ingestion")  # Legacy fallback
+        )
         self.location = location
         self.batch_config = batch_config or BatchConfig()
         self.tool_version = tool_version or os.getenv("KONVEYN_TOOL_VERSION", "1.0.0")
@@ -571,11 +581,17 @@ class BigQueryWriter:
             source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
         )
 
-        # Convert rows to NDJSON
-        ndjson_data = "\n".join(json.dumps(row) for row in rows)
+        # Prepare rows for BigQuery by converting to JSON-safe format
+        # Use our custom serializer to handle datetime objects
+        safe_rows = []
+        for row in rows:
+            # Convert to JSON string and back to ensure everything is serializable
+            json_str = json_dumps_safe(row)
+            safe_row = json.loads(json_str)
+            safe_rows.append(safe_row)
 
         job = self.client.load_table_from_json(
-            json_rows=rows, destination=table_ref, job_config=job_config
+            json_rows=safe_rows, destination=table_ref, job_config=job_config
         )
 
         job.result(timeout=self.batch_config.timeout_seconds)

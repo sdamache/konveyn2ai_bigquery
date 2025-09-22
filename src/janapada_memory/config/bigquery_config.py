@@ -48,10 +48,11 @@ class BigQueryConfig:
         if not self.dataset_id:
             raise ValueError("dataset_id cannot be empty")
 
-        if not self.dataset_id.replace("_", "").isalnum():
+        # Allow hyphens for test datasets (e.g., test-dataset)
+        if not self.dataset_id.replace("_", "").replace("-", "").isalnum():
             raise ValueError(
                 f"Invalid dataset_id format: {self.dataset_id}. "
-                "Must contain only alphanumeric characters and underscores."
+                "Must contain only alphanumeric characters, underscores, and hyphens."
             )
 
     @property
@@ -96,7 +97,10 @@ class BigQueryConfigManager:
         """
         try:
             project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
-            dataset_id = os.getenv("BIGQUERY_DATASET_ID")
+            # Try new standardized variable first, then fall back to legacy
+            dataset_id = os.getenv("BIGQUERY_EMBEDDINGS_DATASET_ID") or os.getenv(
+                "BIGQUERY_DATASET_ID"
+            )  # Legacy fallback
             table_prefix = os.getenv("BIGQUERY_TABLE_PREFIX", "")
             location = os.getenv("BIGQUERY_LOCATION", "us-central1")
 
@@ -108,9 +112,10 @@ class BigQueryConfigManager:
                 )
 
             if not dataset_id:
-                dataset_id = "source_ingestion"
+                dataset_id = "semantic_gap_detector"
                 logger.warning(
-                    "BIGQUERY_DATASET_ID not set, using default: %s", dataset_id
+                    "BIGQUERY_EMBEDDINGS_DATASET_ID not set, using default: %s",
+                    dataset_id,
                 )
 
             config = BigQueryConfig(

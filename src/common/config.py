@@ -32,7 +32,7 @@ class Config:
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "info")
 
     # Vector Index Configuration
-    VECTOR_DIMENSIONS: int = int(os.getenv("VECTOR_DIMENSIONS", "3072"))
+    VECTOR_DIMENSIONS: int = int(os.getenv("VECTOR_DIMENSIONS", "768"))
     SIMILARITY_METRIC: str = os.getenv("SIMILARITY_METRIC", "cosine")
     APPROXIMATE_NEIGHBORS_COUNT: int = int(
         os.getenv("APPROXIMATE_NEIGHBORS_COUNT", "150")

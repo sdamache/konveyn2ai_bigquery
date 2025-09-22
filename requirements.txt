@@ -13,6 +13,7 @@
 
 # Core Google Cloud AI Platform dependencies
 google-cloud-aiplatform==1.42.1
+google-cloud-artifact-registry==1.16.1
 google-genai==1.27.0
 
 # BigQuery Vector Backend dependencies (NEW)
@@ -60,3 +61,4 @@ kr8s==0.10.0
 libcst==1.1.0
 ulid-py==1.1.0
 python-cobol==0.1.4
+google-cloud-run==0.11.0

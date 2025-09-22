@@ -29,10 +29,10 @@ class TestBigQueryPerformanceContract:
 
     def test_similarity_search_500ms_timeout_requirement(self, bigquery_vector_index):
         """similarity_search must complete within 500ms timeout (primary requirement)."""
-        query_vector = [0.1] * 3072  # Gemini embedding dimension
+        query_vector = [0.1] * 768  # Gemini embedding dimension
 
         start_time = time.time()
-        results = bigquery_vector_index.similarity_search(query_vector, top_k=10)
+        results = bigquery_vector_index.similarity_search(query_vector, k=10)
         elapsed = time.time() - start_time
 
         # Primary performance requirement from specification
@@ -43,12 +43,12 @@ class TestBigQueryPerformanceContract:
 
     def test_batch_similarity_search_performance(self, bigquery_vector_index):
         """Batch operations should maintain acceptable performance."""
-        query_vectors = [[0.1] * 3072, [0.2] * 3072, [0.3] * 3072]
+        query_vectors = [[0.1] * 768, [0.2] * 768, [0.3] * 768]
 
         start_time = time.time()
 
         for query_vector in query_vectors:
-            results = bigquery_vector_index.similarity_search(query_vector, top_k=5)
+            results = bigquery_vector_index.similarity_search(query_vector, k=5)
             assert isinstance(results, list)
 
         elapsed = time.time() - start_time
@@ -59,12 +59,12 @@ class TestBigQueryPerformanceContract:
         ), f"Batch search took {elapsed:.3f}s, too slow for 3 queries"
 
     def test_large_top_k_performance(self, bigquery_vector_index):
-        """Large top_k values should not cause significant performance degradation."""
-        query_vector = [0.1] * 3072
+        """Large k values should not cause significant performance degradation."""
+        query_vector = [0.1] * 768
 
         # Test with maximum reasonable top_k
         start_time = time.time()
-        results = bigquery_vector_index.similarity_search(query_vector, top_k=100)
+        results = bigquery_vector_index.similarity_search(query_vector, k=100)
         elapsed = time.time() - start_time
 
         # Should still meet reasonable performance even with large result sets
@@ -76,14 +76,14 @@ class TestBigQueryPerformanceContract:
         """Concurrent similarity searches should maintain performance."""
         import threading
 
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
         results_container = []
         errors_container = []
 
         def search_worker():
             try:
                 start_time = time.time()
-                results = bigquery_vector_index.similarity_search(query_vector, top_k=5)
+                results = bigquery_vector_index.similarity_search(query_vector, k=5)
                 elapsed = time.time() - start_time
                 results_container.append((results, elapsed))
             except Exception as e:
@@ -123,11 +123,11 @@ class TestBigQueryPerformanceContract:
 
     def test_cold_start_performance(self, bigquery_vector_index):
         """First search (cold start) should meet performance requirements."""
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
 
         # Simulate cold start by ensuring no prior operations
         start_time = time.time()
-        results = bigquery_vector_index.similarity_search(query_vector, top_k=5)
+        results = bigquery_vector_index.similarity_search(query_vector, k=5)
         elapsed = time.time() - start_time
 
         # Cold start should still meet performance requirement
@@ -136,7 +136,7 @@ class TestBigQueryPerformanceContract:
 
     def test_fallback_performance_requirement(self, bigquery_vector_index):
         """Fallback to local search should also meet performance requirements."""
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
 
         # Force fallback by mocking BigQuery failure
         with patch.object(
@@ -159,7 +159,7 @@ class TestBigQueryPerformanceContract:
     @pytest.mark.parametrize("top_k", [1, 5, 10, 25, 50])
     def test_performance_scaling_with_top_k(self, bigquery_vector_index, top_k):
         """Performance should scale reasonably with different k values."""
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
 
         start_time = time.time()
         results = bigquery_vector_index.similarity_search(query_vector, k=top_k)
@@ -177,7 +177,7 @@ class TestBigQueryPerformanceContract:
         import psutil
         import os
 
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
         process = psutil.Process(os.getpid())
 
         # Get baseline memory usage
@@ -185,7 +185,7 @@ class TestBigQueryPerformanceContract:
 
         # Perform multiple searches
         for _ in range(5):
-            results = bigquery_vector_index.similarity_search(query_vector, top_k=10)
+            results = bigquery_vector_index.similarity_search(query_vector, k=10)
             assert isinstance(results, list)
 
         # Check memory usage after operations
@@ -210,13 +210,13 @@ class TestPerformanceBaseline:
 
     def test_establish_bigquery_performance_baseline(self, bigquery_vector_index):
         """Establish baseline performance metrics for BigQuery operations."""
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
         measurements = []
 
         # Take multiple measurements for statistical validity
         for i in range(5):
             start_time = time.time()
-            results = bigquery_vector_index.similarity_search(query_vector, top_k=10)
+            results = bigquery_vector_index.similarity_search(query_vector, k=10)
             elapsed = time.time() - start_time
             measurements.append(elapsed)
             assert isinstance(results, list)
@@ -240,7 +240,7 @@ class TestPerformanceBaseline:
 
     def test_establish_fallback_performance_baseline(self, bigquery_vector_index):
         """Establish baseline performance metrics for fallback operations."""
-        query_vector = [0.1] * 3072
+        query_vector = [0.1] * 768
         measurements = []
 
         # Force fallback mode

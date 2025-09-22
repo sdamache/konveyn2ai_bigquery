@@ -1,0 +1,95 @@
+rule_name: "mumps_fileman_field_documentation"
+artifact_type: "mumps"
+version: "1.0.0"
+description: "Validates that MUMPS/VistA FileMan dictionary entries have proper field definitions and descriptions"
+evaluation_sql: |
+  WITH fileman_eval AS (
+    SELECT 
+      chunk_id,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'\^DD\([0-9,.]+\)')
+           THEN true ELSE false END as has_dd_reference,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'"[A-Z][A-Za-z\s]{10,}"')
+           THEN true ELSE false END as has_description,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'INPUT\s+TRANSFORM:|INPUT TRANSFORM:')
+           THEN true ELSE false END as has_input_transform,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'TYPE:|Type:')
+           THEN true ELSE false END as has_type_info,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'HELP-PROMPT:|Help-Prompt:')
+           THEN true ELSE false END as has_help_prompt
+    FROM source_metadata 
+    WHERE artifact_type = 'mumps'
+  )
+  SELECT 
+    chunk_id,
+    (has_dd_reference AND has_description AND (has_type_info OR has_help_prompt)) as passed,
+    (CAST(has_dd_reference as INT64) * 0.2 + 
+     CAST(has_description as INT64) * 0.4 + 
+     CAST(has_type_info as INT64) * 0.2 + 
+     CAST(has_help_prompt as INT64) * 0.2) as confidence
+  FROM fileman_eval
+confidence_weights:
+  dd_reference_present: 0.2
+  description_present: 0.4
+  type_information: 0.2
+  help_prompt_present: 0.2
+severity: 3
+suggested_fix_template: "Add FileMan documentation: {{#missing_dd_ref}}DD reference structure{{/missing_dd_ref}}{{#missing_description}}{{#missing_dd_ref}}, {{/missing_dd_ref}}field description with business meaning{{/missing_description}}{{#missing_type}}{{#missing_dd_ref}}{{#missing_description}}, {{/missing_description}}{{/missing_dd_ref}}{{^missing_dd_ref}}{{#missing_description}}, {{/missing_description}}{{/missing_dd_ref}}field type information{{/missing_type}}{{#missing_help}}{{#missing_dd_ref}}{{#missing_description}}{{#missing_type}}, {{/missing_type}}{{/missing_description}}{{/missing_dd_ref}}{{^missing_dd_ref}}{{#missing_description}}{{#missing_type}}, {{/missing_type}}{{/missing_description}}{{^missing_description}}{{#missing_type}}, {{/missing_type}}{{/missing_description}}{{/missing_dd_ref}}help prompt for users{{/missing_help}}"
+enabled: true
+tags: ["documentation", "mumps", "fileman", "vista", "healthcare"]
+quality_thresholds:
+  min_content_length: 15
+  field_patterns:
+    dd_reference: '\^DD\([0-9,.]+\)'
+    description: '"[A-Za-z\s]{10,}"'
+    input_transform: 'INPUT\s+TRANSFORM:|INPUT TRANSFORM:'
+metadata:
+  author: "healthcare-systems-team"
+  created_date: "2025-01-09"
+  review_frequency: "annually"
+
+---
+rule_name: "mumps_routine_documentation"
+artifact_type: "mumps"
+version: "1.0.0"
+description: "Validates that MUMPS routines have proper header documentation and purpose statements"
+evaluation_sql: |
+  WITH routine_eval AS (
+    SELECT 
+      chunk_id,
+      CASE WHEN REGEXP_CONTAINS(text_content, r'^[A-Z][A-Z0-9]*\s*;')
+           THEN true ELSE false END as has_routine_header,
+      CASE WHEN REGEXP_CONTAINS(text_content, r';;[0-9.]+;[A-Z\s]+;[A-Z\s]+;')
+           THEN true ELSE false END as has_version_info,
+      CASE WHEN REGEXP_CONTAINS(text_content, r';;\s*PURPOSE:|;;\s*DESCRIPTION:|;;\s*Function:')
+           THEN true ELSE false END as has_purpose,
+      CASE WHEN REGEXP_CONTAINS(text_content, r';;\s*INPUT:|;;\s*PARAMETERS:|;;\s*Arguments:')
+           THEN true ELSE false END as has_input_docs,
+      CASE WHEN REGEXP_CONTAINS(text_content, r';;\s*OUTPUT:|;;\s*RETURNS:|;;\s*Return:')
+           THEN true ELSE false END as has_output_docs
+    FROM source_metadata 
+    WHERE artifact_type = 'mumps'
+      AND REGEXP_CONTAINS(text_content, r'^[A-Z][A-Z0-9]*\s*[;\s]')
+  )
+  SELECT 
+    chunk_id,
+    (has_routine_header AND has_purpose AND (has_input_docs OR has_output_docs)) as passed,
+    (CAST(has_routine_header as INT64) * 0.2 + 
+     CAST(has_version_info as INT64) * 0.1 + 
+     CAST(has_purpose as INT64) * 0.4 + 
+     CAST(has_input_docs as INT64) * 0.15 + 
+     CAST(has_output_docs as INT64) * 0.15) as confidence
+  FROM routine_eval
+confidence_weights:
+  routine_header_present: 0.2
+  version_information: 0.1
+  purpose_documented: 0.4
+  input_documentation: 0.15
+  output_documentation: 0.15
+severity: 2
+suggested_fix_template: "Add routine documentation: {{#missing_header}}routine header with name{{/missing_header}}{{#missing_purpose}}{{#missing_header}}, {{/missing_header}}PURPOSE or DESCRIPTION comment{{/missing_purpose}}{{#missing_input}}{{#missing_header}}{{#missing_purpose}}, {{/missing_purpose}}{{/missing_header}}{{^missing_header}}{{#missing_purpose}}, {{/missing_purpose}}{{/missing_header}}INPUT parameter documentation{{/missing_input}}{{#missing_output}}{{#missing_header}}{{#missing_purpose}}{{#missing_input}}, {{/missing_input}}{{/missing_purpose}}{{/missing_header}}{{^missing_header}}{{#missing_purpose}}{{#missing_input}}, {{/missing_input}}{{/missing_purpose}}{{^missing_purpose}}{{#missing_input}}, {{/missing_input}}{{/missing_purpose}}{{/missing_header}}OUTPUT or RETURNS documentation{{/missing_output}}"
+enabled: true
+tags: ["documentation", "mumps", "routines", "vista", "healthcare"]
+metadata:
+  author: "healthcare-systems-team"
+  created_date: "2025-01-09"
+  review_frequency: "annually"
