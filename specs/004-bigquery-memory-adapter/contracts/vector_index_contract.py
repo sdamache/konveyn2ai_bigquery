@@ -15,7 +15,7 @@ class VectorIndex(ABC):
     """Abstract interface that MUST be preserved exactly."""
 
     @abstractmethod
-    def similarity_search(self, query_vector: List[float], top_k: int) -> List[dict]:
+    def similarity_search(self, query_vector: List[float], k: int) -> List[dict]:
         """Return top_k most similar vectors ordered by ascending distance."""
         pass
 

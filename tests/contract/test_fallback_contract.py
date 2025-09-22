@@ -152,7 +152,7 @@ class TestBigQueryFallbackContract:
         with patch.object(bigquery_vector_index, "_bigquery_client") as mock_client:
             mock_client.query.side_effect = NotFound("Table missing")
 
-            results = bigquery_vector_index.similarity_search(query_vector, top_k=5)
+            results = bigquery_vector_index.similarity_search(query_vector, k=5)
 
             # Verify structured logging
             assert "fallback" in caplog.text.lower()
@@ -166,7 +166,7 @@ class TestBigQueryFallbackContract:
         with patch.object(bigquery_vector_index, "_bigquery_client") as mock_client:
             mock_client.query.side_effect = NotFound("Simulated failure")
 
-            results = bigquery_vector_index.similarity_search(query_vector, top_k=5)
+            results = bigquery_vector_index.similarity_search(query_vector, k=5)
 
             if results:
                 # Verify correlation tracking metadata
@@ -187,7 +187,7 @@ class TestBigQueryFallbackContract:
             mock_query_job.__iter__ = Mock(return_value=iter(mock_results))
             mock_client.query.return_value = mock_query_job
 
-            results = bigquery_vector_index.similarity_search(query_vector, top_k=5)
+            results = bigquery_vector_index.similarity_search(query_vector, k=5)
 
             # Verify BigQuery was used, not fallback
             if results:
@@ -239,7 +239,7 @@ class TestFallbackErrorHandling:
             mock_client.query.side_effect = NotFound("Triggering fallback")
 
             start_time = time.time()
-            results = bigquery_vector_index.similarity_search(query_vector, top_k=5)
+            results = bigquery_vector_index.similarity_search(query_vector, k=5)
             elapsed = time.time() - start_time
 
             # Even with fallback, should complete within reasonable time

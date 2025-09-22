@@ -32,7 +32,7 @@ class TestBigQueryPerformanceContract:
         query_vector = [0.1] * 768  # Gemini embedding dimension
 
         start_time = time.time()
-        results = bigquery_vector_index.similarity_search(query_vector, top_k=10)
+        results = bigquery_vector_index.similarity_search(query_vector, k=10)
         elapsed = time.time() - start_time
 
         # Primary performance requirement from specification
@@ -48,7 +48,7 @@ class TestBigQueryPerformanceContract:
         start_time = time.time()
 
         for query_vector in query_vectors:
-            results = bigquery_vector_index.similarity_search(query_vector, top_k=5)
+            results = bigquery_vector_index.similarity_search(query_vector, k=5)
             assert isinstance(results, list)
 
         elapsed = time.time() - start_time
@@ -59,12 +59,12 @@ class TestBigQueryPerformanceContract:
         ), f"Batch search took {elapsed:.3f}s, too slow for 3 queries"
 
     def test_large_top_k_performance(self, bigquery_vector_index):
-        """Large top_k values should not cause significant performance degradation."""
+        """Large k values should not cause significant performance degradation."""
         query_vector = [0.1] * 768
 
         # Test with maximum reasonable top_k
         start_time = time.time()
-        results = bigquery_vector_index.similarity_search(query_vector, top_k=100)
+        results = bigquery_vector_index.similarity_search(query_vector, k=100)
         elapsed = time.time() - start_time
 
         # Should still meet reasonable performance even with large result sets
@@ -83,7 +83,7 @@ class TestBigQueryPerformanceContract:
         def search_worker():
             try:
                 start_time = time.time()
-                results = bigquery_vector_index.similarity_search(query_vector, top_k=5)
+                results = bigquery_vector_index.similarity_search(query_vector, k=5)
                 elapsed = time.time() - start_time
                 results_container.append((results, elapsed))
             except Exception as e:
@@ -127,7 +127,7 @@ class TestBigQueryPerformanceContract:
 
         # Simulate cold start by ensuring no prior operations
         start_time = time.time()
-        results = bigquery_vector_index.similarity_search(query_vector, top_k=5)
+        results = bigquery_vector_index.similarity_search(query_vector, k=5)
         elapsed = time.time() - start_time
 
         # Cold start should still meet performance requirement
@@ -185,7 +185,7 @@ class TestBigQueryPerformanceContract:
 
         # Perform multiple searches
         for _ in range(5):
-            results = bigquery_vector_index.similarity_search(query_vector, top_k=10)
+            results = bigquery_vector_index.similarity_search(query_vector, k=10)
             assert isinstance(results, list)
 
         # Check memory usage after operations
@@ -216,7 +216,7 @@ class TestPerformanceBaseline:
         # Take multiple measurements for statistical validity
         for i in range(5):
             start_time = time.time()
-            results = bigquery_vector_index.similarity_search(query_vector, top_k=10)
+            results = bigquery_vector_index.similarity_search(query_vector, k=10)
             elapsed = time.time() - start_time
             measurements.append(elapsed)
             assert isinstance(results, list)
