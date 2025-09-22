@@ -874,6 +874,123 @@ class BigQueryConnectionManager:
                 },
             )
 
+    def list_tables(self):
+        """
+        List all tables in the dataset.
+
+        Returns:
+            List of table references
+        """
+        correlation_id = str(uuid.uuid4())
+
+        try:
+            dataset_ref = self.client.dataset(self.config.dataset_id)
+            tables = list(self.client.list_tables(dataset_ref))
+
+            self.logger.info(
+                f"Listed {len(tables)} tables from dataset",
+                extra={
+                    "connection_id": self.connection_id,
+                    "correlation_id": correlation_id,
+                    "dataset_id": self.config.dataset_id,
+                    "table_count": len(tables),
+                },
+            )
+
+            return tables
+
+        except Exception as e:
+            self.logger.error(
+                "Failed to list tables",
+                extra={
+                    "connection_id": self.connection_id,
+                    "correlation_id": correlation_id,
+                    "dataset_id": self.config.dataset_id,
+                    "error": str(e),
+                },
+            )
+            raise BigQueryConnectionError(f"Failed to list tables: {e}", e)
+
+    def get_table(self, table_name: str):
+        """
+        Get table reference and metadata.
+
+        Args:
+            table_name: Name of the table
+
+        Returns:
+            BigQuery Table object
+        """
+        correlation_id = str(uuid.uuid4())
+
+        try:
+            table_ref = self.client.dataset(self.config.dataset_id).table(table_name)
+            table = self.client.get_table(table_ref)
+
+            self.logger.info(
+                "Retrieved table metadata",
+                extra={
+                    "connection_id": self.connection_id,
+                    "correlation_id": correlation_id,
+                    "table_name": table_name,
+                    "num_rows": table.num_rows,
+                    "num_bytes": table.num_bytes,
+                },
+            )
+
+            return table
+
+        except Exception as e:
+            self.logger.error(
+                "Failed to get table",
+                extra={
+                    "connection_id": self.connection_id,
+                    "correlation_id": correlation_id,
+                    "table_name": table_name,
+                    "error": str(e),
+                },
+            )
+            raise BigQueryConnectionError(f"Failed to get table {table_name}: {e}", e)
+
+    def get_dataset(self):
+        """
+        Get dataset reference and metadata.
+
+        Returns:
+            BigQuery Dataset object
+        """
+        correlation_id = str(uuid.uuid4())
+
+        try:
+            dataset_ref = self.client.dataset(self.config.dataset_id)
+            dataset = self.client.get_dataset(dataset_ref)
+
+            self.logger.info(
+                "Retrieved dataset metadata",
+                extra={
+                    "connection_id": self.connection_id,
+                    "correlation_id": correlation_id,
+                    "dataset_id": self.config.dataset_id,
+                    "location": dataset.location,
+                },
+            )
+
+            return dataset
+
+        except Exception as e:
+            self.logger.error(
+                "Failed to get dataset",
+                extra={
+                    "connection_id": self.connection_id,
+                    "correlation_id": correlation_id,
+                    "dataset_id": self.config.dataset_id,
+                    "error": str(e),
+                },
+            )
+            raise BigQueryConnectionError(
+                f"Failed to get dataset {self.config.dataset_id}: {e}", e
+            )
+
     def __enter__(self):
         """Context manager entry."""
         return self

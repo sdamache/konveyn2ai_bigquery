@@ -203,7 +203,7 @@ steps:
       - '--port'
       - '8080'
       - '--set-env-vars'
-      - 'GOOGLE_CLOUD_PROJECT=${PROJECT_ID},DOCUMENTATION_DATASET=${_DOCUMENTATION_DATASET}'
+      - 'GOOGLE_CLOUD_PROJECT=${PROJECT_ID},BIGQUERY_DATASET_ID=${_BIGQUERY_DATASET_ID}'
       - '--service-account'
       - '${_SERVICE_ACCOUNT_EMAIL}'
       - '--allow-unauthenticated'
@@ -223,7 +223,7 @@ substitutions:
   _INDEX_ID: ${INDEX_ID}
   _GOOGLE_API_KEY: ${GOOGLE_API_KEY}
   _CLOUD_RUN_HASH: uc
-  _DOCUMENTATION_DATASET: documentation_ops
+  _BIGQUERY_DATASET_ID: semantic_gap_detector
 
 # Options for the build
 options:

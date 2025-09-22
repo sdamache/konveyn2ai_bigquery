@@ -14,7 +14,7 @@ from google.api_core import exceptions as gcloud_exceptions
 from google.cloud import bigquery
 
 DEFAULT_PROJECT = "konveyn2ai"
-DEFAULT_DATASET = "documentation_ops"
+DEFAULT_DATASET = "semantic_gap_detector"
 DEFAULT_TABLE = "documentation_progress_snapshots"
 DEFAULT_OUTPUT_DIR = Path("reports")
 
@@ -37,7 +37,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--dataset",
-        default=os.getenv("DOCUMENTATION_DATASET", DEFAULT_DATASET),
+        default=os.getenv("BIGQUERY_DATASET_ID", DEFAULT_DATASET),
         help="Dataset containing the progress table",
     )
     parser.add_argument(
@@ -119,7 +119,9 @@ def load_progress_data(
         ORDER BY snapshot_date
     """
     job_config = bigquery.QueryJobConfig(query_parameters=parameters)
-    df = client.query(query, job_config=job_config).to_dataframe(create_bqstorage_client=False)
+    df = client.query(query, job_config=job_config).to_dataframe(
+        create_bqstorage_client=False
+    )
     if df.empty:
         return df
     df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
@@ -203,14 +205,19 @@ def compute_highlights(progress: pd.DataFrame) -> dict[str, float | None]:
     latest = progress.iloc[-1]
     earliest = progress.iloc[0]
     return {
-        "coverage_delta": float(latest["coverage_percentage"] - earliest["coverage_percentage"])
-        if pd.notna(latest["coverage_percentage"]) and pd.notna(earliest["coverage_percentage"])
-        else None,
+        "coverage_delta": (
+            float(latest["coverage_percentage"] - earliest["coverage_percentage"])
+            if pd.notna(latest["coverage_percentage"])
+            and pd.notna(earliest["coverage_percentage"])
+            else None
+        ),
         "gaps_closed": float(progress["total_gaps_closed"].sum()),
         "gaps_open_latest": float(latest["total_gaps_open"]),
-        "mean_confidence": float(latest["mean_confidence_score"])
-        if pd.notna(latest["mean_confidence_score"])
-        else None,
+        "mean_confidence": (
+            float(latest["mean_confidence_score"])
+            if pd.notna(latest["mean_confidence_score"])
+            else None
+        ),
     }
 
 
@@ -231,7 +238,9 @@ def render_markdown(
     ]
     coverage_delta = highlights["coverage_delta"]
     if coverage_delta is not None:
-        lines.append(f"- Coverage changed by **{coverage_delta:+.2f} ppts** across the period.")
+        lines.append(
+            f"- Coverage changed by **{coverage_delta:+.2f} ppts** across the period."
+        )
     lines.append(
         f"- Cumulative gaps closed: **{int(highlights['gaps_closed'])}** (latest open gaps: {int(highlights['gaps_open_latest'])})."
     )
@@ -248,7 +257,9 @@ def render_markdown(
     )
     summary_df = progress.copy()
     summary_df["snapshot_date"] = summary_df["snapshot_date"].dt.date
-    summary_df["coverage_percentage"] = summary_df["coverage_percentage"].map(lambda v: f"{v:.2f}")
+    summary_df["coverage_percentage"] = summary_df["coverage_percentage"].map(
+        lambda v: f"{v:.2f}"
+    )
     summary_df["mean_confidence_score"] = summary_df["mean_confidence_score"].map(
         lambda v: "n/a" if pd.isna(v) else f"{v:.2f}"
     )
@@ -272,7 +283,9 @@ def render_markdown(
                 f"## Severity Distribution (Snapshot {severity['snapshot_date'].iloc[0].date()})",
             ]
         )
-        severity_table = severity[["severity", "gaps_detected", "gaps_closed", "gaps_open"]]
+        severity_table = severity[
+            ["severity", "gaps_detected", "gaps_closed", "gaps_open"]
+        ]
         lines.append(severity_table.to_markdown(index=False))
 
     if rule_closures is not None and not rule_closures.empty:
@@ -314,12 +327,16 @@ def main(argv: list[str] | None = None) -> int:
     if progress_df.empty:
         raise SystemExit("No progress snapshots were found for the requested window.")
 
-    severity_df = load_latest_severity(client, args.project_id, args.dataset, args.table)
-    rule_df = load_latest_rule_closures(client, args.project_id, args.dataset, args.table)
+    severity_df = load_latest_severity(
+        client, args.project_id, args.dataset, args.table
+    )
+    rule_df = load_latest_rule_closures(
+        client, args.project_id, args.dataset, args.table
+    )
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    formats = {fmt.strip().lower() for fmt in args.formats.split(',') if fmt.strip()}
+    formats = {fmt.strip().lower() for fmt in args.formats.split(",") if fmt.strip()}
     timestamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
     base_name = f"progress_report_{progress_df['snapshot_date'].min().date()}_{progress_df['snapshot_date'].max().date()}_{timestamp}"
 

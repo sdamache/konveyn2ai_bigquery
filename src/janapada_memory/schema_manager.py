@@ -74,6 +74,67 @@ class SchemaManager:
             bigquery.SchemaField("generated_at", "TIMESTAMP", mode="REQUIRED"),
             bigquery.SchemaField("partition_date", "DATE", mode="REQUIRED"),
         ],
+        "documentation_progress_snapshots": [
+            bigquery.SchemaField("snapshot_date", "DATE", mode="REQUIRED"),
+            bigquery.SchemaField("snapshot_timestamp", "TIMESTAMP", mode="REQUIRED"),
+            bigquery.SchemaField("run_id", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("metrics_version", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("total_chunks_processed", "INT64", mode="REQUIRED"),
+            bigquery.SchemaField("total_chunks_documented", "INT64", mode="REQUIRED"),
+            bigquery.SchemaField("coverage_percentage", "NUMERIC", mode="REQUIRED"),
+            bigquery.SchemaField("total_gaps_detected", "INT64", mode="REQUIRED"),
+            bigquery.SchemaField("total_gaps_open", "INT64", mode="REQUIRED"),
+            bigquery.SchemaField("total_gaps_closed", "INT64", mode="REQUIRED"),
+            bigquery.SchemaField("mean_confidence_score", "NUMERIC", mode="NULLABLE"),
+            bigquery.SchemaField(
+                "severity_distribution",
+                "RECORD",
+                mode="REPEATED",
+                fields=[
+                    bigquery.SchemaField("severity", "STRING", mode="REQUIRED"),
+                    bigquery.SchemaField("gaps_detected", "INT64", mode="REQUIRED"),
+                    bigquery.SchemaField("gaps_open", "INT64", mode="REQUIRED"),
+                    bigquery.SchemaField("gaps_closed", "INT64", mode="REQUIRED"),
+                ],
+            ),
+            bigquery.SchemaField(
+                "gaps_closed_by_rule",
+                "RECORD",
+                mode="REPEATED",
+                fields=[
+                    bigquery.SchemaField("rule_id", "STRING", mode="REQUIRED"),
+                    bigquery.SchemaField("rule_name", "STRING", mode="REQUIRED"),
+                    bigquery.SchemaField("gaps_closed", "INT64", mode="REQUIRED"),
+                ],
+            ),
+            bigquery.SchemaField("metadata", "JSON", mode="NULLABLE"),
+            bigquery.SchemaField("partition_date", "DATE", mode="REQUIRED"),
+        ],
+        "documentation_chunk_metrics": [
+            bigquery.SchemaField("chunk_id", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("source", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("artifact_type", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("documented", "BOOLEAN", mode="REQUIRED"),
+            bigquery.SchemaField("confidence_score", "NUMERIC", mode="NULLABLE"),
+            bigquery.SchemaField("processing_method", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("processed_at", "TIMESTAMP", mode="REQUIRED"),
+            bigquery.SchemaField("metadata", "JSON", mode="NULLABLE"),
+            bigquery.SchemaField("partition_date", "DATE", mode="REQUIRED"),
+        ],
+        "documentation_gap_history": [
+            bigquery.SchemaField("gap_id", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("chunk_id", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("rule_id", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("rule_name", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("status", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("severity", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("detected_at", "TIMESTAMP", mode="REQUIRED"),
+            bigquery.SchemaField("status_at", "TIMESTAMP", mode="REQUIRED"),
+            bigquery.SchemaField("closed_at", "TIMESTAMP", mode="NULLABLE"),
+            bigquery.SchemaField("gap_description", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("metadata", "JSON", mode="NULLABLE"),
+            bigquery.SchemaField("partition_date", "DATE", mode="REQUIRED"),
+        ],
     }
 
     # Clustering configuration
@@ -83,6 +144,9 @@ class SchemaManager:
         "gap_metrics": ["analysis_id", "metric_type", "chunk_id"],
         "semantic_probe_embeddings": ["rule_name", "artifact_type"],
         "semantic_candidates": ["rule_name", "artifact_type", "neighbor_rank"],
+        "documentation_progress_snapshots": ["run_id", "metrics_version"],
+        "documentation_chunk_metrics": ["artifact_type", "documented", "chunk_id"],
+        "documentation_gap_history": ["gap_id", "status", "rule_id"],
     }
 
     def __init__(
@@ -231,9 +295,15 @@ class SchemaManager:
         table = bigquery.Table(table_ref, schema=self.SCHEMAS[table_name])
 
         # Configure partitioning
+        # Use snapshot_date for documentation_progress_snapshots, partition_date for others
+        partition_field = (
+            "snapshot_date"
+            if table_name == "documentation_progress_snapshots"
+            else "partition_date"
+        )
         table.time_partitioning = bigquery.TimePartitioning(
             type_=bigquery.TimePartitioningType.DAY,
-            field="partition_date",
+            field=partition_field,
             expiration_ms=partition_expiration_days * 24 * 60 * 60 * 1000,
         )
 
@@ -253,7 +323,7 @@ class SchemaManager:
             ],
             "partitioning": {
                 "type": "TIME",
-                "field": "partition_date",
+                "field": partition_field,
                 "expiration_days": partition_expiration_days,
             },
             "clustering": self.CLUSTERING_CONFIG.get(table_name, []),
@@ -379,53 +449,63 @@ class SchemaManager:
             table_info = []
 
             for table in tables:
-                # Handle both string table names and TableListItem objects
-                if isinstance(table, str):
-                    table_id = table
-                    full_table = self.connection.get_table(table_id)
-                    table_data = {
-                        "name": table_id,
-                        "full_name": f"{self.project_id}.{self.dataset_id}.{table_id}",
-                        "table_type": "TABLE",
-                    }
-                else:
-                    # Get full table metadata since TableListItem has limited info
-                    full_table = self.connection.get_table(table.table_id)
-                    table_data = {
-                        "name": table.table_id,
-                        "full_name": table.full_table_id,
-                        "table_type": table.table_type,
-                    }
-
-                # Add common fields
-                table_data["num_rows"] = full_table.num_rows
-                table_data["num_bytes"] = full_table.num_bytes
-                table_data["created"] = (
-                    full_table.created.isoformat() if full_table.created else None
-                )
-                table_data["modified"] = (
-                    full_table.modified.isoformat() if full_table.modified else None
-                )
+                table_data = {
+                    "name": table.table_id,
+                    "full_name": table.full_table_id,
+                    "table_type": table.table_type,
+                    "num_rows": getattr(table, "num_rows", 0),
+                    "num_bytes": getattr(table, "num_bytes", 0),
+                    "created": (
+                        table.created.isoformat()
+                        if hasattr(table, "created") and table.created
+                        else None
+                    ),
+                    "modified": (
+                        getattr(table, "modified", None).isoformat()
+                        if hasattr(table, "modified")
+                        and getattr(table, "modified", None)
+                        else None
+                    ),
+                }
 
                 if include_schema:
-                    table_data["schema"] = [
-                        {
-                            "name": field.name,
-                            "type": field.field_type,
-                            "mode": field.mode,
-                        }
-                        for field in full_table.schema
-                    ]
+                    try:
+                        full_table = self.connection.get_table(table.table_id)
+                        table_data["schema"] = [
+                            {
+                                "name": getattr(field, "name", str(field)),
+                                "type": getattr(field, "field_type", "UNKNOWN"),
+                                "mode": getattr(field, "mode", "NULLABLE"),
+                            }
+                            for field in full_table.schema
+                            if hasattr(field, "name") or isinstance(field, str)
+                        ]
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to get schema for table {table.table_id}: {e}"
+                        )
+                        table_data["schema"] = []
 
-                    if full_table.time_partitioning:
-                        table_data["partitioning"] = {
-                            "type": full_table.time_partitioning.type_.name,
-                            "field": full_table.time_partitioning.field,
-                            "expiration_ms": full_table.time_partitioning.expiration_ms,
-                        }
+                    try:
+                        if (
+                            hasattr(full_table, "time_partitioning")
+                            and full_table.time_partitioning
+                        ):
+                            table_data["partitioning"] = {
+                                "type": full_table.time_partitioning.type_.name,
+                                "field": full_table.time_partitioning.field,
+                                "expiration_ms": full_table.time_partitioning.expiration_ms,
+                            }
 
-                    if full_table.clustering_fields:
-                        table_data["clustering"] = full_table.clustering_fields
+                        if (
+                            hasattr(full_table, "clustering_fields")
+                            and full_table.clustering_fields
+                        ):
+                            table_data["clustering"] = full_table.clustering_fields
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to get partitioning/clustering info for {table.table_id}: {e}"
+                        )
 
                 table_info.append(table_data)
 
@@ -447,12 +527,13 @@ class SchemaManager:
             Index listing with status
         """
         try:
-            # Query information schema for vector indexes
+            # Try to query information schema for vector indexes
+            # Note: VECTOR_INDEXES schema may not be available in all BigQuery editions
             query = f"""
             SELECT
                 index_name,
                 table_name,
-                indexed_columns,
+                CAST(NULL AS STRING) as column_name,
                 index_type,
                 status,
                 coverage_percentage
@@ -468,9 +549,7 @@ class SchemaManager:
                     {
                         "name": row.index_name,
                         "table": row.table_name,
-                        "column": (
-                            row.indexed_columns[0] if row.indexed_columns else None
-                        ),
+                        "column": getattr(row, "column_name", None),
                         "index_type": row.index_type,
                         "status": row.status,
                         "coverage_percentage": (
@@ -484,7 +563,7 @@ class SchemaManager:
             return {"indexes": indexes, "count": len(indexes)}
 
         except Exception as e:
-            logger.error(f"Failed to list indexes: {e}")
+            logger.warning(f"Vector indexes information schema not available: {e}")
             # Return empty list if information schema is not available
             return {"indexes": [], "count": 0}
 
@@ -750,7 +829,7 @@ class SchemaManager:
 
         # Check for missing tables
         for table_name, table_info in validation_result["tables"].items():
-            # Skip error entries that are strings, not table info dicts
+            # Skip error entries (they are strings, not dicts)
             if isinstance(table_info, str):
                 continue
             if not table_info.get("exists", False):
@@ -773,6 +852,78 @@ class SchemaManager:
                 )
 
         return recommendations
+
+    def create_gap_metrics_summary_view(self) -> dict[str, Any]:
+        """
+        Create gap_metrics_summary view for notebook compatibility.
+
+        Returns:
+            View creation result
+        """
+        try:
+            from pathlib import Path
+            import re
+
+            # Read the view SQL template
+            view_sql_path = (
+                Path(__file__).parent.parent.parent
+                / "analytics"
+                / "sql"
+                / "create_gap_metrics_summary_view.sql"
+            )
+
+            if not view_sql_path.exists():
+                raise FileNotFoundError(f"View SQL template not found: {view_sql_path}")
+
+            with open(view_sql_path, "r") as f:
+                view_sql = f.read()
+
+            # Replace template variables
+            view_sql = view_sql.replace("{{ project_id }}", self.project_id)
+            view_sql = view_sql.replace("{{ dataset }}", self.dataset_id)
+
+            # Execute view creation
+            query_job = self.connection.client.query(view_sql)
+            query_job.result()  # Wait for completion
+
+            logger.info("Created gap_metrics_summary view successfully")
+
+            return {
+                "view_name": "gap_metrics_summary",
+                "full_name": f"{self.project_id}.{self.dataset_id}.gap_metrics_summary",
+                "created_at": datetime.now().isoformat(),
+                "status": "SUCCESS",
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to create gap_metrics_summary view: {e}")
+            raise
+
+    def create_all_tables(self) -> dict[str, Any]:
+        """
+        Create all tables, views, and dataset for CLI usage.
+
+        Returns:
+            Creation results
+        """
+        # Create dataset first
+        dataset_result = self.create_dataset()
+
+        # Create all tables
+        tables_result = self.create_tables()
+
+        # Create views for notebook compatibility
+        try:
+            view_result = self.create_gap_metrics_summary_view()
+            tables_result["views_created"] = [view_result]
+        except Exception as e:
+            logger.warning(f"Failed to create views: {e}")
+            tables_result["view_errors"] = [str(e)]
+
+        return {
+            "dataset": dataset_result,
+            "tables": tables_result,
+        }
 
     def delete_table(self, table_name: str, not_found_ok: bool = True) -> None:
         """Delete a table."""
@@ -802,3 +953,65 @@ class SchemaManager:
         except Exception as e:
             logger.error(f"Failed to delete all tables: {e}")
             raise
+
+
+def main():
+    """CLI interface for schema manager."""
+    import sys
+    import argparse
+
+    parser = argparse.ArgumentParser(description="BigQuery Schema Manager")
+    parser.add_argument(
+        "command",
+        choices=["create-all", "validate", "list-tables"],
+        help="Command to execute",
+    )
+    parser.add_argument(
+        "--project",
+        help="Google Cloud project ID",
+        default=None,
+    )
+    parser.add_argument(
+        "--dataset",
+        help="BigQuery dataset ID",
+        default=None,
+    )
+
+    args = parser.parse_args()
+
+    try:
+        schema_manager = SchemaManager(
+            project_id=args.project,
+            dataset_id=args.dataset,
+        )
+
+        if args.command == "create-all":
+            print("🚀 Creating BigQuery dataset and tables...")
+            result = schema_manager.create_all_tables()
+            print(f"✅ Dataset created: {result['dataset']['dataset_id']}")
+            print(f"✅ Tables created: {len(result['tables']['tables_created'])}")
+            for table in result["tables"]["tables_created"]:
+                print(f"   - {table['name']}")
+
+        elif args.command == "validate":
+            print("🔍 Validating schema...")
+            result = schema_manager.validate_schema()
+            print(f"Status: {result['overall_status']}")
+            if result["recommendations"]:
+                print("Recommendations:")
+                for rec in result["recommendations"]:
+                    print(f"  - {rec}")
+
+        elif args.command == "list-tables":
+            print("📋 Listing tables...")
+            result = schema_manager.list_tables()
+            for table in result["tables"]:
+                print(f"  - {table['name']} ({table['num_rows']} rows)")
+
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

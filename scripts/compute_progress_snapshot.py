@@ -26,7 +26,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--dataset",
-        default=os.getenv("DOCUMENTATION_DATASET", "documentation_ops"),
+        default=os.getenv("BIGQUERY_DATASET_ID", "semantic_gap_detector"),
         help="BigQuery dataset containing documentation metrics",
     )
     parser.add_argument(
@@ -83,7 +83,10 @@ def main(argv: list[str] | None = None) -> int:
     if not template_path.exists():
         raise FileNotFoundError(f"SQL template not found: {template_path}")
 
-    run_id = args.run_id or f"progress-{args.snapshot_date.isoformat()}-{uuid.uuid4().hex[:8]}"
+    run_id = (
+        args.run_id
+        or f"progress-{args.snapshot_date.isoformat()}-{uuid.uuid4().hex[:8]}"
+    )
 
     replacements = {
         "{{ project_id }}": args.project_id,
@@ -103,9 +106,13 @@ def main(argv: list[str] | None = None) -> int:
     client = bigquery.Client(project=args.project_id)
     job_config = bigquery.QueryJobConfig(
         query_parameters=[
-            bigquery.ScalarQueryParameter("snapshot_date", "DATE", args.snapshot_date.isoformat()),
+            bigquery.ScalarQueryParameter(
+                "snapshot_date", "DATE", args.snapshot_date.isoformat()
+            ),
             bigquery.ScalarQueryParameter("run_id", "STRING", run_id),
-            bigquery.ScalarQueryParameter("metrics_version", "STRING", args.metrics_version),
+            bigquery.ScalarQueryParameter(
+                "metrics_version", "STRING", args.metrics_version
+            ),
         ]
     )
 

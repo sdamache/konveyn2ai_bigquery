@@ -12,7 +12,7 @@ from google.api_core import exceptions as gcloud_exceptions
 from google.cloud import bigquery
 
 DEFAULT_PROJECT = "konveyn2ai"
-DEFAULT_DATASET = "documentation_ops"
+DEFAULT_DATASET = "semantic_gap_detector"
 DEFAULT_TABLE = "documentation_progress_snapshots"
 
 
@@ -82,7 +82,9 @@ def load_progress_timeseries(
             bigquery.ScalarQueryParameter("end_date", "DATE", end_date.isoformat()),
         ]
     )
-    df = client.query(query, job_config=job_config).to_dataframe(create_bqstorage_client=False)
+    df = client.query(query, job_config=job_config).to_dataframe(
+        create_bqstorage_client=False
+    )
     if df.empty:
         return df
     df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
@@ -126,7 +128,9 @@ def load_severity_heatmap(
             bigquery.ScalarQueryParameter("end_date", "DATE", end_date.isoformat()),
         ]
     )
-    df = client.query(query, job_config=job_config).to_dataframe(create_bqstorage_client=False)
+    df = client.query(query, job_config=job_config).to_dataframe(
+        create_bqstorage_client=False
+    )
     if df.empty:
         return df
     df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
@@ -190,7 +194,9 @@ def severity_heatmap(df: pd.DataFrame) -> alt.Chart:
         .encode(
             x=alt.X("snapshot_date:T", title="Snapshot Date"),
             y=alt.Y("severity:N", title="Severity"),
-            color=alt.Color("gaps_open:Q", title="Open Gaps", scale=alt.Scale(scheme="reds")),
+            color=alt.Color(
+                "gaps_open:Q", title="Open Gaps", scale=alt.Scale(scheme="reds")
+            ),
             tooltip=[
                 alt.Tooltip("snapshot_date:T", title="Date"),
                 alt.Tooltip("severity:N", title="Severity"),
@@ -227,15 +233,23 @@ def render_summary_metrics(df: pd.DataFrame) -> None:
         delta = current - prev
         return f"{delta:+.2f}"
 
-    coverage_delta = format_delta(latest["coverage_percentage"], previous["coverage_percentage"] if previous is not None else None)
+    coverage_delta = format_delta(
+        latest["coverage_percentage"],
+        previous["coverage_percentage"] if previous is not None else None,
+    )
     gaps_delta = format_delta(
-        latest["total_gaps_open"], previous["total_gaps_open"] if previous is not None else None
+        latest["total_gaps_open"],
+        previous["total_gaps_open"] if previous is not None else None,
     )
 
     cols = st.columns(3)
     cols[0].metric(
         label="Coverage (%)",
-        value=f"{latest['coverage_percentage']:.2f}" if pd.notna(latest["coverage_percentage"]) else "n/a",
+        value=(
+            f"{latest['coverage_percentage']:.2f}"
+            if pd.notna(latest["coverage_percentage"])
+            else "n/a"
+        ),
         delta=coverage_delta,
     )
     cols[1].metric(
@@ -245,7 +259,11 @@ def render_summary_metrics(df: pd.DataFrame) -> None:
     )
     cols[2].metric(
         label="Confidence",
-        value=f"{latest['mean_confidence_score']:.2f}" if pd.notna(latest["mean_confidence_score"]) else "n/a",
+        value=(
+            f"{latest['mean_confidence_score']:.2f}"
+            if pd.notna(latest["mean_confidence_score"])
+            else "n/a"
+        ),
     )
 
 
@@ -274,7 +292,9 @@ def main() -> None:
         load_rule_closures.clear()
 
     try:
-        progress_df = load_progress_timeseries(project_id, dataset, table, start_date, end_date)
+        progress_df = load_progress_timeseries(
+            project_id, dataset, table, start_date, end_date
+        )
     except gcloud_exceptions.GoogleAPIError as error:
         st.error(
             "Failed to load progress snapshots. Verify project credentials and dataset permissions."
@@ -316,7 +336,9 @@ def main() -> None:
             ).set_index("Metric")
         )
 
-    severity_df = load_severity_heatmap(project_id, dataset, table, start_date, end_date)
+    severity_df = load_severity_heatmap(
+        project_id, dataset, table, start_date, end_date
+    )
     st.subheader("Gap Severity Heat Map")
     if severity_df.empty:
         st.info("No severity distribution data available for the selected window.")
@@ -329,9 +351,7 @@ def main() -> None:
         st.info("No gap closure activity recorded in the latest snapshot.")
     else:
         st.altair_chart(rule_closure_bar(rule_df), use_container_width=True)
-        st.caption(
-            f"Latest snapshot: {rule_df['snapshot_date'].iloc[0].date()}"
-        )
+        st.caption(f"Latest snapshot: {rule_df['snapshot_date'].iloc[0].date()}")
 
 
 if __name__ == "__main__":

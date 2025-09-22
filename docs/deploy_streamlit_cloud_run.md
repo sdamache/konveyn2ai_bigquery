@@ -69,7 +69,7 @@ gcloud run deploy "$SERVICE" \
   --region "$REGION" \
   --image "$IMAGE" \
   --allow-unauthenticated \
-  --set-env-vars GOOGLE_CLOUD_PROJECT=konveyn2ai,DOCUMENTATION_DATASET=documentation_ops \
+  --set-env-vars GOOGLE_CLOUD_PROJECT=konveyn2ai,BIGQUERY_DATASET_ID=semantic_gap_detector \
   --service-account streamlit-dashboard@konveyn2ai.iam.gserviceaccount.com
 ```
 
@@ -82,7 +82,7 @@ Notes:
 - After deployment, gcloud prints the service URL. Open it in the browser.
 - Refresh the dashboard to ensure BigQuery calls succeed. You may want to run:
   ```bash
-  python scripts/compute_progress_snapshot.py --project-id konveyn2ai --dataset documentation_ops --snapshot-date $(date +%F)
+  python scripts/compute_progress_snapshot.py --project-id konveyn2ai --dataset semantic_gap_detector --snapshot-date $(date +%F)
   ```
   to ensure the table has fresh data.
 

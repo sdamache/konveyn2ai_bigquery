@@ -8,7 +8,7 @@ This guide explains how to create and maintain daily documentation coverage snap
 2. Apply the definition:
 
 ```bash
-env PROJECT_ID=konveyn2ai DATASET=documentation_ops \
+env PROJECT_ID=konveyn2ai DATASET=semantic_gap_detector \
   envsubst < analytics/sql/create_progress_snapshot_table.sql > /tmp/create_progress.sql
 
 bq query --project_id=konveyn2ai --nouse_legacy_sql < /tmp/create_progress.sql
@@ -30,7 +30,7 @@ The insert query template lives at `analytics/sql/insert_progress_snapshot.sql`.
 ```bash
 make progress-snapshot \
   PROJECT_ID=my-project \
-  DATASET=documentation_ops \
+  DATASET=semantic_gap_detector \
   SNAPSHOT_DATE=$(date +%F)
 ```
 
@@ -56,7 +56,7 @@ Run the Streamlit dashboard locally:
 streamlit run analytics/dashboard/coverage_dashboard.py \
   -- \
   --project-id my-project \
-  --dataset documentation_ops
+  --dataset semantic_gap_detector
 ```
 
 Dashboard sections:
@@ -74,7 +74,7 @@ Generate Markdown/CSV summaries for stakeholders:
 ```bash
 python scripts/export_progress_report.py \
   --project-id my-project \
-  --dataset documentation_ops \
+  --dataset semantic_gap_detector \
   --start-date 2025-01-01 \
   --end-date 2025-01-31 \
   --output-dir reports --formats md,csv --verbose
@@ -93,12 +93,3 @@ CSV exports mirror the raw progress table for easy import into spreadsheets.
 - After inserting a real snapshot, open the Streamlit dashboard and verify new points appear.
 - Use the report exporter to generate a Markdown report and review the highlights section for accuracy.
 
-### Support call insights
-
-To surface executive-ready support summaries, follow the companion guide in `docs/support_insight_dashboard.md` and execute:
-
-```bash
-make support-insights SUPPORT_SNAPSHOT_DATE=$(date +%F)
-```
-
-Then refresh the Streamlit dashboard and select the **Support Call Insights** tab.

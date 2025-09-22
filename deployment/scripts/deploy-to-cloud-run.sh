@@ -11,7 +11,7 @@ REGION=${GOOGLE_CLOUD_LOCATION:-"us-central1"}
 REPOSITORY_NAME="konveyn2ai-repo"
 SERVICE_ACCOUNT_EMAIL="konveyn2ai-service@${PROJECT_ID}.iam.gserviceaccount.com"
 DASHBOARD_SERVICE_NAME="coverage-dashboard"
-DASHBOARD_DATASET=${DOCUMENTATION_DATASET:-"documentation_ops"}
+DASHBOARD_DATASET=${BIGQUERY_DATASET_ID:-"semantic_gap_detector"}
 
 # Load environment variables from .env file if it exists
 if [ -f .env ]; then
@@ -330,7 +330,7 @@ gcloud run deploy ${DASHBOARD_SERVICE_NAME} \
     --min-instances=0 \
     --max-instances=10 \
     --port=8080 \
-    --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},DOCUMENTATION_DATASET=${DASHBOARD_DATASET}" \
+    --set-env-vars="GOOGLE_CLOUD_PROJECT=${PROJECT_ID},BIGQUERY_DATASET_ID=${DASHBOARD_DATASET}" \
     --service-account=${SERVICE_ACCOUNT_EMAIL} \
     --allow-unauthenticated \
     --project=${PROJECT_ID}
