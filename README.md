@@ -485,7 +485,7 @@ This project represents the culmination of extensive research into **computation
 
 ### 🎯 24-Hour Sprint Methodology
 
-Built for the **ODSC 2025 Agentic AI Hackathon**, KonveyN2AI demonstrates rapid prototyping of production-ready AI systems through research-driven architectural patterns and systematic implementation of proven organizational frameworks.
+Built for the **BigQuery AI Hackathon on Kaggle**, KonveyN2AI demonstrates rapid prototyping of production-ready AI systems through research-driven architectural patterns and systematic implementation of proven organizational frameworks.
 
 **Design Philosophy:**
 > *"Just as Chanakya's Saptanga model provided a framework for governing ancient kingdoms through specialized yet coordinated roles, KonveyN2AI applies this time-tested organizational wisdom to modern AI agent collaboration, ensuring each component excels in its domain while contributing to the greater intelligence of the whole system."*
