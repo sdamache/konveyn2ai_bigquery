@@ -26,7 +26,6 @@
 - **⚡ Real-Time Performance**: Sub-second response times with intelligent caching
 - **🛡️ Production Security**: Enterprise-grade authentication, logging, and monitoring
 - **🔄 Graceful Degradation**: Robust fallback mechanisms ensure continuous operation
-- **📞 Support Insights**: Executive dashboard transforms raw call logs into actionable recommendations (`docs/support_insight_dashboard.md`)
 - **📈 Coverage Reporting**: BigQuery snapshots, Streamlit dashboards, and exportable reports (see `docs/progress_reporting.md`)
 - **☁️ Cloud Ready Dashboard**: Deploy Streamlit insights to Cloud Run (`Dockerfile.streamlit`, `docs/deploy_streamlit_cloud_run.md`)
 
@@ -997,6 +996,6 @@ async def get_advice(role: str, code_snippets: list):
 
 ---
 
-**Built with ❤️ for the ODSC 2025 Agentic AI Hackathon**
+**Built with ❤️ for the BigQuery 2025 Kaggle Hackathon**
 
 *Demonstrating the future of intelligent multi-agent systems with Google Gemini API*
