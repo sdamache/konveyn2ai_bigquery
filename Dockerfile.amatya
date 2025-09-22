@@ -13,12 +13,8 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy requirements first for better caching
-COPY src/amatya-role-prompter/requirements.txt ./amatya-requirements.txt
-COPY src/common/requirements.txt ./common-requirements.txt
-
-# Create consolidated requirements file
-RUN cat amatya-requirements.txt common-requirements.txt > requirements.txt
+# Copy consolidated requirements file
+COPY requirements.txt ./requirements.txt
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --user -r requirements.txt
