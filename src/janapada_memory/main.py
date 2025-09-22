@@ -31,7 +31,6 @@ from guard_fort import GuardFort
 # Import service modules
 try:
     from .memory_service import JanapadaMemoryService
-    from .config.bigquery_config import BigQueryConfig
     from .connections.bigquery_connection import BigQueryConnectionManager
 except ImportError:
     # Fallback to absolute imports when run directly
@@ -39,7 +38,6 @@ except ImportError:
     import os
     sys.path.insert(0, os.path.dirname(__file__))
     from memory_service import JanapadaMemoryService
-    from config.bigquery_config import BigQueryConfig
     from connections.bigquery_connection import BigQueryConnectionManager
 
 # Configure logging
@@ -55,7 +53,7 @@ MAX_RESULTS_LIMIT = 100
 
 # Global variables for service components
 memory_service: JanapadaMemoryService = None
-config: BigQueryConfig = None
+config = None
 
 
 @asynccontextmanager
@@ -67,7 +65,8 @@ async def lifespan(app: FastAPI):
 
     try:
         # Initialize configuration
-        config = BigQueryConfig()
+        from config.bigquery_config import BigQueryConfigManager
+        config = BigQueryConfigManager.load_from_environment()
         logger.info("Configuration loaded successfully")
 
         # Initialize BigQuery connection
