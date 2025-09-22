@@ -13,14 +13,28 @@ from typing import Any, Dict, List, Optional
 from abc import ABC, abstractmethod
 from enum import Enum
 
-from .adapters.bigquery_adapter import BigQueryAdapter, BigQueryAdapterError
-from .connections.bigquery_connection import (
-    BigQueryConnectionManager,
-    BigQueryConnectionError,
-)
-from .fallback.local_vector_index import LocalVectorIndex, LocalVectorIndexError
-from .models.vector_search_config import VectorSearchConfig, VectorSearchConfigError
-from .models.vector_search_result import VectorSearchResult
+try:
+    from .adapters.bigquery_adapter import BigQueryAdapter, BigQueryAdapterError
+    from .connections.bigquery_connection import (
+        BigQueryConnectionManager,
+        BigQueryConnectionError,
+    )
+    from .fallback.local_vector_index import LocalVectorIndex, LocalVectorIndexError
+    from .models.vector_search_config import VectorSearchConfig, VectorSearchConfigError
+    from .models.vector_search_result import VectorSearchResult
+except ImportError:
+    # Fallback to absolute imports when run directly
+    import sys
+    import os
+    sys.path.insert(0, os.path.dirname(__file__))
+    from adapters.bigquery_adapter import BigQueryAdapter, BigQueryAdapterError
+    from connections.bigquery_connection import (
+        BigQueryConnectionManager,
+        BigQueryConnectionError,
+    )
+    from fallback.local_vector_index import LocalVectorIndex, LocalVectorIndexError
+    from models.vector_search_config import VectorSearchConfig, VectorSearchConfigError
+    from models.vector_search_result import VectorSearchResult
 
 logger = logging.getLogger(__name__)
 

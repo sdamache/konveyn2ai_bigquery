@@ -21,7 +21,9 @@ from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
 # Add path for common modules
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
+current_dir = os.path.dirname(__file__)
+src_dir = os.path.join(current_dir, "..")
+sys.path.insert(0, src_dir)
 
 from common.rpc_server import JsonRpcServer
 from guard_fort import GuardFort
@@ -32,6 +34,10 @@ try:
     from .config.bigquery_config import BigQueryConfig
     from .connections.bigquery_connection import BigQueryConnectionManager
 except ImportError:
+    # Fallback to absolute imports when run directly
+    import sys
+    import os
+    sys.path.insert(0, os.path.dirname(__file__))
     from memory_service import JanapadaMemoryService
     from config.bigquery_config import BigQueryConfig
     from connections.bigquery_connection import BigQueryConnectionManager

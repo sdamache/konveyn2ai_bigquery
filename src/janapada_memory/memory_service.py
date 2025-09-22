@@ -9,9 +9,18 @@ import logging
 import time
 from typing import Any, Dict, List, Optional
 
-from .bigquery_vector_index import BigQueryVectorIndex, SearchMode
-from .connections.bigquery_connection import BigQueryConnectionManager
-from .models.vector_search_config import VectorSearchConfig
+try:
+    from .bigquery_vector_index import BigQueryVectorIndex, SearchMode
+    from .connections.bigquery_connection import BigQueryConnectionManager
+    from .models.vector_search_config import VectorSearchConfig
+except ImportError:
+    # Fallback to absolute imports when run directly
+    import sys
+    import os
+    sys.path.insert(0, os.path.dirname(__file__))
+    from bigquery_vector_index import BigQueryVectorIndex, SearchMode
+    from connections.bigquery_connection import BigQueryConnectionManager
+    from models.vector_search_config import VectorSearchConfig
 
 logger = logging.getLogger(__name__)
 
