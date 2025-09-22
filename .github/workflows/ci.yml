@@ -87,6 +87,27 @@ jobs:
         echo ""
         echo "=== Version verification complete ==="
 
+        # Add to GitHub Actions Summary
+        {
+          echo "## 🔧 Tool Versions"
+          echo "| Tool | Expected | Installed |"
+          echo "|------|----------|-----------|"
+          while IFS= read -r line; do
+            tool=$(echo "$line" | sed 's/==.*//')
+            expected_version=$(echo "$line" | sed 's/.*==//')
+            case $tool in
+              black) installed_version=$(black --version | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+') ;;
+              ruff) installed_version=$(ruff --version | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+') ;;
+              mypy) installed_version=$(mypy --version | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+') ;;
+              bandit) installed_version=$(bandit --version | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+') ;;
+              pre-commit) installed_version=$(pre-commit --version | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+') ;;
+              *) installed_version="N/A" ;;
+            esac
+            echo "| $tool | $expected_version | $installed_version |"
+          done < <(grep -E "(black|ruff|mypy|bandit|pre-commit)==" requirements.txt)
+          echo ""
+        } >> $GITHUB_STEP_SUMMARY
+
     - name: Run code quality validation (CHECK-ONLY MODE)
       run: |
         # CI runs in validation-only mode - NO file modifications allowed
@@ -95,7 +116,32 @@ jobs:
         echo "❌ CI will FAIL if any issues are found - fix locally first!"
 
         # Use CI-specific pre-commit config with --check flags only
-        pre-commit run --config .pre-commit-config-ci.yaml --all-files
+        if pre-commit run --config .pre-commit-config-ci.yaml --all-files; then
+          echo "✅ All code quality checks passed"
+          QUALITY_STATUS="✅ PASSED"
+        else
+          echo "❌ Code quality issues found"
+          QUALITY_STATUS="❌ FAILED"
+        fi
+
+        # Add to GitHub Actions Summary
+        {
+          echo "## 🔍 Code Quality Results"
+          echo "| Check | Status |"
+          echo "|-------|--------|"
+          echo "| Pre-commit hooks | $QUALITY_STATUS |"
+          echo ""
+          if [ "$QUALITY_STATUS" = "❌ FAILED" ]; then
+            echo "### ⚠️ Issues Found"
+            echo "Code quality validation failed. Please run \`pre-commit run --all-files\` locally to fix issues."
+            echo ""
+          fi
+        } >> $GITHUB_STEP_SUMMARY
+
+        # Exit with proper code
+        if [ "$QUALITY_STATUS" = "❌ FAILED" ]; then
+          exit 1
+        fi
 
     - name: Ensure contract tests exist
       run: |
@@ -140,6 +186,45 @@ jobs:
 
             print(f'\n📊 Test Results: {passed}/{total} passed ({pass_rate:.1f}%) — phase: {phase.upper()}')
 
+            # Write test results to GitHub Actions Summary
+            with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+                f.write('## 🧪 Test Results\n\n')
+                f.write('| Metric | Value |\n')
+                f.write('|--------|-------|\n')
+                f.write(f'| **Tests Passed** | {passed} |\n')
+                f.write(f'| **Tests Failed** | {failed} |\n')
+                f.write(f'| **Total Tests** | {total} |\n')
+                f.write(f'| **Pass Rate** | {pass_rate:.1f}% |\n')
+                f.write(f'| **TDD Phase** | {phase.upper()} |\n')
+                f.write('\n')
+
+                if phase == 'red':
+                    if failed > 0:
+                        f.write('### ✅ TDD RED Phase\n')
+                        f.write('Failing tests detected as expected during RED phase (before implementation).\n\n')
+                    else:
+                        f.write('### ❌ TDD RED Phase Error\n')
+                        f.write('RED phase indicated but no failing tests found.\n\n')
+                else:
+                    if pass_rate >= 70:
+                        f.write('### ✅ TDD GREEN Phase\n')
+                        f.write(f'Pass rate ({pass_rate:.1f}%) meets the 70% threshold.\n\n')
+                    else:
+                        f.write('### ❌ TDD GREEN Phase Failed\n')
+                        f.write(f'Pass rate ({pass_rate:.1f}%) below 70% threshold.\n\n')
+
+                # Add test breakdown if there are failures
+                if failed > 0:
+                    f.write('### 📋 Test Details\n')
+                    f.write('```\n')
+                    # Extract failed test names from output
+                    failed_lines = [line for line in output.split('\n') if 'FAILED' in line]
+                    for line in failed_lines[:10]:  # Limit to first 10 failures
+                        f.write(line + '\n')
+                    if len(failed_lines) > 10:
+                        f.write(f'... and {len(failed_lines) - 10} more failures\n')
+                    f.write('```\n\n')
+
             if total == 0:
                 print('❌ No tests executed; CI cannot proceed.')
                 sys.exit(1)
@@ -160,9 +245,74 @@ jobs:
                     sys.exit(1)
         else:
             print('❌ Could not parse test results')
+            # Still write to summary even if parsing failed
+            with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+                f.write('## ❌ Test Results Parse Error\n\n')
+                f.write('Could not parse pytest output. Check logs for details.\n\n')
             sys.exit(1)
         "
 
     - name: Run project setup tests
       run: |
         PYTHONPATH=src python tests/test_project_setup.py
+
+    - name: Generate CI Summary
+      if: always()
+      run: |
+        # Generate overall CI summary
+        {
+          echo "## 📋 CI Pipeline Summary"
+          echo ""
+          echo "| Component | Status |"
+          echo "|-----------|--------|"
+
+          # Check if each step completed successfully
+          if [ -f "$GITHUB_STEP_SUMMARY" ] && grep -q "Tool Versions" "$GITHUB_STEP_SUMMARY"; then
+            echo "| 🔧 Tool Versions | ✅ Verified |"
+          else
+            echo "| 🔧 Tool Versions | ❌ Failed |"
+          fi
+
+          if [ -f "$GITHUB_STEP_SUMMARY" ] && grep -q "Code Quality Results" "$GITHUB_STEP_SUMMARY"; then
+            if grep -q "✅ PASSED" "$GITHUB_STEP_SUMMARY"; then
+              echo "| 🔍 Code Quality | ✅ Passed |"
+            else
+              echo "| 🔍 Code Quality | ❌ Failed |"
+            fi
+          else
+            echo "| 🔍 Code Quality | ❓ Unknown |"
+          fi
+
+          if [ -f "$GITHUB_STEP_SUMMARY" ] && grep -q "Test Results" "$GITHUB_STEP_SUMMARY"; then
+            if grep -q "TDD GREEN Phase" "$GITHUB_STEP_SUMMARY" && grep -q "✅" "$GITHUB_STEP_SUMMARY"; then
+              echo "| 🧪 Tests | ✅ Passed |"
+            elif grep -q "TDD RED Phase" "$GITHUB_STEP_SUMMARY" && grep -q "✅" "$GITHUB_STEP_SUMMARY"; then
+              echo "| 🧪 Tests | ✅ RED Phase |"
+            else
+              echo "| 🧪 Tests | ❌ Failed |"
+            fi
+          else
+            echo "| 🧪 Tests | ❓ Unknown |"
+          fi
+
+          echo ""
+          echo "### 📊 Quick Stats"
+          if [ -f "$GITHUB_STEP_SUMMARY" ]; then
+            if grep -q "Tests Passed" "$GITHUB_STEP_SUMMARY"; then
+              passed=$(grep "Tests Passed" "$GITHUB_STEP_SUMMARY" | sed 's/.*| \([0-9]*\) |.*/\1/')
+              total=$(grep "Total Tests" "$GITHUB_STEP_SUMMARY" | sed 's/.*| \([0-9]*\) |.*/\1/')
+              pass_rate=$(grep "Pass Rate" "$GITHUB_STEP_SUMMARY" | sed 's/.*| \([0-9.]*\)% |.*/\1/')
+              echo "- **Tests**: $passed/$total passed ($pass_rate%)"
+            fi
+
+            if grep -q "TDD Phase" "$GITHUB_STEP_SUMMARY"; then
+              phase=$(grep "TDD Phase" "$GITHUB_STEP_SUMMARY" | sed 's/.*| \([A-Z]*\) |.*/\1/')
+              echo "- **TDD Phase**: $phase"
+            fi
+          fi
+
+          echo ""
+          echo "---"
+          echo "*View detailed results in the sections above*"
+
+        } >> $GITHUB_STEP_SUMMARY
