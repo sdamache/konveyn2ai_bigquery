@@ -34,7 +34,6 @@ from vertexai.language_models import TextEmbeddingModel
 
 # Using Vertex AI for embeddings with service account auth
 
-from src.janapada_memory.config.bigquery_config import BigQueryConfig
 from src.janapada_memory.connections.bigquery_connection import (
     BigQueryConnectionManager,
 )
@@ -282,8 +281,9 @@ class EmbeddingPipeline:
         self.embedding_model = embedding_model
 
         # Initialize components
-        config = BigQueryConfig(project_id=project_id, dataset_id=dataset_id)
-        self.connection = BigQueryConnectionManager(config=config)
+        self.connection = BigQueryConnectionManager(
+            project_id=project_id, dataset_id=dataset_id
+        )
         self.schema_manager = SchemaManager(connection=self.connection)
         self.generator = EmbeddingGenerator(
             api_key=api_key,

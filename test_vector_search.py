@@ -15,7 +15,6 @@ from typing import Any, Dict, List, Optional
 
 from google.cloud import bigquery
 
-from src.janapada_memory.config.bigquery_config import BigQueryConfig
 from src.janapada_memory.connections.bigquery_connection import (
     BigQueryConnectionManager,
 )
@@ -37,9 +36,9 @@ class VectorSearchTester:
         """
         self.project_id = project_id
         self.dataset_id = dataset_id
-
-        config = BigQueryConfig(project_id=project_id, dataset_id=dataset_id)
-        self.connection = BigQueryConnectionManager(config=config)
+        self.connection = BigQueryConnectionManager(
+            project_id=project_id, dataset_id=dataset_id
+        )
 
         logger.info(f"Vector search tester initialized for {project_id}.{dataset_id}")
 
