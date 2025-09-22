@@ -650,7 +650,7 @@ KonveyN2AI implements a sophisticated microservices architecture with three spec
 - **Demo & Documentation (20%)**: Clear reproduction instructions and comprehensive guides
 
 ### 🎯 Judge Quick Access
-1. **Watch Demo**: [3-minute video](https://www.loom.com/share/819aaf1a42fd414da4f04f0fc54cb120) showcasing complete pipeline
+1. **Watch Demo**: [3-minute video](https://youtu.be/wJY4wYffFuc) showcasing complete pipeline
 2. **Review Submission**: [HACKATHON.md](./HACKATHON.md) for technical details and innovation
 3. **Try Interactive Demo**: Follow 5-minute setup instructions above
 4. **Explore Code**: Browse repository for architecture and implementation details
