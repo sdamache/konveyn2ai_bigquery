@@ -6,6 +6,7 @@ partitioning, clustering, and schema validation for the vector store.
 """
 
 import logging
+import os
 from datetime import datetime
 from typing import Any, Optional
 
@@ -38,7 +39,7 @@ class SchemaManager:
             bigquery.SchemaField("chunk_id", "STRING", mode="REQUIRED"),
             bigquery.SchemaField("model", "STRING", mode="REQUIRED"),
             bigquery.SchemaField("content_hash", "STRING", mode="REQUIRED"),
-            bigquery.SchemaField("embedding_vector", "FLOAT64", mode="REPEATED"),
+            bigquery.SchemaField("embedding", "FLOAT64", mode="REPEATED"),
             bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED"),
             bigquery.SchemaField("source_type", "STRING", mode="NULLABLE"),
             bigquery.SchemaField("artifact_id", "STRING", mode="NULLABLE"),
@@ -106,8 +107,11 @@ class SchemaManager:
             from .config import BigQueryConfig
 
             config = BigQueryConfig(
-                project_id=project_id or "konveyn2ai",
-                dataset_id=dataset_id or "semantic_gap_detector",
+                project_id=project_id or os.getenv("GOOGLE_CLOUD_PROJECT", "konveyn2ai"),
+                dataset_id=dataset_id or (
+                    os.getenv("BIGQUERY_EMBEDDINGS_DATASET_ID") or
+                    os.getenv("BIGQUERY_DATASET_ID", "semantic_gap_detector")  # Legacy fallback
+                ),
             )
             self.connection = BigQueryConnectionManager(config=config)
 
@@ -371,21 +375,33 @@ class SchemaManager:
             table_info = []
 
             for table in tables:
-                # Get full table metadata since TableListItem has limited info
-                full_table = self.connection.get_table(table.table_id)
-                table_data = {
-                    "name": table.table_id,
-                    "full_name": table.full_table_id,
-                    "table_type": table.table_type,
-                    "num_rows": full_table.num_rows,
-                    "num_bytes": full_table.num_bytes,
-                    "created": (
-                        full_table.created.isoformat() if full_table.created else None
-                    ),
-                    "modified": (
-                        full_table.modified.isoformat() if full_table.modified else None
-                    ),
-                }
+                # Handle both string table names and TableListItem objects
+                if isinstance(table, str):
+                    table_id = table
+                    full_table = self.connection.get_table(table_id)
+                    table_data = {
+                        "name": table_id,
+                        "full_name": f"{self.project_id}.{self.dataset_id}.{table_id}",
+                        "table_type": "TABLE",
+                    }
+                else:
+                    # Get full table metadata since TableListItem has limited info
+                    full_table = self.connection.get_table(table.table_id)
+                    table_data = {
+                        "name": table.table_id,
+                        "full_name": table.full_table_id,
+                        "table_type": table.table_type,
+                    }
+
+                # Add common fields
+                table_data["num_rows"] = full_table.num_rows
+                table_data["num_bytes"] = full_table.num_bytes
+                table_data["created"] = (
+                    full_table.created.isoformat() if full_table.created else None
+                )
+                table_data["modified"] = (
+                    full_table.modified.isoformat() if full_table.modified else None
+                )
 
                 if include_schema:
                     table_data["schema"] = [
@@ -774,7 +790,9 @@ class SchemaManager:
         try:
             tables = self.connection.list_tables()
             for table in tables:
-                self.delete_table(table.table_id, not_found_ok=True)
+                # Handle both string table names and TableListItem objects
+                table_id = table if isinstance(table, str) else table.table_id
+                self.delete_table(table_id, not_found_ok=True)
 
             logger.info(f"All tables deleted from dataset {self.dataset_id}")
         except Exception as e:

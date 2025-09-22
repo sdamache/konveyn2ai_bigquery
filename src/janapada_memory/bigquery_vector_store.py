@@ -100,8 +100,8 @@ class BigQueryVectorStore:
         now = datetime.now(timezone.utc)
         embedding_record = {
             "chunk_id": chunk_id,
-            "embedding_vector": processed_embedding,
-            "embedding_model": self.embedding_model,
+            "embedding": processed_embedding,
+            "model": self.embedding_model,
             "created_at": now.isoformat(),
             "partition_date": now.date().isoformat(),
         }
@@ -167,7 +167,7 @@ class BigQueryVectorStore:
                 m.metadata,
                 m.created_at as metadata_created_at,
                 e.embedding,
-                e.embedding_model,
+                e.model,
                 e.created_at as embedding_created_at
             FROM {self.metadata_table} m
             JOIN {self.embeddings_table} e ON m.chunk_id = e.chunk_id
@@ -198,7 +198,7 @@ class BigQueryVectorStore:
                 "record_name": row.record_name,
                 "metadata": json.loads(row.metadata) if row.metadata else {},
                 "embedding": row.embedding,
-                "embedding_model": row.embedding_model,
+                "model": row.model,
                 "metadata_created_at": row.metadata_created_at.isoformat(),
                 "embedding_created_at": row.embedding_created_at.isoformat(),
             }
@@ -268,7 +268,7 @@ class BigQueryVectorStore:
                 m.metadata,
                 m.created_at as metadata_created_at,
                 {embedding_field}
-                e.embedding_model,
+                e.model,
                 e.created_at as embedding_created_at
             FROM {self.metadata_table} m
             JOIN {self.embeddings_table} e ON m.chunk_id = e.chunk_id
@@ -301,7 +301,7 @@ class BigQueryVectorStore:
                     "api_path": row.api_path,
                     "record_name": row.record_name,
                     "metadata": json.loads(row.metadata) if row.metadata else {},
-                    "embedding_model": row.embedding_model,
+                    "model": row.model,
                     "metadata_created_at": row.metadata_created_at.isoformat(),
                     "embedding_created_at": row.embedding_created_at.isoformat(),
                 }
@@ -560,8 +560,8 @@ class BigQueryVectorStore:
                 embedding_record = {
                     "chunk_id": chunk_id,
                     "embedding": embedding,
-                    "embedding_model": data.get(
-                        "embedding_model", self.embedding_model
+                    "model": data.get(
+                        "model", self.embedding_model
                     ),
                     "created_at": now.isoformat(),
                     "partition_date": now.date().isoformat(),
@@ -643,7 +643,7 @@ class BigQueryVectorStore:
                 m.metadata,
                 m.created_at as metadata_created_at,
                 e.embedding,
-                e.embedding_model,
+                e.model,
                 e.created_at as embedding_created_at
             FROM {self.metadata_table} m
             JOIN {self.embeddings_table} e ON m.chunk_id = e.chunk_id
@@ -673,7 +673,7 @@ class BigQueryVectorStore:
                         "record_name": row.record_name,
                         "metadata": json.loads(row.metadata) if row.metadata else {},
                         "embedding": row.embedding,
-                        "embedding_model": row.embedding_model,
+                        "model": row.model,
                         "metadata_created_at": row.metadata_created_at.isoformat(),
                         "embedding_created_at": row.embedding_created_at.isoformat(),
                     }
@@ -751,7 +751,7 @@ class BigQueryVectorStore:
 
         try:
             # Check BigQuery connection
-            connection_health = self.connection.health_check()
+            connection_health = self.connection.check_health()
             health_status["bigquery_connection"] = connection_health[
                 "bigquery_connection"
             ]
