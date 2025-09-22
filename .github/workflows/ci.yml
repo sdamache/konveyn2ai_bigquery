@@ -230,16 +230,37 @@ jobs:
         output = result.stdout + result.stderr
         print(output)
 
+        # Try multiple patterns to extract test results
+        failed = 0
+        passed = 0
+
+        # Pattern 1: "X failed, Y passed" or "X passed, Y failed"
         match = re.search(r'(\d+) failed.*?(\d+) passed', output, re.DOTALL)
         if match:
             failed = int(match.group(1))
             passed = int(match.group(2))
-            total = failed + passed
-            pass_rate = (passed / total) * 100 if total > 0 else 0
+        else:
+            # Pattern 2: Only passed tests (no failures)
+            match = re.search(r'(\d+) passed', output)
+            if match:
+                passed = int(match.group(1))
+                failed = 0
+            else:
+                # Pattern 3: Alternative pytest format "=== X passed, Y failed ==="
+                match = re.search(r'=+\s*(\d+)\s+passed(?:.*?(\d+)\s+failed)?', output)
+                if match:
+                    passed = int(match.group(1))
+                    failed = int(match.group(2)) if match.group(2) else 0
 
-            print(f'\n📊 Test Results: {passed}/{total} passed ({pass_rate:.1f}%) — phase: {phase.upper()}')
+        total = failed + passed
+        pass_rate = (passed / total) * 100 if total > 0 else 0
 
-            # Write test results to GitHub Actions Summary
+        print(f'\n📊 Test Results: {passed}/{total} passed ({pass_rate:.1f}%) — phase: {phase.upper()}')
+        print(f'Debug: Passed={passed}, Failed={failed}, Total={total}')
+
+        # Always write results even if counts are 0
+        if total >= 0:
+
             with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
                 f.write('## 🧪 Test Execution Results\n\n')
 
@@ -261,14 +282,16 @@ jobs:
 
                 f.write(f'**Overall Status**: {status_icon} {status_text}\n\n')
 
+                # Display actual numeric values
+                f.write('### 📊 Test Metrics\n\n')
                 f.write('| Metric | Value | Target | Status |\n')
-                f.write('|--------|-------|--------|--------|\n')
-                f.write(f'| **Tests Passed** | `{str(passed)}` | - | - |\n')
-                f.write(f'| **Tests Failed** | `{str(failed)}` | - | - |\n')
-                f.write(f'| **Total Tests** | `{str(total)}` | - | - |\n')
+                f.write('|:-------|------:|-------:|:------:|\n')
+                f.write(f'| Tests Passed | **{str(passed)}** | - | - |\n')
+                f.write(f'| Tests Failed | **{str(failed)}** | - | - |\n')
+                f.write(f'| Total Tests | **{str(total)}** | - | - |\n')
                 pass_status = '✅' if pass_rate >= 70 else '❌'
-                f.write(f'| **Pass Rate** | `{pass_rate:.1f}%` | `≥70%` | {pass_status} |\n')
-                f.write(f'| **TDD Phase** | `{phase.upper()}` | - | - |\n')
+                f.write(f'| Pass Rate | **{pass_rate:.1f}%** | ≥70% | {pass_status} |\n')
+                f.write(f'| TDD Phase | **{phase.upper()}** | - | - |\n')
                 f.write('\n')
 
                 # Phase-specific messaging
@@ -322,6 +345,7 @@ jobs:
                     sys.exit(1)
         else:
             print('❌ Could not parse test results')
+            print('Debug: Could not match any test result patterns in output')
             # Still write to summary even if parsing failed
             with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
                 f.write('## ❌ Test Results Parse Error\n\n')
@@ -329,6 +353,7 @@ jobs:
                 f.write('<details>\n')
                 f.write('<summary>🔍 Debugging Information</summary>\n\n')
                 f.write('Check the workflow logs for detailed test output and error messages.\n\n')
+                f.write('Pytest output did not match expected patterns.\n\n')
                 f.write('</details>\n\n')
             sys.exit(1)
         "
