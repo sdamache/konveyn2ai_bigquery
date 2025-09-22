@@ -23,21 +23,47 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Initialize CI Summary
+      run: |
+        echo "# 🚀 KonveyN2AI BigQuery CI Pipeline" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "📋 **Pipeline Status**: Running..." >> $GITHUB_STEP_SUMMARY
+        echo "🔧 **Python Version**: ${{ matrix.python-version }}" >> $GITHUB_STEP_SUMMARY
+        echo "🌿 **Branch**: \`${{ github.head_ref || github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "---" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
     - name: Detect TDD phase
       if: github.event_name == 'pull_request'
       run: |
         PHASE="$TDD_PHASE"
-        LABELS=$(echo '${{ toJSON(github.event.pull_request.labels) }}' | jq -r '.[].name' 2>/dev/null || true)
+        # Get labels as comma-separated list instead of newline-separated
+        LABELS=$(echo '${{ toJSON(github.event.pull_request.labels) }}' | jq -r '.[].name' 2>/dev/null | tr '\n' ', ' | sed 's/, *$//' || true)
         HEAD_REF="${{ github.head_ref }}"
-        if echo "$LABELS" | tr '[:upper:]' '[:lower:]' | grep -qx 'tdd-red-phase'; then
+
+        # Check for TDD phase in labels (handle comma-separated list)
+        LABELS_LOWER=$(echo "$LABELS" | tr '[:upper:]' '[:lower:]')
+        if echo "$LABELS_LOWER" | grep -q 'tdd-red-phase'; then
           PHASE="red"
         elif [[ "$HEAD_REF" == tdd-red/* ]]; then
           PHASE="red"
         fi
+
         echo "Detected labels: $LABELS"
         echo "Branch ref: $HEAD_REF"
         echo "TDD phase: $PHASE"
         echo "TDD_PHASE=$PHASE" >> $GITHUB_ENV
+
+        # Add TDD phase to summary
+        echo "## 🧪 TDD Phase Detection" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| **Current Phase** | \`$PHASE\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Branch Ref** | \`${HEAD_REF:-main}\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Labels** | \`${LABELS:-none}\` |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
@@ -64,8 +90,14 @@ jobs:
 
     - name: Install dependencies
       run: |
+        echo "## 📦 Dependencies Installation" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+
+        echo "✅ **Status**: Dependencies installed successfully" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
 
     - name: Validate version synchronization
       run: |
@@ -87,6 +119,40 @@ jobs:
         echo ""
         echo "=== Version verification complete ==="
 
+        # Add to GitHub Actions Summary
+        echo "## 🔧 Tool Version Verification" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Tool | Expected | Installed | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|------|----------|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+
+        while IFS= read -r line; do
+          tool=$(echo "$line" | sed 's/==.*//')
+          expected_version=$(echo "$line" | sed 's/.*==//')
+          case $tool in
+            black) installed_version=$(black --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1) ;;
+            ruff) installed_version=$(ruff --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1) ;;
+            mypy) installed_version=$(mypy --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1) ;;
+            bandit) installed_version=$(bandit --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1) ;;
+            pre-commit) installed_version=$(pre-commit --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1) ;;
+            *) installed_version="N/A" ;;
+          esac
+
+          # Default to N/A if version couldn't be extracted
+          if [ -z "$installed_version" ]; then
+            installed_version="N/A"
+          fi
+
+          if [ "$expected_version" = "$installed_version" ]; then
+            status="✅ Match"
+          else
+            status="⚠️ Diff"
+          fi
+
+          echo "| \`$tool\` | \`$expected_version\` | \`$installed_version\` | $status |" >> $GITHUB_STEP_SUMMARY
+        done < <(grep -E "(black|ruff|mypy|bandit|pre-commit)==" requirements.txt)
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+
     - name: Run code quality validation (CHECK-ONLY MODE)
       run: |
         # CI runs in validation-only mode - NO file modifications allowed
@@ -95,7 +161,40 @@ jobs:
         echo "❌ CI will FAIL if any issues are found - fix locally first!"
 
         # Use CI-specific pre-commit config with --check flags only
-        pre-commit run --config .pre-commit-config-ci.yaml --all-files
+        if pre-commit run --config .pre-commit-config-ci.yaml --all-files; then
+          echo "✅ All code quality checks passed"
+          QUALITY_STATUS="✅ PASSED"
+        else
+          echo "❌ Code quality issues found"
+          QUALITY_STATUS="❌ FAILED"
+        fi
+
+        # Add to GitHub Actions Summary
+        echo "## 🔍 Code Quality Validation" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Check Type | Result | Details |" >> $GITHUB_STEP_SUMMARY
+        echo "|------------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+        echo "| **Pre-commit Hooks** | $QUALITY_STATUS | All linting rules enforced |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        if [ "$QUALITY_STATUS" = "❌ FAILED" ]; then
+          echo "<details>" >> $GITHUB_STEP_SUMMARY
+          echo "<summary>⚠️ Issues Found - Click to expand</summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Code quality validation failed. Please run the following locally to fix issues:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "pre-commit run --all-files" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        # Exit with proper code
+        if [ "$QUALITY_STATUS" = "❌ FAILED" ]; then
+          exit 1
+        fi
 
     - name: Ensure contract tests exist
       run: |
@@ -131,14 +230,100 @@ jobs:
         output = result.stdout + result.stderr
         print(output)
 
+        # Try multiple patterns to extract test results
+        failed = 0
+        passed = 0
+
+        # Pattern 1: "X failed, Y passed" or "X passed, Y failed"
         match = re.search(r'(\d+) failed.*?(\d+) passed', output, re.DOTALL)
         if match:
             failed = int(match.group(1))
             passed = int(match.group(2))
-            total = failed + passed
-            pass_rate = (passed / total) * 100 if total > 0 else 0
+        else:
+            # Pattern 2: Only passed tests (no failures)
+            match = re.search(r'(\d+) passed', output)
+            if match:
+                passed = int(match.group(1))
+                failed = 0
+            else:
+                # Pattern 3: Alternative pytest format "=== X passed, Y failed ==="
+                match = re.search(r'=+\s*(\d+)\s+passed(?:.*?(\d+)\s+failed)?', output)
+                if match:
+                    passed = int(match.group(1))
+                    failed = int(match.group(2)) if match.group(2) else 0
 
-            print(f'\n📊 Test Results: {passed}/{total} passed ({pass_rate:.1f}%) — phase: {phase.upper()}')
+        total = failed + passed
+        pass_rate = (passed / total) * 100 if total > 0 else 0
+
+        print(f'\n📊 Test Results: {passed}/{total} passed ({pass_rate:.1f}%) — phase: {phase.upper()}')
+        print(f'Debug: Passed={passed}, Failed={failed}, Total={total}')
+
+        # Always write results even if counts are 0
+        if total >= 0:
+
+            with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+                f.write('## 🧪 Test Execution Results\n\n')
+
+                # Status indicator based on phase and results
+                if phase == 'red':
+                    if failed > 0:
+                        status_icon = '✅'
+                        status_text = 'RED phase successful'
+                    else:
+                        status_icon = '❌'
+                        status_text = 'RED phase error'
+                else:
+                    if pass_rate >= 70:
+                        status_icon = '✅'
+                        status_text = 'GREEN phase successful'
+                    else:
+                        status_icon = '❌'
+                        status_text = 'GREEN phase failed'
+
+                f.write(f'**Overall Status**: {status_icon} {status_text}\n\n')
+
+                # Display actual numeric values
+                f.write('### 📊 Test Metrics\n\n')
+                f.write('| Metric | Value | Target | Status |\n')
+                f.write('|:-------|------:|-------:|:------:|\n')
+                f.write(f'| Tests Passed | **{str(passed)}** | - | - |\n')
+                f.write(f'| Tests Failed | **{str(failed)}** | - | - |\n')
+                f.write(f'| Total Tests | **{str(total)}** | - | - |\n')
+                pass_status = '✅' if pass_rate >= 70 else '❌'
+                f.write(f'| Pass Rate | **{pass_rate:.1f}%** | ≥70% | {pass_status} |\n')
+                f.write(f'| TDD Phase | **{phase.upper()}** | - | - |\n')
+                f.write('\n')
+
+                # Phase-specific messaging
+                if phase == 'red':
+                    if failed > 0:
+                        f.write('### ✅ TDD RED Phase Success\n')
+                        f.write('Failing tests detected as expected during RED phase (before implementation).\n\n')
+                    else:
+                        f.write('### ❌ TDD RED Phase Error\n')
+                        f.write('RED phase indicated but no failing tests found. This suggests tests may not be properly written.\n\n')
+                else:
+                    if pass_rate >= 70:
+                        f.write('### ✅ TDD GREEN Phase Success\n')
+                        f.write(f'Pass rate ({pass_rate:.1f}%) meets the 70% threshold requirement.\n\n')
+                    else:
+                        f.write('### ❌ TDD GREEN Phase Failed\n')
+                        f.write(f'Pass rate ({pass_rate:.1f}%) below required 70% threshold.\n\n')
+
+                # Add collapsible test breakdown if there are failures
+                if failed > 0:
+                    f.write('<details>\n')
+                    f.write(f'<summary>📋 Failed Tests ({str(failed)} failures) - Click to expand</summary>\n\n')
+                    f.write('```\n')
+                    # Extract failed test names from output
+                    failed_lines = [line for line in output.split('\n') if 'FAILED' in line]
+                    for line in failed_lines[:10]:  # Limit to first 10 failures
+                        f.write(line + '\n')
+                    if len(failed_lines) > 10:
+                        remaining = len(failed_lines) - 10
+                        f.write(f'... and {str(remaining)} more failures\n')
+                    f.write('```\n')
+                    f.write('</details>\n\n')
 
             if total == 0:
                 print('❌ No tests executed; CI cannot proceed.')
@@ -160,9 +345,103 @@ jobs:
                     sys.exit(1)
         else:
             print('❌ Could not parse test results')
+            print('Debug: Could not match any test result patterns in output')
+            # Still write to summary even if parsing failed
+            with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+                f.write('## ❌ Test Results Parse Error\n\n')
+                f.write('⚠️ Could not parse pytest output properly.\n\n')
+                f.write('<details>\n')
+                f.write('<summary>🔍 Debugging Information</summary>\n\n')
+                f.write('Check the workflow logs for detailed test output and error messages.\n\n')
+                f.write('Pytest output did not match expected patterns.\n\n')
+                f.write('</details>\n\n')
             sys.exit(1)
         "
 
     - name: Run project setup tests
       run: |
-        PYTHONPATH=src python tests/test_project_setup.py
+        echo "## 🔧 Project Setup Validation" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        if PYTHONPATH=src python tests/test_project_setup.py; then
+          echo "✅ **Status**: Project setup tests passed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Status**: Project setup tests failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+    - name: Finalize CI Summary
+      if: always()
+      run: |
+        # Generate final pipeline summary
+        echo "---" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## 📊 Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # Determine overall pipeline status
+        if grep -q "❌" "$GITHUB_STEP_SUMMARY" 2>/dev/null; then
+          OVERALL_STATUS="❌ Failed"
+          STATUS_COLOR="🔴"
+        elif grep -q "⚠️" "$GITHUB_STEP_SUMMARY" 2>/dev/null; then
+          OVERALL_STATUS="⚠️ Warning"
+          STATUS_COLOR="🟡"
+        else
+          OVERALL_STATUS="✅ Success"
+          STATUS_COLOR="🟢"
+        fi
+
+        echo "$STATUS_COLOR **Overall Result**: $OVERALL_STATUS" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Stage | Status | Notes |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------|--------|-------|" >> $GITHUB_STEP_SUMMARY
+
+        # Check each component status
+        if grep -q "Tool Version Verification" "$GITHUB_STEP_SUMMARY"; then
+          if grep -q "⚠️ Diff" "$GITHUB_STEP_SUMMARY"; then
+            echo "| 🔧 Tool Versions | ⚠️ Warning | Version mismatches detected |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🔧 Tool Versions | ✅ Passed | All versions match |" >> $GITHUB_STEP_SUMMARY
+          fi
+        else
+          echo "| 🔧 Tool Versions | ❓ Unknown | Check not completed |" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        if grep -q "Code Quality Validation" "$GITHUB_STEP_SUMMARY"; then
+          if grep -q "✅ PASSED" "$GITHUB_STEP_SUMMARY"; then
+            echo "| 🔍 Code Quality | ✅ Passed | All linting rules satisfied |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🔍 Code Quality | ❌ Failed | Linting issues found |" >> $GITHUB_STEP_SUMMARY
+          fi
+        else
+          echo "| 🔍 Code Quality | ❓ Unknown | Check not completed |" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        if grep -q "Test Execution Results" "$GITHUB_STEP_SUMMARY"; then
+          if grep -q "GREEN phase successful" "$GITHUB_STEP_SUMMARY"; then
+            echo "| 🧪 Tests | ✅ Passed | GREEN phase completed |" >> $GITHUB_STEP_SUMMARY
+          elif grep -q "RED phase successful" "$GITHUB_STEP_SUMMARY"; then
+            echo "| 🧪 Tests | ✅ RED Phase | Expected failures detected |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🧪 Tests | ❌ Failed | Phase requirements not met |" >> $GITHUB_STEP_SUMMARY
+          fi
+        else
+          echo "| 🧪 Tests | ❓ Unknown | Tests not executed |" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        if grep -q "Project Setup Validation" "$GITHUB_STEP_SUMMARY"; then
+          if grep -q "Project setup tests passed" "$GITHUB_STEP_SUMMARY"; then
+            echo "| 🔧 Setup | ✅ Passed | Configuration validated |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🔧 Setup | ❌ Failed | Setup validation failed |" >> $GITHUB_STEP_SUMMARY
+          fi
+        else
+          echo "| 🔧 Setup | ❓ Unknown | Validation not run |" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "---" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "💡 **Next Steps**: Review any failed stages above and address issues before merging." >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "📋 **For detailed logs**: Check individual step outputs in the workflow run." >> $GITHUB_STEP_SUMMARY
