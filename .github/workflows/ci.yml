@@ -38,13 +38,18 @@ jobs:
       if: github.event_name == 'pull_request'
       run: |
         PHASE="$TDD_PHASE"
-        LABELS=$(echo '${{ toJSON(github.event.pull_request.labels) }}' | jq -r '.[].name' 2>/dev/null || true)
+        # Get labels as comma-separated list instead of newline-separated
+        LABELS=$(echo '${{ toJSON(github.event.pull_request.labels) }}' | jq -r '.[].name' 2>/dev/null | tr '\n' ', ' | sed 's/, *$//' || true)
         HEAD_REF="${{ github.head_ref }}"
-        if echo "$LABELS" | tr '[:upper:]' '[:lower:]' | grep -qx 'tdd-red-phase'; then
+
+        # Check for TDD phase in labels (handle comma-separated list)
+        LABELS_LOWER=$(echo "$LABELS" | tr '[:upper:]' '[:lower:]')
+        if echo "$LABELS_LOWER" | grep -q 'tdd-red-phase'; then
           PHASE="red"
         elif [[ "$HEAD_REF" == tdd-red/* ]]; then
           PHASE="red"
         fi
+
         echo "Detected labels: $LABELS"
         echo "Branch ref: $HEAD_REF"
         echo "TDD phase: $PHASE"
@@ -56,8 +61,8 @@ jobs:
         echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
         echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
         echo "| **Current Phase** | \`$PHASE\` |" >> $GITHUB_STEP_SUMMARY
-        echo "| **Branch Ref** | \`$HEAD_REF\` |" >> $GITHUB_STEP_SUMMARY
-        echo "| **Labels** | \`$LABELS\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Branch Ref** | \`${HEAD_REF:-main}\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| **Labels** | \`${LABELS:-none}\` |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
 
     - name: Set up Python ${{ matrix.python-version }}
@@ -124,13 +129,18 @@ jobs:
           tool=$(echo "$line" | sed 's/==.*//')
           expected_version=$(echo "$line" | sed 's/.*==//')
           case $tool in
-            black) installed_version=$(black --version | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+') ;;
-            ruff) installed_version=$(ruff --version | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+') ;;
-            mypy) installed_version=$(mypy --version | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+') ;;
-            bandit) installed_version=$(bandit --version | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+') ;;
-            pre-commit) installed_version=$(pre-commit --version | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+') ;;
+            black) installed_version=$(black --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1) ;;
+            ruff) installed_version=$(ruff --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1) ;;
+            mypy) installed_version=$(mypy --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1) ;;
+            bandit) installed_version=$(bandit --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1) ;;
+            pre-commit) installed_version=$(pre-commit --version 2>/dev/null | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1) ;;
             *) installed_version="N/A" ;;
           esac
+
+          # Default to N/A if version couldn't be extracted
+          if [ -z "$installed_version" ]; then
+            installed_version="N/A"
+          fi
 
           if [ "$expected_version" = "$installed_version" ]; then
             status="✅ Match"
@@ -256,7 +266,8 @@ jobs:
                 f.write(f'| **Tests Passed** | `{str(passed)}` | - | - |\n')
                 f.write(f'| **Tests Failed** | `{str(failed)}` | - | - |\n')
                 f.write(f'| **Total Tests** | `{str(total)}` | - | - |\n')
-                f.write(f'| **Pass Rate** | `{pass_rate:.1f}%` | `≥70%` | {"✅" if pass_rate >= 70 else "❌"} |\n')
+                pass_status = '✅' if pass_rate >= 70 else '❌'
+                f.write(f'| **Pass Rate** | `{pass_rate:.1f}%` | `≥70%` | {pass_status} |\n')
                 f.write(f'| **TDD Phase** | `{phase.upper()}` | - | - |\n')
                 f.write('\n')
 
@@ -286,7 +297,8 @@ jobs:
                     for line in failed_lines[:10]:  # Limit to first 10 failures
                         f.write(line + '\n')
                     if len(failed_lines) > 10:
-                        f.write(f'... and {str(len(failed_lines) - 10)} more failures\n')
+                        remaining = len(failed_lines) - 10
+                        f.write(f'... and {str(remaining)} more failures\n')
                     f.write('```\n')
                     f.write('</details>\n\n')
 
@@ -343,10 +355,10 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
 
         # Determine overall pipeline status
-        if grep -q "❌" "$GITHUB_STEP_SUMMARY"; then
+        if grep -q "❌" "$GITHUB_STEP_SUMMARY" 2>/dev/null; then
           OVERALL_STATUS="❌ Failed"
           STATUS_COLOR="🔴"
-        elif grep -q "⚠️" "$GITHUB_STEP_SUMMARY"; then
+        elif grep -q "⚠️" "$GITHUB_STEP_SUMMARY" 2>/dev/null; then
           OVERALL_STATUS="⚠️ Warning"
           STATUS_COLOR="🟡"
         else
