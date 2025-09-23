@@ -13,7 +13,7 @@
 ## 🚀 Quick Start for Kaggle Judges
 
 ### 📺 Demo Materials
-- **🎬 3-Minute Demo Video**: [Watch Live Demo](https://www.loom.com/share/819aaf1a42fd414da4f04f0fc54cb120)
+- **🎬 3-Minute Demo Video**: [Watch Live Demo](https://youtu.be/wJY4wYffFuc)
 - **📋 Hackathon Submission**: [HACKATHON.md](./HACKATHON.md) - Complete submission details
 - **📊 Interactive Dashboard**: `issue6_visualization_notebook.ipynb` - Live BigQuery AI visualizations
 
@@ -639,7 +639,7 @@ KonveyN2AI implements a sophisticated microservices architecture with three spec
 - **[HACKATHON.md](./HACKATHON.md)**: Complete submission with problem statement and innovation details
 - **[issue6_visualization_notebook.ipynb](./issue6_visualization_notebook.ipynb)**: Interactive BigQuery AI dashboard
 - **[requirements.txt](./requirements.txt)**: Streamlined dependencies for Kaggle environment
-- **Demo Video**: [3-minute walkthrough](https://www.loom.com/share/819aaf1a42fd414da4f04f0fc54cb120)
+- **Demo Video**: [3-minute walkthrough](https://youtu.be/wJY4wYffFuc)
 - **Verification Scripts**: `verify_kaggle_submission.py` and `quick_setup_test.py`
 - **Public Repository**: Full source code with comprehensive documentation
 
@@ -648,12 +648,6 @@ KonveyN2AI implements a sophisticated microservices architecture with three spec
 - **Innovation & Impact (25%)**: Novel multi-source gap detection with measurable business value
 - **BigQuery AI Usage (20%)**: Native vector operations central to core functionality
 - **Demo & Documentation (20%)**: Clear reproduction instructions and comprehensive guides
-
-### 🎯 Judge Quick Access
-1. **Watch Demo**: [3-minute video](https://youtu.be/wJY4wYffFuc) showcasing complete pipeline
-2. **Review Submission**: [HACKATHON.md](./HACKATHON.md) for technical details and innovation
-3. **Try Interactive Demo**: Follow 5-minute setup instructions above
-4. **Explore Code**: Browse repository for architecture and implementation details
 
 ---
 
