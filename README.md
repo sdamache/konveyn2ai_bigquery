@@ -526,7 +526,7 @@ KonveyN2AI implements a sophisticated microservices architecture with three spec
 
 > Run `make setup` whenever the dataset needs to be created or refreshed; the target is idempotent and provisions the embeddings table required by the adapter.
 
-   ```
+
 
 #### Fallback behaviour
 - BigQuery execution is attempted first for every `similarity_search` call. Connection errors, missing tables, authentication failures, or query timeouts trigger the local vector index.
